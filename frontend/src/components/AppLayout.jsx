@@ -27,22 +27,12 @@ const hostNav = [
 
 const adminNav = [{ to: "/admin", label: "Control interno", icon: ShieldCheck, end: true }];
 
-export default function AppLayout() {
-  const { user, logout, isAdmin } = useSession();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const nav = isAdmin ? adminNav : hostNav;
-
-  const doLogout = () => {
-    logout();
-    navigate("/auth/login", { replace: true });
-  };
-
-  const NavItems = ({ onNavigate }) => (
+// Estos dos componentes viven FUERA de AppLayout a propósito: si se declaran
+// dentro, React los remonta en cada render (pierden el foco y se reconstruyen).
+function NavItems({ items, onNavigate }) {
+  return (
     <nav className="grid gap-1">
-      {nav.map(({ to, label, icon: Icon, end }) => (
+      {items.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}
           to={to}
@@ -63,8 +53,10 @@ export default function AppLayout() {
       ))}
     </nav>
   );
+}
 
-  const UserCard = () => (
+function UserCard({ user, isAdmin, onLogout }) {
+  return (
     <div className="mt-auto rounded-2xl border border-line bg-cloud p-3">
       <div className="flex items-center gap-3">
         <Avatar name={user?.name} size="size-10" />
@@ -74,21 +66,35 @@ export default function AppLayout() {
         </div>
       </div>
       <button
-        onClick={doLogout}
+        onClick={onLogout}
         className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line-strong bg-paper px-3 py-2.5 text-sm font-bold text-ink transition-all hover:-translate-y-px hover:border-danger hover:text-danger"
       >
         <LogOut size={16} /> Cerrar sesión
       </button>
     </div>
   );
+}
+
+export default function AppLayout() {
+  const { user, logout, isAdmin } = useSession();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const nav = isAdmin ? adminNav : hostNav;
+
+  const doLogout = () => {
+    logout();
+    navigate("/auth/login", { replace: true });
+  };
 
   return (
     <div className="min-h-dvh bg-cloud text-ink">
       {/* Sidebar escritorio */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] flex-col gap-6 border-r border-line bg-paper p-5 lg:flex">
         <Brand />
-        <NavItems />
-        <UserCard />
+        <NavItems items={nav} />
+        <UserCard user={user} isAdmin={isAdmin} onLogout={doLogout} />
       </aside>
 
       {/* Barra superior */}
@@ -128,8 +134,8 @@ export default function AppLayout() {
                 <X size={20} />
               </button>
             </div>
-            <NavItems onNavigate={() => setMobileOpen(false)} />
-            <UserCard />
+            <NavItems items={nav} onNavigate={() => setMobileOpen(false)} />
+            <UserCard user={user} isAdmin={isAdmin} onLogout={doLogout} />
           </div>
         </div>
       )}

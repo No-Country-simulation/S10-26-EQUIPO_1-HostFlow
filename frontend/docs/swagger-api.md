@@ -129,8 +129,11 @@ pero conserva los datos.
 
 ## Pendiente de definir en el backend
 
-Estos módulos todavía **no existen** en `backend/`; el frontend los resuelve con el store
-local de demostración (`src/data/store.js`) y ya tienen las rutas reservadas:
+Estos módulos todavía **no existen** en `backend/`. Mientras tanto la capa de servicios
+(`src/services/index.js`) cae al **store local** (`src/data/store.js`), de modo que las
+pantallas siguen siendo usables; cuando el backend los implemente, alcanza con agregar las
+rutas en `src/services/endpoints.js` y los métodos en `src/services/httpApi.js`: las
+pantallas ya consumen la capa de servicios y no cambian.
 
 | Módulo | Rutas reservadas en `endpoints.js` |
 |---|---|
@@ -139,6 +142,3 @@ local de demostración (`src/data/store.js`) y ya tienen las rutas reservadas:
 | Reservas | `/lodgings/mine/bookings`, `/bookings/{id}` |
 | Métodos de pago | `/lodgings/mine/payment-methods` |
 | Estadísticas de administración | `/admin/stats` |
-
-Cuando el backend los implemente, alcanza con actualizar `src/services/endpoints.js` y
-`src/services/httpApi.js`: las pantallas ya consumen la capa de servicios y no cambian.

@@ -3,7 +3,6 @@ import { Building2, CalendarDays, CheckCircle2, Search, ShieldCheck, Users } fro
 import { Badge, Card, EmptyState, Stat } from "../../components/ui";
 import { useStore } from "../../data/useStore";
 import { useSession } from "../../context/SessionContext";
-import { cn } from "../../lib/format";
 
 export default function AdminDashboard() {
   const { actions } = useSession();

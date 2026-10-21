@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle2, Mail, RotateCcw, ShieldCheck } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import {
@@ -84,7 +84,15 @@ export default function Recover() {
       await actions.resetPassword({ email, code: otp, password });
       setStep("done");
     } catch (err) {
-      setError(err?.message || "El código es inválido o expiró.");
+      // El backend valida el código al restablecer la clave: si es inválido
+      // se vuelve al paso del OTP para que el usuario lo reingrese.
+      if (err?.status === 400) {
+        setOtp("");
+        setStep("otp");
+        setError(err?.message || "El código es inválido o expiró.");
+        return;
+      }
+      setError(err?.message || "No pudimos actualizar la contraseña.");
     } finally {
       setLoading(false);
     }

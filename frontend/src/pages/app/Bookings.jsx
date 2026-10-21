@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, Search } from "lucide-react";
-import { Badge, Card, EmptyState } from "../../components/ui";
+import { Badge, EmptyState } from "../../components/ui";
 import { BookingCard } from "../../components/BookingCard";
 import { useStore } from "../../data/useStore";
 import { useSession } from "../../context/SessionContext";

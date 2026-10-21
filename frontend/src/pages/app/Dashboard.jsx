@@ -9,7 +9,7 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import { Badge, Button, Card, Stat } from "../../components/ui";
+import { Badge, Card, Stat } from "../../components/ui";
 import { BookingCard } from "../../components/BookingCard";
 import { useStore } from "../../data/useStore";
 import { useSession } from "../../context/SessionContext";
@@ -28,7 +28,12 @@ export default function Dashboard() {
 
   const next30 = addDays(today, 30);
   const next = upcoming.find((b) => b.checkIn <= next30);
-  const revenue = upcoming.filter((b) => b.checkIn <= next30).reduce((sum, b) => sum + b.total, 0);
+  // Los ingresos se suman solo en la moneda principal del alojamiento:
+  // mezclar ARS con USD/EUR daría un total sin sentido.
+  const inWindow = upcoming.filter((b) => b.checkIn <= next30);
+  const localBookings = inWindow.filter((b) => b.currency === lodging.currency);
+  const foreignBookings = inWindow.filter((b) => b.currency !== lodging.currency);
+  const revenue = localBookings.reduce((sum, b) => sum + b.total, 0);
   const pendingCount = upcoming.filter((b) => b.status === "PENDING").length;
 
   const quick = [
@@ -62,7 +67,7 @@ export default function Dashboard() {
           </div>
           <Link
             to="/panel/reservas"
-            className="inline-flex items-center gap-2 rounded-xl bg-white/95 px-4 py-2.5 text-sm font-bold text-ink transition hover:-translate-y-0.5 hover:bg-white"
+            className="inline-flex items-center gap-2 rounded-xl bg-white/95 px-4 py-2.5 text-sm font-bold text-[#111] transition hover:-translate-y-0.5 hover:bg-white"
           >
             Gestionar reservas <ArrowRight size={16} />
           </Link>
@@ -89,7 +94,17 @@ export default function Dashboard() {
       {/* Métricas */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Próximas reservas" value={upcoming.length} hint={pendingCount ? `${pendingCount} pendiente${pendingCount === 1 ? "" : "s"}` : "Todo al día"} tone="lime" icon={CalendarDays} />
-        <Stat label="Ingresos próximos 30 días" value={formatMoney(revenue, lodging.currency)} tone="teal" icon={Wallet} />
+        <Stat
+          label="Ingresos próximos 30 días"
+          value={formatMoney(revenue, lodging.currency)}
+          hint={
+            foreignBookings.length
+              ? `+ ${foreignBookings.length} reserva${foreignBookings.length === 1 ? "" : "s"} en otra moneda`
+              : undefined
+          }
+          tone="teal"
+          icon={Wallet}
+        />
         <Stat label="Habitaciones" value={lodging.rooms} hint={`${lodging.bathrooms} baños`} tone="pink" icon={BedDouble} />
         <Stat label="Días bloqueados" value={blockedDays.length} tone="lime" icon={CalendarX} />
       </section>

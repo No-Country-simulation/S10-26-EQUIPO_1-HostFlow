@@ -68,7 +68,7 @@ const seedBookings = [
     checkIn: addDays(today, 5),
     checkOut: addDays(today, 9),
     guests: 2,
-    total: 340000,
+    total: 340,
     currency: "USD",
     status: "PENDING",
     additional: "Lancha 09:30hs",
@@ -207,6 +207,13 @@ const delay = (ms = 320) => new Promise((resolve) => setTimeout(resolve, ms));
 const publicUser = ({ password, ...user }) => user;
 
 export const actions = {
+  // Setea (o limpia) el usuario de la sesión.
+  // Con el backend real es el login quien lo informa: el token viaja en los headers
+  // pero el store necesita la identidad para proteger las rutas de la interfaz.
+  setUser(user) {
+    setState((s) => ({ ...s, user: user ? { ...user } : null }))
+  },
+
   async login({ email, password }) {
     await delay();
     const user = state.users.find((u) => u.email.toLowerCase() === String(email).toLowerCase());

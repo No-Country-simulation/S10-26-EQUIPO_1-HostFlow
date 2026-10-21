@@ -11,6 +11,7 @@ import {
 } from "../../components/ui";
 import { isEmail } from "../../lib/format";
 import { useSession } from "../../context/SessionContext";
+import { DEMO_MODE } from "../../config/env";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -103,22 +104,24 @@ export default function Login() {
         Crear cuenta de alojamiento
       </Link>
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => quickLogin("anfitrion@hostflow.app")}
-          className="inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-cloud px-3 text-xs font-bold text-ink-soft transition-all hover:-translate-y-px hover:border-teal hover:text-teal-strong"
-        >
-          <UserRound size={15} /> Demo anfitrión
-        </button>
-        <button
-          type="button"
-          onClick={() => quickLogin("admin@hostflow.app")}
-          className="inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-cloud px-3 text-xs font-bold text-ink-soft transition-all hover:-translate-y-px hover:border-teal hover:text-teal-strong"
-        >
-          <ShieldCheck size={15} /> Demo admin
-        </button>
-      </div>
+      {DEMO_MODE && (
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => quickLogin("anfitrion@hostflow.app")}
+            className="inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-cloud px-3 text-xs font-bold text-ink-soft transition-all hover:-translate-y-px hover:border-teal hover:text-teal-strong"
+          >
+            <UserRound size={15} /> Demo anfitrión
+          </button>
+          <button
+            type="button"
+            onClick={() => quickLogin("admin@hostflow.app")}
+            className="inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-cloud px-3 text-xs font-bold text-ink-soft transition-all hover:-translate-y-px hover:border-teal hover:text-teal-strong"
+          >
+            <ShieldCheck size={15} /> Demo admin
+          </button>
+        </div>
+      )}
 
       <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-muted">
         <LogIn size={13} /> Protegido con OTP y sesión segura

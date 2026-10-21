@@ -33,48 +33,60 @@ export const currencySymbol = (currency = "ARS") => CURRENCIES[currency]?.symbol
 
 const LOCALE = "es-AR";
 
+// Interpreta "YYYY-MM-DD" como fecha LOCAL y no como UTC.
+// `new Date("2026-10-24")` se parsea como medianoche UTC, que en Argentina
+// (UTC-3) es el 23 a las 21:00 y desplaza todas las fechas un día hacia atrás.
+export function parseISODate(iso) {
+  if (!iso) return null
+  const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
+}
+
 export function formatDate(iso) {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short", year: "numeric" }).format(date);
+  const date = parseISODate(iso)
+  if (!date) return "—"
+  return new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short", year: "numeric" }).format(date)
 }
 
 export function formatDateShort(iso) {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat(LOCALE, { day: "2-digit", month: "short" }).format(date);
+  const date = parseISODate(iso)
+  if (!date) return "—"
+  return new Intl.DateTimeFormat(LOCALE, { day: "2-digit", month: "short" }).format(date)
 }
 
 export function toISODate(date = new Date()) {
-  const d = new Date(date);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const d = new Date(date)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
 }
 
 export function addDays(iso, days) {
-  const date = new Date(iso);
-  date.setDate(date.getDate() + days);
-  return toISODate(date);
+  const date = parseISODate(iso)
+  if (!date) return iso
+  date.setDate(date.getDate() + days)
+  return toISODate(date)
 }
 
 export function daysBetween(fromISO, toISO) {
-  const from = new Date(fromISO);
-  const to = new Date(toISO);
-  return Math.max(1, Math.round((to - from) / 86_400_000));
+  const from = parseISODate(fromISO)
+  const to = parseISODate(toISO)
+  if (!from || !to) return 1
+  return Math.max(1, Math.round((to - from) / 86_400_000))
 }
 
 export function weekdayShort(iso) {
-  const date = new Date(iso);
-  return new Intl.DateTimeFormat(LOCALE, { weekday: "short" }).format(date);
+  const date = parseISODate(iso)
+  if (!date) return "—"
+  return new Intl.DateTimeFormat(LOCALE, { weekday: "short" }).format(date)
 }
 
 export function isPast(iso) {
-  if (!iso) return false;
-  return new Date(iso) < new Date(toISODate());
+  const date = parseISODate(iso)
+  if (!date) return false
+  return date < parseISODate(toISODate())
 }
 
 // ── Texto ─────────────────────────────────────────────────────────────────
