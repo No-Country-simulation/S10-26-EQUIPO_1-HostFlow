@@ -53,11 +53,14 @@ después de cambiar una clave).
 ## Integración con el backend (Swagger)
 
 - Contrato de API: **[docs/swagger-api.md](docs/swagger-api.md)** (rutas, cuerpos, respuestas y errores).
-- `src/services/endpoints.js` mapea cada operación a su ruta (`GET /v3/api-docs` del backend).
+- `src/services/endpoints.js` mapea cada operación a su ruta (contrato real del backend, ver
+  `backend/src/main/java/com/hostflow/controller/`).
 - `src/services/httpApi.js` implementa las llamadas reales; `src/services/demoApi.js` implementa el
   **mismo contrato** con datos en memoria.
 - `src/services/index.js` elige el adaptador según `VITE_API_URL`. Las pantallas nunca llaman a `fetch`.
-- Documentación interactiva del backend: `GET /swagger-ui/index.html`.
+- El backend expone el context-path `/api/v1`, así que `VITE_API_URL` debe incluirlo:
+  `VITE_API_URL=http://localhost:8080/api/v1`.
+- Documentación interactiva del backend: `GET /api/v1/swagger-ui.html` (OpenAPI en `/api/v1/api-docs`).
 
 ## Estructura
 
