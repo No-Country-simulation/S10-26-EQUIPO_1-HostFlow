@@ -87,6 +87,14 @@ public class Owner {
     private Boolean enabled = true;
 
     /**
+     * Fecha y hora hasta cuando está bloqueada la cuenta.
+     * {@code null} si la cuenta no está bloqueada.
+     * Se establece automáticamente tras 5 intentos fallidos de login.
+     */
+    @Column(name = "blocked_until")
+    private LocalDateTime blockedUntil;
+
+    /**
      * Roles asignados al dueño. Por defecto, todo dueño
      * registrado recibe el rol {@code ROLE_OWNER}.
      */

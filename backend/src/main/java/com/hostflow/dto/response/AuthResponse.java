@@ -47,4 +47,10 @@ public class AuthResponse {
      * Lista de roles asignados al usuario.
      */
     private List<String> roles;
+
+    /**
+     * NUEVOS CAMPOS para el control de inactividad
+     */
+    private Long inactivityTimeoutMs;      // Tiempo total de inactividad permitido
+    private Long warningBeforeMs;          // Tiempo antes del cierre para avisar
 }
