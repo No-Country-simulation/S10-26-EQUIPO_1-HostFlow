@@ -1,7 +1,9 @@
-# HostFlow · Frontend — módulo de autenticación
+# HostFlow · Frontend
 
-Versión reducida del MVP con **solo** Login, Registro y Recuperación de contraseña.
-React 19 · Vite · Tailwind CSS 4 · React Router.
+MVP del frontend de **HostFlow** con el Home rediseñado, el módulo de autenticación completo
+(Login · Registro · Restauración de clave con OTP) y el panel de gestión de alojamientos.
+
+React 19 · Vite 8 · Tailwind CSS 4 · React Router 7 · Lucide.
 
 ## Cómo correrlo
 
@@ -11,38 +13,75 @@ pnpm dev            # http://localhost:5173
 pnpm build          # genera dist/
 ```
 
-Sin `VITE_API_URL` (ver `.env.example`) la app corre en **modo demo**: no valida credenciales,
-no guarda nada y muestra un aviso visible. Cualquier correo/contraseña válidos permiten ingresar.
+Sin `VITE_API_URL` (ver `.env.example`) la app corre en **modo demo**: los datos viven en
+memoria + `sessionStorage`, no se valida nada contra un servidor y se muestra un aviso visible.
+
+### Credenciales de demostración
+
+| Rol | Correo | Contraseña |
+|---|---|---|
+| Anfitrión | `anfitrion@hostflow.app` | `demo1234` |
+| Administrador | `admin@hostflow.app` | `admin1234` |
+
+En la pantalla de ingreso hay botones **“Demo anfitrión”** y **“Demo admin”** que entran
+directamente (el acceso rápido ignora la contraseña para que la presentación nunca se bloquee
+después de cambiar una clave).
 
 ## Rutas
 
-| Ruta | Pantalla |
-|---|---|
-| `/` | Home de presentación de HostFlow (enlaces a ingresar y crear cuenta) |
-| `/auth/login` | Ingreso |
-| `/auth/registro` | Crear cuenta |
-| `/auth/recuperar` | Recuperar contraseña (solo solicitud del correo) |
-| `/panel` | **Pantalla temporal** posterior al ingreso (protegida, con "Cerrar sesión"). Reemplazarla por el panel real. |
+| Ruta | Pantalla | Acceso |
+|---|---|---|
+| `/` | Home de presentación (minimalista moderno) | público |
+| `/auth/login` | Ingreso | público |
+| `/auth/registro` | Crear cuenta | público |
+| `/auth/recuperar` | Recuperar clave: correo → **OTP 6 dígitos** → nueva clave + confirmación | público |
+| `/panel` | **Panel** del anfitrión (próximas reservas, métricas, accesos rápidos) | sesión |
+| `/panel/reservas` | Listado de reservas con filtros y búsqueda | sesión |
+| `/panel/alojamiento` | Datos del alojamiento (nombre, habitaciones, baños, precio, imágenes) | sesión |
+| `/panel/disponibilidad` | Calendario para **deshabilitar días** | sesión |
+| `/panel/pagos` | Métodos de pago (ARS principal, USD/EUR secundarias, billeteras digitales) | sesión |
+| `/panel/perfil` | Perfil: **subir logo** + personalización de la empresa (color, acento, formas) | sesión |
+| `/admin` | **Control interno**: cantidad de alojamientos, listado y búsqueda por dueño / ID / correo | solo `role: ADMIN` |
+
+## Tema claro / oscuro
+
+- El **modo claro está preseleccionado**; se cambia con el botón sol/luna (header, panel y pantallas de acceso).
+- La preferencia se guarda en `localStorage` (`hostflow.theme`).
+- La paleta y sus reglas están documentadas en **[docs/paleta-colores.md](docs/paleta-colores.md)**.
+- Los tokens viven en `@theme` (`src/index.css`); la clase `.dark` en `<html>` los sobreescribe.
+
+## Integración con el backend (Swagger)
+
+- Contrato de API: **[docs/swagger-api.md](docs/swagger-api.md)** (rutas, cuerpos, respuestas y errores).
+- `src/services/endpoints.js` mapea cada operación a su ruta (`GET /v3/api-docs` del backend).
+- `src/services/httpApi.js` implementa las llamadas reales; `src/services/demoApi.js` implementa el
+  **mismo contrato** con datos en memoria.
+- `src/services/index.js` elige el adaptador según `VITE_API_URL`. Las pantallas nunca llaman a `fetch`.
+- Documentación interactiva del backend: `GET /swagger-ui/index.html`.
 
 ## Estructura
 
 ```
 src/
-  pages/auth/     Login · Register · Recover   (originales)
-  pages/          Home (presentación) · SessionStarted (temporal)
-  layouts/        AuthLayout                    (original)
-  components/     ui.jsx (Brand, Button, Field, DemoBanner) · RequireAuth.jsx
-  services/       index (api) · httpApi | demoApi · endpoints · httpClient · tokenStorage · errors
+  pages/          Home (presentación)
+  pages/auth/     Login · Register · Recover (OTP)
+  pages/app/      Dashboard · Bookings · Lodging · Availability · Payments · Profile
+  pages/admin/    AdminDashboard (control interno)
+  layouts/        AuthLayout
+  components/     ui.jsx (sistema visual) · AppLayout · RequireAuth · BookingCard
+  context/        ThemeContext (claro/oscuro) · SessionContext (sesión y acciones)
+  data/           store.js (estado demo) · useStore.js (hook reactivo)
+  services/       index (fachada) · httpApi · demoApi · endpoints · httpClient · tokenStorage · errors
   config/env.js   VITE_API_URL → DEMO_MODE
-  lib/format.js   cn, isEmail
-  index.css       sistema visual original completo
+  lib/format.js   cn, isEmail, monedas, fechas, textos
+  index.css       sistema visual (paleta, tema, animaciones)
+docs/             paleta-colores.md · swagger-api.md
 ```
 
-## Conectar el backend Java Spring Boot
+## Notas
 
-1. Definir `VITE_API_URL`.
-2. Completar `path` de `login`, `register` y `recoverPassword` en `src/services/endpoints.js`
-   (hoy son `null`: la interfaz avisa "conexión no configurada" y nunca finge una respuesta).
-3. Datos de entrada/respuesta que espera el frontend y todo lo **pendiente de definir**
-   (Bearer vs cookie, correo duplicado, flujo posterior de recuperación, etc.):
-   ver el comentario al inicio de `src/services/httpApi.js`.
+- La sección **Mockups** se eliminó: no forms parte de la presentación final.
+- Las animaciones (`rise`, `fade`, `pop`, `float`, `marquee`) están en `src/index.css` y respetan
+  `prefers-reduced-motion`.
+- El estado de la demo se persiste en `sessionStorage` (`hostflow.app.v1`), por lo que recargar la
+  página no pierde los cambios (incluida una clave nueva definida por OTP).

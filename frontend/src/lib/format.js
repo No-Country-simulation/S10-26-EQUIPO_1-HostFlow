@@ -1,3 +1,100 @@
-export const cn = (...items) => items.filter(Boolean).join(" ")
+// Utilidades de formato y validación compartidas.
 
-export const isEmail = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim())
+export const cn = (...items) => items.filter(Boolean).join(" ");
+
+export const isEmail = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim());
+
+// ── Monedas ────────────────────────────────────────────────────────────────
+
+export const CURRENCIES = {
+  ARS: { code: "ARS", symbol: "$", label: "Pesos Argentinos", locale: "es-AR" },
+  USD: { code: "USD", symbol: "US$", label: "Dólares", locale: "en-US" },
+  EUR: { code: "EUR", symbol: "€", label: "Euros", locale: "es-ES" },
+};
+
+export const WALLETS = ["Mercado Pago", "PayPal", "Ualá", "Binance Pay", "AirTM"];
+
+export function formatMoney(amount = 0, currency = "ARS") {
+  const config = CURRENCIES[currency] || CURRENCIES.ARS;
+  try {
+    return new Intl.NumberFormat(config.locale, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: currency === "ARS" ? 0 : 2,
+    }).format(amount);
+  } catch {
+    return `${config.symbol} ${amount.toLocaleString("es-AR")}`;
+  }
+}
+
+export const currencySymbol = (currency = "ARS") => CURRENCIES[currency]?.symbol || "$";
+
+// ── Fechas ─────────────────────────────────────────────────────────────────
+
+const LOCALE = "es-AR";
+
+export function formatDate(iso) {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+export function formatDateShort(iso) {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat(LOCALE, { day: "2-digit", month: "short" }).format(date);
+}
+
+export function toISODate(date = new Date()) {
+  const d = new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function addDays(iso, days) {
+  const date = new Date(iso);
+  date.setDate(date.getDate() + days);
+  return toISODate(date);
+}
+
+export function daysBetween(fromISO, toISO) {
+  const from = new Date(fromISO);
+  const to = new Date(toISO);
+  return Math.max(1, Math.round((to - from) / 86_400_000));
+}
+
+export function weekdayShort(iso) {
+  const date = new Date(iso);
+  return new Intl.DateTimeFormat(LOCALE, { weekday: "short" }).format(date);
+}
+
+export function isPast(iso) {
+  if (!iso) return false;
+  return new Date(iso) < new Date(toISODate());
+}
+
+// ── Texto ─────────────────────────────────────────────────────────────────
+
+export function initials(name = "") {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
+export function plural(count, singular, pluralForm) {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
+export function maskEmail(email = "") {
+  const [user, domain] = email.split("@");
+  if (!user || !domain) return email;
+  const head = user.slice(0, 2);
+  return `${head}${"•".repeat(Math.max(1, user.length - 2))}@${domain}`;
+}
