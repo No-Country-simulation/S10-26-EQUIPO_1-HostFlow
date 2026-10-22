@@ -1,24 +1,28 @@
-import { Waves } from "lucide-react";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
+import { Eye, EyeOff, Moon, Sun } from "lucide-react";
 import { DEMO_MODE } from "../config/env";
-import { cn } from "../lib/format";
+import { useTheme } from "../context/ThemeContext";
+import { cn, initials } from "../lib/format";
 
 export { cn };
 
-// ── Botones ─────────────────────────────────────────────────────────────
+// ── Botones ─────────────────────────────────────────────────────────────────
 
 const BUTTON =
-  "inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2.25 rounded-xl border border-transparent px-5 text-sm font-[650] tracking-[0.005em] transition-[translate,scale,transform,box-shadow,background,border-color,color] duration-200 hover:-translate-y-px active:translate-y-0 active:scale-[0.985] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none";
+  "inline-flex min-h-[46px] cursor-pointer select-none items-center justify-center gap-2 rounded-xl border border-transparent px-5 text-sm font-semibold tracking-[-0.005em] transition-[translate,scale,background,border-color,color,box-shadow] duration-200 hover:-translate-y-px active:translate-y-0 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-50";
 
 const BUTTON_VARIANTS = {
-  primary:
-    "bg-btn text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_6px_16px_rgba(30,101,88,0.28)] [&:not(:disabled)]:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_10px_24px_rgba(30,101,88,0.36)]",
-
+  primary: "bg-lime text-lime-ink shadow-lime hover:bg-lime-strong",
+  teal: "bg-teal text-white hover:bg-teal-strong",
+  dark: "bg-ink text-paper hover:opacity-90",
   secondary:
-    "border-2 border-[#144d43] bg-white text-[#144d43] shadow-[0_3px_8px_rgba(20,48,43,0.12)] hover:bg-green-soft hover:border-[#0f3a33] hover:shadow-md",
+    "border border-line-strong bg-transparent text-ink hover:border-ink/40 hover:bg-overlay",
+  ghost: "bg-transparent text-ink-soft hover:bg-overlay hover:text-ink",
+  danger: "bg-danger text-white hover:brightness-105",
+  soft: "bg-lime-soft text-lime-ink hover:brightness-95",
 };
 
-// Clases de un botón; sirve también para <Link> con aspecto de botón.
 export const buttonClass = (variant = "primary", className) =>
   cn(BUTTON, BUTTON_VARIANTS[variant], className);
 
@@ -31,27 +35,27 @@ export function Button({ children, variant = "primary", className, icon: Icon, .
   );
 }
 
-// ── Formularios ─────────────────────────────────────────────────────────
+// ── Formularios ─────────────────────────────────────────────────────────────
 
 const CONTROL =
-  "min-h-[50px] w-full rounded-xl border bg-white px-3.5 py-3 text-[15px] font-medium text-ink outline-none transition-[border-color,box-shadow,background] duration-200 placeholder:font-normal placeholder:text-[#9aa9a4]";
+  "min-h-[50px] w-full appearance-none rounded-xl border bg-paper px-3.5 py-3 text-[15px] font-medium text-ink outline-none transition-[border-color,box-shadow,background] duration-200 placeholder:font-normal placeholder:text-muted";
 
 const CONTROL_OK =
-  "border-line-strong shadow-[inset_0_1px_2px_rgba(20,48,43,0.04)] hover:border-[#b3c4bd] focus:border-green focus:shadow-[0_0_0_4px_var(--color-green-ring)]";
+  "border-line-strong hover:border-ink/35 focus:border-teal focus:shadow-[0_0_0_4px_var(--color-teal-soft)]";
 
 const CONTROL_ERROR =
-  "border-danger bg-[#fffafa] shadow-[inset_0_1px_2px_rgba(20,48,43,0.04)] focus:shadow-[0_0_0_4px_rgba(179,65,47,0.16)]";
+  "border-danger bg-[color-mix(in_srgb,var(--color-danger)_3%,var(--color-paper))] focus:shadow-[0_0_0_4px_var(--color-danger-soft)]";
 
 export const controlClass = (error, className) =>
   cn(CONTROL, error ? CONTROL_ERROR : CONTROL_OK, className);
 
-export function Field({ label, error, hint, as = "input", children, ...props }) {
+export function Field({ label, error, hint, as = "input", children, className, ...props }) {
   const Element = as;
-  const custom = children && as === "input";
+  const custom = Boolean(children) && as === "input";
 
   return (
-    <label className="grid gap-1.75 text-[13.5px] font-bold text-ink">
-      <span>{label}</span>
+    <label className={cn("grid gap-1.5 text-[13.5px] font-semibold text-ink", className)}>
+      {label && <span>{label}</span>}
 
       {custom ? (
         children
@@ -60,9 +64,9 @@ export function Field({ label, error, hint, as = "input", children, ...props }) 
           className={controlClass(
             error,
             cn(
-              as === "textarea" && "min-h-24 resize-y leading-normal",
+              as === "textarea" && "min-h-28 resize-y leading-normal",
               as === "select" &&
-                "appearance-none bg-select bg-size-[18px] bg-position-[right_13px_center] bg-no-repeat pr-10",
+                "appearance-none bg-[image:var(--select-arrow)] bg-[right_13px_center] bg-no-repeat pr-10",
             ),
           )}
           {...props}
@@ -72,55 +76,111 @@ export function Field({ label, error, hint, as = "input", children, ...props }) 
       )}
 
       {error && <small className="text-[12.5px] font-semibold text-danger">{error}</small>}
-
-      {hint && <small className="text-[12.5px] font-normal text-muted">{hint}</small>}
+      {!error && hint && <small className="text-[12.5px] font-normal text-muted">{hint}</small>}
     </label>
   );
 }
 
-export function Alert({ children }) {
+export function PasswordField({ label = "Contraseña", error, hint, className, ...props }) {
+  const [show, setShow] = useState(false);
+  return (
+    <Field label={label} error={error} hint={hint} className={className}>
+      <div className="relative">
+        <input
+          className={controlClass(error, "pr-12")}
+          type={show ? "text" : "password"}
+          {...props}
+        />
+        <button
+          type="button"
+          onClick={() => setShow((v) => !v)}
+          aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
+          className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-overlay hover:text-ink"
+        >
+          {show ? <EyeOff className="w-4" /> : <Eye className="w-4" />}
+        </button>
+      </div>
+    </Field>
+  );
+}
+
+export function Alert({ children, tone = "danger" }) {
+  const tones = {
+    danger: "border-danger/40 bg-danger-soft text-danger",
+    success: "border-success/40 bg-success-soft text-success",
+    info: "border-teal/40 bg-teal-soft text-teal",
+    lime: "border-lime/60 bg-lime-soft text-lime-ink",
+  };
   return (
     <div
       role="alert"
-      className="flex items-center gap-2.5 rounded-xl border border-[#f3cfc7] bg-danger-soft px-3.75 py-3.25 text-sm leading-[1.4] text-danger"
+      className={cn(
+        "flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-sm font-medium leading-snug",
+        tones[tone],
+      )}
     >
-      {children}
+      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-current" />
+      <span>{children}</span>
     </div>
   );
 }
 
-// ── Marca, textos y contenedores ────────────────────────────────────────
+// ── Marca ───────────────────────────────────────────────────────────────────
 
-export function Brand({ light }) {
+export function LogoMark({ className }) {
+  return (
+    <svg viewBox="0 0 40 40" className={className} aria-hidden="true">
+      <rect width="40" height="40" rx="12" fill="var(--color-lime)" />
+      <path
+        d="M11 14.5 20 8.5l9 6"
+        stroke="var(--color-ink)"
+        strokeWidth="2.6"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13 17v8.5A2.5 2.5 0 0 0 15.5 28h9a2.5 2.5 0 0 0 2.5-2.5V17"
+        stroke="var(--color-ink)"
+        strokeWidth="2.6"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 30.5c2.7-2 5.3-2 8 0s5.3 2 8 0"
+        stroke="var(--color-teal-strong)"
+        strokeWidth="2.4"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function Brand({ className, size = "text-[19px]" }) {
   return (
     <Link
       to="/"
       className={cn(
-        "flex items-center gap-2.75 text-[19px] font-extrabold tracking-[-0.02em] pointer-coarse:min-h-11",
-        light ? "text-white" : "text-green-dark",
+        "inline-flex items-center gap-2.5 font-extrabold tracking-[-0.02em] text-ink",
+        size,
+        className,
       )}
     >
-      <span
-        className={cn(
-          "grid size-9 place-items-center rounded-[11px] text-white",
-          light
-            ? "bg-white/[0.14] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)]"
-            : "bg-[linear-gradient(145deg,#4b8479,#144d43)] shadow-[0_4px_12px_rgba(30,101,88,0.3)]",
-        )}
-      >
-        <Waves size={20} />
+      <LogoMark className="size-8 drop-shadow-sm" />
+      <span className="font-display italic">
+        Host<span className="text-teal-strong not-italic">Flow</span>
       </span>
-      HostFlow
     </Link>
   );
 }
 
-export function Eyebrow({ light, className, children }) {
+export function Eyebrow({ className, children }) {
   return (
     <span
       className={cn(
-        "mb-2.5 inline-flex items-center gap-2.25 text-xs font-extrabold uppercase tracking-[0.14em] before:h-0.5 before:w-4.5 before:rounded-sm before:bg-current before:opacity-[0.55] before:content-['']",
-        light ? "text-[#cfe3db]" : "text-green",
+        "mb-2 inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.14em] text-teal-strong before:h-0.5 before:w-4 before:rounded-sm before:bg-current before:content-['']",
         className,
       )}
     >
@@ -129,30 +189,258 @@ export function Eyebrow({ light, className, children }) {
   );
 }
 
-export function AuthCard({ children }) {
+// ── Contenedores y texto ────────────────────────────────────────────────────
+
+export function Card({ className, children, as: Element = "div", ...props }) {
   return (
-    <div className="w-[min(100%,450px)] animate-rise rounded-[26px] border border-line bg-white px-10 py-10.5 shadow-md max-[600px]:border-0 max-[600px]:bg-transparent max-[600px]:p-0 max-[600px]:shadow-none">
+    <Element className={cn("card", className)} {...props}>
+      {children}
+    </Element>
+  );
+}
+
+export function Badge({ tone = "neutral", className, children }) {
+  const tones = {
+    neutral: "bg-overlay text-ink-soft",
+    lime: "bg-lime-soft text-lime-ink",
+    teal: "bg-teal-soft text-teal-strong",
+    pink: "bg-pink-soft text-pink-strong",
+    success: "bg-success-soft text-success",
+    danger: "bg-danger-soft text-danger",
+    ink: "bg-ink text-paper",
+  };
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide",
+        tones[tone],
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function Avatar({ name = "", className, size = "size-9" }) {
+  return (
+    <span
+      className={cn(
+        "grid shrink-0 place-items-center rounded-full bg-teal-soft text-xs font-extrabold text-teal-strong",
+        size,
+        className,
+      )}
+    >
+      {initials(name) || "·"}
+    </span>
+  );
+}
+
+export function SectionHeading({ eyebrow, title, text, center, className, children }) {
+  return (
+    <div className={cn("max-w-2xl", center && "mx-auto text-center", className)}>
+      {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
+      {title && (
+        <h2 className="text-[clamp(26px,3.4vw,40px)] font-bold leading-[1.1] text-ink">{title}</h2>
+      )}
+      {text && <p className="mt-3.5 text-[15.5px] leading-relaxed text-muted">{text}</p>}
       {children}
     </div>
   );
 }
 
-export function AuthTitle({ children }) {
-  return <h2 className="mb-2 text-[34px] max-[600px]:text-[30px]">{children}</h2>;
+export function EmptyState({ icon: Icon, title, text, action }) {
+  return (
+    <div className="grid place-items-center gap-3 rounded-2xl border border-dashed border-line-strong px-6 py-14 text-center">
+      {Icon && (
+        <span className="grid size-12 place-items-center rounded-2xl bg-teal-soft text-teal-strong">
+          <Icon className="w-6" />
+        </span>
+      )}
+      <div>
+        <p className="font-bold text-ink">{title}</p>
+        {text && <p className="mt-1 max-w-sm text-sm text-muted">{text}</p>}
+      </div>
+      {action}
+    </div>
+  );
 }
+
+export function Spinner({ className }) {
+  return (
+    <span
+      className={cn(
+        "size-5 animate-spin rounded-full border-2 border-current border-t-transparent",
+        className,
+      )}
+      aria-hidden="true"
+    />
+  );
+}
+
+export function Stat({ label, value, hint, tone = "lime", icon: Icon }) {
+  const tones = {
+    lime: "bg-lime-soft text-lime-ink",
+    teal: "bg-teal-soft text-teal-strong",
+    pink: "bg-pink-soft text-pink-strong",
+  };
+  return (
+    <div className="card card-hover p-5">
+      <span className={cn("mb-4 grid size-10 place-items-center rounded-xl", tones[tone])}>
+        {Icon ? <Icon size={19} /> : <span className="size-2.5 rounded-full bg-current" />}
+      </span>
+      <p className="text-[clamp(24px,2.6vw,32px)] font-extrabold leading-none text-ink">{value}</p>
+      <p className="mt-1.5 text-sm font-semibold text-ink-soft">{label}</p>
+      {hint && <p className="text-xs text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+// ── Switch ──────────────────────────────────────────────────────────────────
+
+export function Switch({ checked, onChange, label, description }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange?.(!checked)}
+        className={cn(
+          "relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors duration-200",
+          checked ? "border-lime bg-lime" : "border-line-strong bg-overlay",
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-1/2 size-5 -translate-y-1/2 rounded-full transition-all duration-200",
+            checked ? "left-[calc(100%-22px)] bg-lime-ink" : "left-0.5 bg-muted",
+          )}
+        />
+      </button>
+      {(label || description) && (
+        <span className="grid">
+          {label && <span className="text-sm font-semibold text-ink">{label}</span>}
+          {description && <span className="text-xs text-muted">{description}</span>}
+        </span>
+      )}
+    </label>
+  );
+}
+
+// ── OTP (6 dígitos) ─────────────────────────────────────────────────────────
+
+export function OtpInput({ value = "", onChange, length = 6, autoFocus = true, error }) {
+  const refs = useRef([]);
+  // Espejo del valor: compone correctamente cambios seguidos dentro del mismo tick.
+  const latest = useRef(value);
+  latest.current = value;
+
+  const digits = Array.from({ length }, (_, i) => value[i] || "");
+
+  const setAt = (index, digit) => {
+    const chars = latest.current.padEnd(length, " ").split("");
+    chars[index] = digit;
+    const next = chars.join("").trimEnd();
+    latest.current = next;
+    onChange?.(next.slice(0, length));
+  };
+
+  const handleChange = (index) => (event) => {
+    const char = event.target.value.replace(/\D/g, "").slice(-1);
+    if (!char) return;
+    setAt(index, char);
+    if (index < length - 1) refs.current[index + 1]?.focus();
+  };
+
+  const handleKeyDown = (index) => (event) => {
+    if (event.key === "Backspace" && !digits[index] && index > 0) {
+      refs.current[index - 1]?.focus();
+    }
+    if (event.key === "ArrowLeft" && index > 0) refs.current[index - 1]?.focus();
+    if (event.key === "ArrowRight" && index < length - 1) refs.current[index + 1]?.focus();
+  };
+
+  const handlePaste = (event) => {
+    event.preventDefault();
+    const text = (event.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, length);
+    if (!text) return;
+    onChange?.(text);
+    refs.current[Math.min(text.length, length - 1)]?.focus();
+  };
+
+  return (
+    <div className="flex justify-between gap-2" onPaste={handlePaste}>
+      {digits.map((digit, index) => (
+        <input
+          key={index}
+          ref={(el) => (refs.current[index] = el)}
+          inputMode="numeric"
+          autoComplete={index === 0 ? "one-time-code" : "off"}
+          maxLength={1}
+          value={digit}
+          autoFocus={autoFocus && index === 0}
+          onChange={handleChange(index)}
+          onKeyDown={handleKeyDown(index)}
+          aria-label={`Dígito ${index + 1}`}
+          className={cn(
+            "size-12 appearance-none rounded-xl border bg-paper text-center text-xl font-extrabold text-ink outline-none transition-all duration-200 placeholder:text-muted",
+            error
+              ? "border-danger"
+              : "border-line-strong hover:border-ink/35 focus:border-teal focus:shadow-[0_0_0_4px_var(--color-teal-soft)]",
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── Tema claro/oscuro ───────────────────────────────────────────────────────
+
+export function ThemeToggle({ className }) {
+  const { isDark, toggle } = useTheme();
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={isDark ? "Cambiar a fondo claro" : "Cambiar a fondo oscuro"}
+      title={isDark ? "Cambiar a fondo claro" : "Cambiar a fondo oscuro"}
+      className={cn(
+        "grid size-10 cursor-pointer place-items-center rounded-xl border border-line bg-paper text-ink-soft shadow-card transition-all duration-200 hover:-translate-y-px hover:text-ink",
+        className,
+      )}
+    >
+      <span className="relative grid place-items-center">
+        <Sun
+          className={cn(
+            "size-[18px] transition-all duration-300",
+            isDark ? "scale-100 opacity-100" : "absolute scale-50 opacity-0",
+          )}
+        />
+        <Moon
+          className={cn(
+            "size-[18px] transition-all duration-300",
+            isDark ? "absolute scale-50 opacity-0" : "scale-100 opacity-100",
+          )}
+        />
+      </span>
+    </button>
+  );
+}
+
+// ── Demo banner ─────────────────────────────────────────────────────────────
 
 export function DemoBanner({ className }) {
   if (!DEMO_MODE) return null;
-
   return (
     <div
       role="note"
       className={cn(
-        "flex items-center justify-center gap-2.25 border-b border-[#f1dcc0] bg-[linear-gradient(90deg,#fbeedd,#fdf6ea)] px-4 py-2 text-center text-[12.5px] font-semibold leading-[1.35] text-[#87501f] before:size-1.75 before:shrink-0 before:rounded-full before:bg-copper before:shadow-[0_0_0_3px_rgba(196,116,47,0.2)] before:content-[''] max-[600px]:px-3.5 max-[600px]:py-1.5 max-[600px]:text-xs",
+        "border-b border-lime/40 bg-lime-soft px-4 py-2 text-center text-[12.5px] font-semibold text-lime-ink",
         className,
       )}
     >
-      Modo demostración · datos de prueba. Nada se envía ni se guarda en ningún servidor.
+      Modo demostración · datos de prueba. Nada se envía a ningún servidor.
     </div>
   );
 }

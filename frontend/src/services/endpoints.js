@@ -1,13 +1,27 @@
-// CONTRATO DE API DE AUTENTICACIÓN — PENDIENTE DE DEFINICIÓN CON EL BACKEND (Java Spring Boot).
+// CONTRATO DE API — HostFlow (backend Java Spring Boot).
 //
-// No se inventaron rutas. Cada endpoint tiene `path: null` hasta que el contrato real
-// exista. Mientras sea null, el cliente lanza ApiNotConfiguredError y la interfaz muestra
-// "La conexión con el servidor todavía no está configurada" (nunca finge una respuesta).
+// Fuente de verdad: el propio backend (Swagger UI en /api/v1/swagger-ui.html,
+// especificación OpenAPI en /api/v1/api-docs) y docs/swagger-api.md.
 //
-// Para completar: reemplazar `path` (ej. "/algo/login") y ajustar `method` si hace falta.
-// Qué datos envía y espera el frontend en cada uno: ver httpApi.js.
+// `VITE_API_URL` debe apuntar a la BASE del contexto, es decir incluir el
+// context-path configurado en el backend (`server.servlet.context-path=/api/v1`).
+//   .env  →  VITE_API_URL=http://localhost:8080/api/v1
+//
+// A partir de ahí las rutas son relativas a esa base.
 export const ENDPOINTS = {
-  login: { method: "POST", path: null },
-  register: { method: "POST", path: null },
-  recoverPassword: { method: "POST", path: null },
+  // ── Auth (públicos) ───────────────────────────────────────────────────
+  login: { method: "POST", path: "/auth/login" },
+  register: { method: "POST", path: "/auth/register" },
+  // Solicita el envío del código de recuperación de 6 dígitos.
+  forgotPassword: { method: "POST", path: "/auth/forgot-password" },
+  // Restablece la contraseña con { email, code, newPassword }.
+  resetPassword: { method: "POST", path: "/auth/reset-password" },
+
+  // ── Dueños de alojamiento (requieren JWT) ──────────────────────────────
+  getOwnerByEmail: { method: "GET", path: "/owners/email/{email}" },
+  getOwnerById: { method: "GET", path: "/owners/{id}" },
+  // Solo ROLE_ADMIN
+  getAllOwners: { method: "GET", path: "/owners" },
+  // Solo ROLE_ADMIN → ?enabled=true|false
+  toggleOwnerStatus: { method: "PATCH", path: "/owners/{id}/status" },
 }
