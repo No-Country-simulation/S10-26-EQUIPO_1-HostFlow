@@ -1,315 +1,354 @@
-# HostFlow — Backend API
+# 🏨 HostFlow Backend
 
-![Java](https://img.shields.io/badge/Java-17-orange)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.5-brightgreen)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-blue)
-![JWT](https://img.shields.io/badge/JWT-HS512-red)
-![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%203-85EA2D)
+> API REST para la gestión de alojamientos y sus propietarios: registro con verificación de correo, autenticación JWT, recuperación de contraseña, control de roles y desactivación temporal de alojamientos.
 
-API REST del **sistema de gestión de alojamientos HostFlow**, construida con **Spring Boot 3.2.5 / Java 17**. Provee autenticación mediante **JWT (HS512)**, registro de dueños de alojamiento, control de acceso por **roles (ADMIN / OWNER)**, recuperación de contraseña por **código de 6 dígitos enviado por email** y documentación interactiva con **Swagger UI**.
-
----
-
-## 1. Arquitectura general
-
-El backend sigue el patrón de **capas desacopladas** de Spring:
-
-```
-HTTP Request
-    │
-    ▼
-┌─────────────────┐
-│  Controller     │  AuthController · OwnerController        (capa web, DTOs, validación)
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│  Service        │  AuthService · OwnerService ·            (lógica de negocio, @Transactional)
-│                 │  PasswordResetService · EmailService · JwtService
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│  Repository     │  OwnerRepository · RoleRepository ·      (Spring Data JPA)
-│                 │  PasswordResetTokenRepository
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│  Model (JPA)    │  Owner · Role · PasswordResetToken  ──►  PostgreSQL
-└─────────────────┘
-
-Security (transversal): SecurityConfig · JwtAuthenticationFilter ·
-                        CustomUserDetailsService · BCryptPasswordEncoder
-```
-
-| Módulo | Clases | Responsabilidad |
-|---|---|---|
-| **Auth** | `AuthController`, `AuthService` | Registro de dueños, login, emisión de JWT Bearer. |
-| **Password Recovery** | `PasswordResetController (en AuthController)`, `PasswordResetService`, `EmailService` | Código de 6 dígitos por email, validación y cambio de contraseña. |
-| **Owners** | `OwnerController`, `OwnerService` | Consulta y administración de dueños (activar/desactivar cuentas). |
-| **Security** | `SecurityConfig`, `JwtAuthenticationFilter`, `CustomUserDetailsService`, `PasswordEncoderConfig` | Cadena de filtros, JWT stateless, CORS, BCrypt, roles. |
-| **Config** | `SwaggerConfig`, `EmailConfig`, `WebConfig`, `DataInitializer` | OpenAPI, JavaMailSender, CORS web y seed de datos. |
-| **Exceptions** | `GlobalExceptionHandler`, `BusinessException`, `ResourceNotFoundException` | Respuestas de error HTTP uniformes. |
+![Java](https://img.shields.io/badge/Java-17%2B-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-6DB33F?logo=springboot&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-DB-4169E1?logo=postgresql&logoColor=white)
+![JWT](https://img.shields.io/badge/Auth-JWT-000000?logo=jsonwebtokens&logoColor=white)
+![OpenAPI](https://img.shields.io/badge/Docs-Swagger%20UI-85EA2D?logo=swagger&logoColor=black)
 
 ---
 
-## 2. Stack tecnológico (verificado en `pom.xml`)
+## 📑 Tabla de contenidos
 
-| Tecnología | Versión | Uso |
-|---|---|---|
-| Java | **17** | Lenguaje y runtime |
-| Spring Boot | **3.2.5** | Framework base (Web, Data JPA, Security, Validation, Mail, DevTools) |
-| PostgreSQL Driver | (Spring Boot managed) | Base de datos de producción |
-| Flyway Core | (Spring Boot managed) | Migraciones de esquema |
-| JJWT (io.jsonwebtoken) | **0.12.5** | Generación y validación de tokens (algoritmo **HS512**) |
-| springdoc-openapi | **2.5.0** | Swagger UI / OpenAPI 3 |
-| Lombok | (Spring Boot managed) | Reducción de boilerplate (`@Getter`, `@Builder`, etc.) |
-| Spring Boot Maven Plugin | 3.2.5 | Empaquetado en JAR ejecutable |
-
----
-
-## 3. Requisitos previos — *instalación manual en el equipo*
-
-El proyecto **no requiere instalar Maven** (incluye el *wrapper*), pero sí necesitas:
-
-| Software | Versión | ¿Para qué? | Verificación |
-|---|---|---|---|
-| **JDK 17** (Temurin, Oracle o similar) | 17+ | Compilar y ejecutar el backend | `java -version` |
-| **IntelliJ IDEA** | 2022+ | IDE recomendado (plugin *Spring Boot* preinstalado en Ultimate; en Community instalar *Spring Boot Helper*) | — |
-| **PostgreSQL** | 13+ | Motor de base de datos (driver incluido en el proyecto) | `psql --version` |
-| **pgAdmin** (opcional) | — | Administración visual de PostgreSQL | — |
-| **Git** | 2.x | Clonar el repositorio | `git --version` |
-| **Postman** (opcional) | — | Pruebas manuales de endpoints | — |
-
-> ⚠️ **Importante:** si el `datasource` apunta a `localhost:5432`, PostgreSQL debe estar **corriendo** y la base de datos `hostflow` creada previamente:
-> ```sql
-> CREATE DATABASE hostflow;
-> ```
+1. [Descripción general](#-descripción-general)
+2. [Características](#-características)
+3. [Stack tecnológico](#-stack-tecnológico)
+4. [Arquitectura del proyecto](#-arquitectura-del-proyecto)
+5. [Requisitos previos](#-requisitos-previos)
+6. [Instalación y ejecución](#-instalación-y-ejecución)
+7. [Variables de entorno](#-variables-de-entorno)
+8. [Configuración de la aplicación](#-configuración-de-la-aplicación)
+9. [Documentación de la API](#-documentación-de-la-api)
+10. [Modelo Entidad-Relación (MER)](#-modelo-entidad-relación-mer)
+11. [Seguridad](#-seguridad)
+12. [Manejo de errores](#-manejo-de-errores)
+13. [Flujo de trabajo con Git](#-flujo-de-trabajo-con-git)
+14. [Consideraciones para producción](#-consideraciones-para-producción)
+15. [Equipo y licencia](#-equipo-y-licencia)
 
 ---
 
-## 4. Qué se descarga **automáticamente** al ejecutar
+## 📖 Descripción general
 
-| # | Qué | De dónde | Dónde queda |
-|---|---|---|---|
-| 1 | **Maven** (la versión exacta del wrapper) | Internet (según `.mvn/wrapper/maven-wrapper.properties`) | `~/.m2/wrapper` |
-| 2 | **Todas las dependencias** del `pom.xml` (Spring Boot starters, JJWT, springdoc, Lombok, PostgreSQL driver, Flyway…) | **Maven Central** | `~/.m2/repository` |
-| 3 | **Plugins de build** (`spring-boot-maven-plugin`, compiler, surefire…) | Maven Central | caché local de Maven |
-| 4 | **Esquema de base de datos** | Generado por **Hibernate** (`ddl-auto`) y/o por migraciones **Flyway** en `src/main/resources/db/migration` | PostgreSQL |
-| 5 | **Datos iniciales (seed)** | `DataInitializer` inserta roles (`ROLE_ADMIN`, `ROLE_OWNER`) al arrancar | Tabla `roles` |
+**HostFlow** es el backend de una plataforma orientada a propietarios de alojamientos (*owners*) y administradores. Expone una API REST bajo el prefijo `/api/v1` que permite:
 
-> En resumen: solo instalar JDK 17 + IntelliJ + PostgreSQL; **todo lo demás lo resuelve Maven automáticamente en el primer build**.
+- Registrar propietarios y verificar su correo electrónico.
+- Autenticar usuarios mediante **JSON Web Tokens (JWT)**.
+- Recuperar contraseñas con un código de 6 dígitos enviado por correo.
+- Administrar usuarios (consulta y habilitación/deshabilitación) desde un rol administrador.
+- Desactivar temporalmente un alojamiento (remodelación, mantenimiento, etc.) y consultar su estado, historial y disponibilidad.
 
 ---
 
-## 5. Configuración
+## ✨ Características
 
-Crear/editar `src/main/resources/application.properties` (o `application.yml`):
+| Área | Detalle |
+|------|---------|
+| **Autenticación** | Login con JWT (access token de 24 h y refresh token de 7 días configurables). |
+| **Autorización** | Control por roles `ROLE_ADMIN` y `ROLE_OWNER` con `@PreAuthorize`. |
+| **Verificación de correo** | Enlace con token de expiración (60 min por defecto) y reenvío de verificación. |
+| **Recuperación de contraseña** | Código numérico de 6 dígitos con expiración (60 min por defecto). |
+| **Protección contra fuerza bruta** | Bloqueo de cuenta tras 5 intentos fallidos durante 60 minutos, con registro de intentos (IP y *user agent*). |
+| **Cierre por inactividad** | Tiempos de inactividad por rol (Owner: 10 min, Admin: 15 min) y aviso previo de 1 min, entregados al frontend. |
+| **Desactivación de alojamientos** | Desactivación temporal con motivo y rango de fechas, historial y consulta de disponibilidad. |
+| **Datos semilla** | Creación automática de roles y de un super usuario administrador en el primer arranque. |
+| **Documentación interactiva** | Swagger UI / OpenAPI 3 con soporte para autenticación Bearer. |
+| **Serialización limpia** | Fechas ISO-8601 y exclusión de campos `null` en las respuestas JSON. |
 
-```properties
-# ---------- Servidor ----------
-server.port=8080
-spring.application.name=HostFlow
+---
 
-# ---------- PostgreSQL ----------
-spring.datasource.url=jdbc:postgresql://localhost:5432/hostflow
-spring.datasource.username=postgres
-spring.datasource.password=${DB_PASSWORD}
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.format_sql=true
+## 🧰 Stack tecnológico
 
-# ---------- JWT (JwtService) ----------
-jwt.secret=${JWT_SECRET}                # min. 64 bytes para HS512
-jwt.expiration=86400000                 # access token: 24 h
-jwt.refresh-expiration=604800000        # refresh token: 7 días
-jwt.issuer=HostFlow
+- **Lenguaje:** Java (17 o superior, requerido por Spring Boot 3)
+- **Framework:** Spring Boot (Web, Data JPA, Security, Validation, Mail)
+- **Persistencia:** Hibernate / JPA sobre **PostgreSQL**
+- **Seguridad:** Spring Security + JWT + BCrypt
+- **Documentación:** springdoc-openapi (Swagger UI)
+- **Utilidades:** Lombok, SLF4J
+- **Migraciones:** Flyway (deshabilitado en desarrollo; previsto para producción)
+- **Correo:** SMTP (Gmail)
+- **Build:** Maven
 
-# ---------- Recuperación de contraseña (PasswordResetService) ----------
-app.password-reset.expiration-minutes=60
-app.password-reset.code-length=6
+---
 
-# ---------- Correo (EmailConfig / EmailService) ----------
-spring.mail.host=smtp.gmail.com
-spring.mail.port=587
-spring.mail.username=${MAIL_USERNAME}
-spring.mail.password=${MAIL_APP_PASSWORD}
-spring.mail.properties.mail.smtp.auth=true
-spring.mail.properties.mail.smtp.starttls.enable=true
+## 🗂 Arquitectura del proyecto
+
+El proyecto sigue una **arquitectura en capas** bajo el paquete base `com.hostflow`:
+
+```text
+com.hostflow
+├── HostflowApplication.java        # Punto de entrada de Spring Boot
+├── config/                         # Configuración transversal
+│   ├── DataInitializer.java        #   Seed de roles y administrador
+│   ├── EmailConfig.java            #   Parámetros de correo
+│   ├── InactivityConfig.java       #   Tiempos de inactividad por rol
+│   ├── SwaggerConfig.java          #   OpenAPI / Bearer Authentication
+│   └── WebConfig.java              #   Configuración MVC
+├── controller/                     # Capa REST
+│   ├── AuthController.java         #   /auth
+│   ├── OwnerController.java        #   /owners
+│   └── AccommodationController.java#   /owners/accommodation
+├── dto/
+│   ├── request/                    # Objetos de entrada validados
+│   └── response/                   # Objetos de salida
+├── enums/
+│   └── RoleType.java               # ROLE_ADMIN, ROLE_OWNER
+├── exception/                      # Excepciones de negocio y handler global
+├── model/                          # Entidades JPA
+├── repository/                     # Repositorios Spring Data JPA
+├── security/                       # JWT, filtro, SecurityConfig, UserDetailsService
+└── service/                        # Lógica de negocio
+    ├── AuthService.java
+    ├── OwnerService.java
+    ├── PasswordResetService.java
+    ├── LoginAttemptService.java
+    ├── JwtService.java
+    ├── EmailService.java
+    └── AccommodationTemporaryDisableService.java
 ```
 
-> 🔐 **Buena práctica:** nunca versionar credenciales. Usar variables de entorno (`DB_PASSWORD`, `JWT_SECRET`, `MAIL_USERNAME`, `MAIL_APP_PASSWORD`) o un `application-local.properties` fuera del VCS.
+---
+
+## ✅ Requisitos previos
+
+- **JDK 17+**
+- **Maven 3.8+** (o el *wrapper* del proyecto, si existe)
+- **PostgreSQL** en ejecución local
+- Una cuenta de **Gmail** con *Contraseña de aplicación* para el envío de correos
+- IDE recomendado: IntelliJ IDEA
 
 ---
 
-## 6. Ejecución
+## 🚀 Instalación y ejecución
 
-### Opción A — Consola (Linux / macOS)
+### 1. Clonar el repositorio
+
 ```bash
-cd backend
-./mvnw spring-boot:run
+git clone <URL-DEL-REPOSITORIO>
+cd hostflow
 ```
 
-### Opción B — Consola (Windows)
-```cmd
-cd backend
-mvnw.cmd spring-boot:run
+### 2. Crear la base de datos
+
+```sql
+CREATE DATABASE hostflow_dev;
 ```
 
-### Opción C — JAR empaquetado
+> Con `ddl-auto=update`, Hibernate crea las tablas automáticamente en el primer arranque.
+
+### 3. Configurar las variables de entorno
+
+Define las variables descritas en [Variables de entorno](#-variables-de-entorno). En IntelliJ IDEA: **Run → Edit Configurations → Environment variables**.
+
+### 4. Ejecutar la aplicación
+
 ```bash
-./mvnw clean package -DskipTests
-java -jar target/hostflow-backend-1.0.0.jar
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-### Opción D — IntelliJ IDEA
-1. `File → Open…` → seleccionar la carpeta que contiene `pom.xml`.
-2. Esperar a que el IDE importe el proyecto Maven y descargue dependencias (barra inferior).
-3. Localizar la clase principal `BackendApplication` y pulsar ▶️ **Run**.
-4. Con **DevTools** activo, cualquier cambio en `src/main/java` reinicia la aplicación automáticamente (hot reload).
+Para generar el artefacto y ejecutarlo:
 
-**Servicios disponibles al arrancar:**
+```bash
+mvn clean package
+java -jar target/hostflow-*.jar --spring.profiles.active=dev
+```
 
-| Recurso | URL |
-|---|---|
-| API base | `http://localhost:8080` |
-| Swagger UI | `http://localhost:8080/swagger-ui/index.html` |
-| OpenAPI JSON | `http://localhost:8080/v3/api-docs` |
+### 5. Verificar
+
+- API base: `http://localhost:8080/api/v1`
+- Swagger UI: `http://localhost:8080/api/v1/swagger-ui.html`
 
 ---
 
-## 7. Estructura del proyecto en IntelliJ IDEA
+## 🔐 Variables de entorno
 
-```
-backend/
-├── .mvn/
-│   └── wrapper/
-│       └── maven-wrapper.properties       ← versión de Maven a descargar
-├── mvnw / mvnw.cmd                        ← Maven Wrapper (Linux/Mac · Windows)
-├── pom.xml                                ← Spring Boot 3.2.5 · Java 17 · dependencias
-└── src/
-    └── main/
-        ├── java/
-        │   └── com/
-        │       └── hostflow/
-        │           ├── BackendApplication.java               ← @SpringBootApplication (main)
-        │           ├── config/
-        │           │   ├── DataInitializer.java              ← seed de roles al arrancar
-        │           │   ├── EmailConfig.java                  ← JavaMailSender
-        │           │   ├── SwaggerConfig.java                ← OpenAPI / Swagger UI
-        │           │   └── WebConfig.java                    ← configuración web/CORS
-        │           ├── controller/
-        │           │   ├── AuthController.java               ← /auth/** (público)
-        │           │   └── OwnerController.java              ← /owners/** (JWT + roles)
-        │           ├── dto/
-        │           │   ├── request/
-        │           │   │   ├── LoginRequest.java
-        │           │   │   ├── OwnerRegisterRequest.java
-        │           │   │   ├── ForgotPasswordRequest.java
-        │           │   │   └── ResetPasswordRequest.java
-        │           │   └── response/
-        │           │       ├── AuthResponse.java
-        │           │       ├── OwnerResponse.java
-        │           │       └── PasswordResetResponse.java
-        │           ├── enums/
-        │           │   └── RoleType.java                     ← ROLE_ADMIN · ROLE_OWNER
-        │           ├── exception/
-        │           │   ├── BusinessException.java
-        │           │   ├── ResourceNotFoundException.java
-        │           │   └── GlobalExceptionHandler.java       ← @RestControllerAdvice
-        │           ├── model/
-        │           │   ├── Owner.java
-        │           │   ├── Role.java
-        │           │   └── PasswordResetToken.java
-        │           ├── repository/
-        │           │   ├── OwnerRepository.java
-        │           │   ├── RoleRepository.java
-        │           │   └── PasswordResetTokenRepository.java
-        │           ├── security/
-        │           │   ├── SecurityConfig.java               ← SecurityFilterChain · CORS · stateless
-        │           │   ├── JwtAuthenticationFilter.java      ← filtro OncePerRequestFilter
-        │           │   ├── CustomUserDetailsService.java     ← carga usuario por email
-        │           │   └── PasswordEncoderConfig.java        ← BCryptPasswordEncoder @Bean
-        │           └── service/
-        │               ├── AuthService.java                  ← registerOwner() · login()
-        │               ├── OwnerService.java                 ← consultas + toggleOwnerStatus()
-        │               ├── PasswordResetService.java         ← forgotPassword() · resetPassword()
-        │               ├── EmailService.java                 ← envío de correos
-        │               └── JwtService.java                   ← HS512 · claims · expiración
-        └── resources/
-            ├── application.properties
-            ├── static/
-            ├── templates/                                    ← plantillas de correo
-            └── db/migration/                                 ← migraciones Flyway (V1__, V2__…)
-```
+| Variable | Obligatoria | Valor por defecto | Descripción |
+|----------|:-----------:|-------------------|-------------|
+| `JWT_SECRET` | ✅ | — | Clave secreta para firmar los JWT. Mínimo 32 caracteres. |
+| `ADMIN_PASSWORD` | ✅ | — | Contraseña del super usuario administrador. |
+| `DB_USERNAME` | ➖ | `postgres` | Usuario de PostgreSQL. |
+| `DB_PASSWORD` | ➖ | `postgres` | Contraseña de PostgreSQL. |
+| `MAIL_USERNAME` | ✅ | — | Cuenta de Gmail emisora de los correos. |
+| `MAIL_PASSWORD` | ✅ | — | *App Password* de 16 caracteres (sin espacios). |
 
-> **Regla de oro:** los controladores reciben/devuelven **DTOs**; las **entidades JPA** nunca se exponen directamente (`OwnerService.mapToResponse()` excluye la contraseña).
+> ⚠️ **Nunca** subas credenciales reales al repositorio. Usa variables de entorno o un archivo `.env` local ignorado por Git.
+
+Para generar la contraseña de aplicación de Gmail, activa la verificación en dos pasos y crea una en <https://myaccount.google.com/apppasswords>.
 
 ---
 
-## 8. Endpoints de la API
+## ⚙️ Configuración de la aplicación
 
-### 8.1 Autenticación — `AuthController` (públicos, sin JWT)
+Propiedades principales (`application.properties`):
 
-| Método | Ruta | Body (DTO) | Respuesta | Descripción |
-|---|---|---|---|---|
-| `POST` | `/auth/register` | `OwnerRegisterRequest` | `201 → AuthResponse` | Registra un dueño: valida términos, unicidad de email, encripta BCrypt, asigna `ROLE_OWNER` y devuelve JWT. |
-| `POST` | `/auth/login` | `LoginRequest` | `200 → AuthResponse` | Autentica credenciales con `AuthenticationManager` y devuelve JWT Bearer. |
-| `POST` | `/auth/forgot-password` | `ForgotPasswordRequest` | `200 → PasswordResetRequestResponse` | Genera código de 6 dígitos, invalida tokens previos, lo envía por email. **Siempre responde éxito** (anti-enumeración). |
-| `POST` | `/auth/reset-password` | `ResetPasswordRequest` | `200 → PasswordResetResponse` | Valida código (existente, no expirado, no usado), actualiza contraseña BCrypt, marca token usado y envía confirmación. |
+| Propiedad | Valor | Descripción |
+|-----------|-------|-------------|
+| `server.port` | `8080` | Puerto del servidor. |
+| `server.servlet.context-path` | `/api/v1` | Prefijo de todos los endpoints. |
+| `jwt.expiration` | `86400000` | Vida del access token (24 h). |
+| `jwt.refresh-expiration` | `604800000` | Vida del refresh token (7 días). |
+| `jwt.issuer` | `HostFlow` | Claim `iss` del token. |
+| `app.password-reset.expiration-minutes` | `60` | Validez del código de recuperación. |
+| `app.password-reset.code-length` | `6` | Longitud del código. |
+| `app.inactivity.owner-milliseconds` | `600000` | Inactividad máxima Owner (10 min). |
+| `app.inactivity.admin-milliseconds` | `900000` | Inactividad máxima Admin (15 min). |
+| `app.inactivity.warning-before-milliseconds` | `60000` | Aviso previo al cierre (1 min). |
+| `app.security.max-failed-attempts` | `5` | Intentos fallidos antes del bloqueo. |
+| `app.security.block-duration-minutes` | `60` | Duración del bloqueo. |
+| `app.security.failed-attempts-window-minutes` | `60` | Ventana para contar intentos fallidos. |
 
-> `SecurityConfig` también permite `/api/v1/auth/**` para cubrir variantes de prefijo.
+### Perfiles
 
-#### Ejemplo — Login
-```bash
-curl -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"martina@hostflow.com","password":"Secret123"}'
+| Perfil | Uso | Notas |
+|--------|-----|-------|
+| `dev` | Desarrollo local | PostgreSQL local, `ddl-auto=update`, `show-sql=true`, Flyway desactivado. |
+| `prod` | Producción | `ddl-auto=validate`, Flyway activo, variables de entorno obligatorias. |
+
+---
+
+## 📡 Documentación de la API
+
+**URL base:** `http://localhost:8080/api/v1`
+
+La documentación interactiva está disponible en:
+
+- **Swagger UI:** `/swagger-ui.html`
+- **OpenAPI JSON:** `/api-docs`
+
+Para consumir endpoints protegidos, envía el token en la cabecera:
+
+```http
+Authorization: Bearer <JWT>
 ```
-```json
+
+### 🔑 Autenticación — `/auth` (público)
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| `POST` | `/auth/register` | Registra un propietario y envía el correo de verificación. |
+| `POST` | `/auth/login` | Inicia sesión y devuelve el JWT. |
+| `POST` | `/auth/forgot-password` | Envía un código de recuperación al correo. |
+| `POST` | `/auth/reset-password` | Restablece la contraseña con el código recibido. |
+| `GET`  | `/auth/verify-email?token=` | Verifica el correo con el token del enlace. |
+| `POST` | `/auth/resend-verification?email=` | Reenvía el correo de verificación. |
+
+**Ejemplo — registro**
+
+```http
+POST /api/v1/auth/register
+Content-Type: application/json
+
 {
-  "token": "eyJhbGciOiJIUzUxMiJ9...",
-  "tokenType": "Bearer",
-  "userId": 1,
-  "email": "martina@hostflow.com",
-  "fullName": "Martina Silva",
-  "roles": ["ROLE_OWNER"]
+  "fullName": "María Pérez",
+  "accommodationName": "Casa Rural El Roble",
+  "email": "maria@example.com",
+  "password": "MiClaveSegura123",
+  "termsAccepted": true
 }
 ```
 
-### 8.2 Dueños — `OwnerController` (requieren `Authorization: Bearer <token>`)
+**Ejemplo — login**
 
-| Método | Ruta | Rol requerido | Descripción |
-|---|---|---|---|
-| `GET` | `/owners/email/{email}` | `OWNER` o `ADMIN` | Detalle de un dueño por email. |
-| `GET` | `/owners/{id}` | `OWNER` o `ADMIN` | Detalle de un dueño por ID. |
-| `GET` | `/owners` | **`ADMIN` únicamente** | Listado completo de dueños. |
-| `PATCH` | `/owners/{id}/status?enabled=true\|false` | **`ADMIN` únicamente** | Activa/desactiva la cuenta (`enabled=false` impide el login sin borrar datos). |
+```http
+POST /api/v1/auth/login
+Content-Type: application/json
 
-> La restricción se aplica con `@PreAuthorize("hasAnyRole('OWNER','ADMIN')")` y `@PreAuthorize("hasRole('ADMIN')")` gracias a `@EnableMethodSecurity`.
+{
+  "email": "maria@example.com",
+  "password": "MiClaveSegura123"
+}
+```
+
+**Respuesta (campos principales)**
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "tokenType": "Bearer",
+  "userId": 1,
+  "email": "maria@example.com",
+  "fullName": "María Pérez",
+  "roles": ["ROLE_OWNER"],
+  "emailVerified": true,
+  "inactivityTimeoutMs": 600000,
+  "warningBeforeMs": 60000
+}
+```
+
+**Ejemplo — restablecer contraseña**
+
+```http
+POST /api/v1/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "maria@example.com",
+  "code": "123456",
+  "newPassword": "NuevaClave456"
+}
+```
+
+> Los nombres exactos de los campos de los DTO pueden consultarse en Swagger UI.
+
+### 👤 Propietarios — `/owners` (requiere JWT)
+
+| Método | Endpoint | Rol requerido | Descripción |
+|--------|----------|---------------|-------------|
+| `GET`   | `/owners` | `ADMIN` | Lista todos los propietarios. |
+| `GET`   | `/owners/{id}` | `OWNER`, `ADMIN` | Obtiene un propietario por ID. |
+| `GET`   | `/owners/email/{email}` | `OWNER`, `ADMIN` | Obtiene un propietario por correo. |
+| `PATCH` | `/owners/{id}/status?enabled=` | `ADMIN` | Habilita o deshabilita una cuenta. |
+
+### 🏠 Alojamiento — `/owners/accommodation` (requiere JWT, rol `OWNER`)
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| `POST` | `/owners/accommodation/disable` | Desactiva temporalmente el alojamiento (motivo y fechas obligatorios). |
+| `POST` | `/owners/accommodation/enable` | Reactiva el alojamiento. |
+| `GET`  | `/owners/accommodation/status` | Consulta el estado actual. |
+| `GET`  | `/owners/accommodation/history` | Historial de desactivaciones. |
+| `GET`  | `/owners/accommodation/availability?date=` | Verifica disponibilidad en una fecha/hora (`LocalDateTime` ISO-8601). |
+
+### Reglas de validación
+
+| Campo | Regla |
+|-------|-------|
+| `fullName` | Obligatorio, 3–150 caracteres. |
+| `accommodationName` | Obligatorio, 3–200 caracteres. |
+| `email` | Obligatorio, formato válido. |
+| `password` | Obligatorio, 8–100 caracteres. |
+| `termsAccepted` | Obligatorio (aceptación de términos y privacidad). |
+| `code` (recuperación) | Obligatorio, exactamente 6 caracteres. |
+| `reason` / `disabledFrom` (desactivación) | Obligatorios. |
 
 ---
 
-## 9. Modelo Entidad-Relación (MER)
+## 🗄 Modelo Entidad-Relación (MER)
+
+El esquema se genera automáticamente con Hibernate (`ddl-auto=update` en desarrollo) a partir de las entidades JPA del paquete `com.hostflow.model`.
 
 ```mermaid
 erDiagram
-    OWNER ||--o{ PASSWORD_RESET_TOKEN : "solicita (por email)"
-    OWNER }o--o{ ROLE : "tiene (tabla puente owner_roles)"
-
-    OWNER {
+    OWNERS {
         BIGINT id PK "IDENTITY"
         VARCHAR full_name "NOT NULL · 150"
         VARCHAR accommodation_name "NOT NULL · 200"
-        VARCHAR email "NOT NULL · UNIQUE · 150"
+        VARCHAR email UK "NOT NULL · UNIQUE · 150"
         VARCHAR password "NOT NULL · BCrypt hash"
         BOOLEAN terms_accepted "NOT NULL · default false"
         BOOLEAN enabled "NOT NULL · default true"
-        TIMESTAMP created_at "NOT NULL · @CreationTimestamp"
-        TIMESTAMP updated_at "NOT NULL · @UpdateTimestamp"
+        TIMESTAMP disabled_at "NULL · cuándo se deshabilitó"
+        BOOLEAN email_verified "NOT NULL · default false"
+        TIMESTAMP blocked_until "NULL · bloqueo por intentos fallidos"
+        TIMESTAMP created_at "NOT NULL · CreationTimestamp"
+        TIMESTAMP updated_at "NOT NULL · UpdateTimestamp"
     }
 
-    ROLE {
+    ROLES {
         BIGINT id PK "IDENTITY"
-        VARCHAR role_name "NOT NULL · UNIQUE · 50 · EnumType.STRING"
+        VARCHAR role_name UK "NOT NULL · UNIQUE · 50 · EnumType.STRING"
     }
 
     OWNER_ROLES {
@@ -317,91 +356,140 @@ erDiagram
         BIGINT role_id FK "→ roles.id"
     }
 
-    PASSWORD_RESET_TOKEN {
+    PASSWORD_RESET_TOKENS {
         BIGINT id PK "IDENTITY"
         VARCHAR token "NOT NULL · 10 · código de 6 dígitos"
         VARCHAR email "NOT NULL · 150 · dueño solicitante"
-        TIMESTAMP created_at "NOT NULL · @CreationTimestamp"
-        TIMESTAMP expires_at "NOT NULL · ahora + 60 min"
+        TIMESTAMP created_at "NOT NULL · CreationTimestamp"
+        TIMESTAMP expires_at "NOT NULL"
         BOOLEAN used "NOT NULL · default false"
     }
+
+    EMAIL_VERIFICATION_TOKENS {
+        BIGINT id PK "IDENTITY"
+        VARCHAR token UK "NOT NULL · UNIQUE · 100"
+        VARCHAR email "NOT NULL · 150 · idx_email"
+        TIMESTAMP created_at "NOT NULL · CreationTimestamp"
+        TIMESTAMP expires_at "NOT NULL"
+    }
+
+    LOGIN_ATTEMPTS {
+        BIGINT id PK "IDENTITY"
+        BIGINT owner_id "NULL · idx_owner_id · referencia lógica"
+        VARCHAR email "NOT NULL · 100"
+        VARCHAR full_name "NULL · 150"
+        VARCHAR role "NULL · 50"
+        BOOLEAN success "NOT NULL"
+        BOOLEAN blocked "NOT NULL"
+        TIMESTAMP blocked_until "NULL"
+        TIMESTAMP attempt_at "NOT NULL · CreationTimestamp"
+        VARCHAR ip_address "NULL · 45"
+        VARCHAR user_agent "NULL · 500"
+    }
+
+    ACCOMMODATION_TEMPORARY_DISABLES {
+        BIGINT id PK "IDENTITY"
+        BIGINT owner_id "NOT NULL · referencia lógica a owners.id"
+        VARCHAR reason "NOT NULL · 500"
+        TIMESTAMP disabled_from "NOT NULL"
+        TIMESTAMP disabled_until "NULL"
+        BOOLEAN is_active "NOT NULL · default true"
+        TIMESTAMP created_at "NOT NULL · CreationTimestamp"
+        TIMESTAMP updated_at "NULL · UpdateTimestamp"
+    }
+
+    OWNERS ||--o{ OWNER_ROLES : "tiene (tabla puente owner_roles)"
+    ROLES ||--o{ OWNER_ROLES : "asignado a"
+    OWNERS ||--o{ PASSWORD_RESET_TOKENS : "solicita (por email)"
+    OWNERS ||--o{ EMAIL_VERIFICATION_TOKENS : "recibe (por email)"
+    OWNERS |o--o{ LOGIN_ATTEMPTS : "genera (por owner_id / email)"
+    OWNERS ||--o{ ACCOMMODATION_TEMPORARY_DISABLES : "registra (por owner_id)"
 ```
 
-### Reglas del modelo
+### Descripción de las tablas
 
-1. **`OWNER` ↔ `ROLE` (N:M)** — relación `@ManyToMany(fetch = EAGER)` con tabla puente **`owner_roles`** (`owner_id`, `role_id`). Un dueño puede acumular varios roles; todo registro nuevo recibe `ROLE_OWNER` por defecto.
-2. **`OWNER` ↔ `PASSWORD_RESET_TOKEN` (1:N lógica)** — el token **no usa FK**, almacena el `email` del solicitante. Cada solicitud nueva **elimina los tokens pendientes anteriores** (`findByEmailAndUsedFalse` + `deleteAll`) y el token es **de un solo uso** (`used=true` tras el cambio).
-3. **Unicidades e integridad:** `owners.email` y `roles.role_name` son `UNIQUE`; `terms_accepted` y `enabled` son `NOT NULL` con valores por defecto.
-4. **`Role.roleName`** se persiste como `VARCHAR` con `@Enumerated(EnumType.STRING)` (robusto ante reordenamientos del enum).
-5. **Auditoría:** `created_at` / `updated_at` gestionados por Hibernate (`@CreationTimestamp` / `@UpdateTimestamp`).
-6. **DDL:** gestionado por Hibernate (`spring.jpa.hibernate.ddl-auto=update`); en producción se recomienda `validate` + migraciones **Flyway** (`db/migration`).
+| Tabla | Propósito |
+|-------|-----------|
+| `owners` | Usuario/propietario: datos personales, credenciales, estado (`enabled`, `email_verified`, `blocked_until`) y fechas de auditoría. |
+| `roles` | Catálogo de roles del sistema (`ROLE_ADMIN`, `ROLE_OWNER`). |
+| `owner_roles` | Tabla puente de la relación *many-to-many* entre `owners` y `roles`. |
+| `password_reset_tokens` | Códigos de recuperación de contraseña con expiración y marca de uso. |
+| `email_verification_tokens` | Tokens únicos de verificación de correo con expiración. |
+| `login_attempts` | Auditoría de intentos de inicio de sesión (éxito, bloqueo, IP y *user agent*). |
+| `accommodation_temporary_disables` | Periodos de desactivación temporal de un alojamiento, con motivo y rango de fechas. |
+
+### Índices
+
+| Tabla | Índice | Columnas |
+|-------|--------|----------|
+| `email_verification_tokens` | `idx_token_unique` (único) | `token` |
+| `email_verification_tokens` | `idx_email` | `email` |
+| `login_attempts` | `idx_email_attempt` | `email`, `attempt_at` |
+| `login_attempts` | `idx_owner_id` | `owner_id` |
+| `accommodation_temporary_disables` | `idx_owner_active` | `owner_id`, `is_active` |
+| `accommodation_temporary_disables` | `idx_disable_dates` | `disabled_from`, `disabled_until` |
+| `accommodation_temporary_disables` | `idx_owner_created` | `owner_id`, `created_at` |
+
+> **Nota:** `password_reset_tokens`, `email_verification_tokens`, `login_attempts` y `accommodation_temporary_disables` se relacionan con `owners` mediante `email` u `owner_id` como **referencia lógica**, sin clave foránea declarada en la base de datos. Las únicas claves foráneas explícitas son las de `owner_roles`.
 
 ---
 
-## 10. Flujo de seguridad (JWT stateless)
+## 🛡 Seguridad
 
+- **Autenticación *stateless*** con JWT; filtro `JwtAuthenticationFilter` antes de `UsernamePasswordAuthenticationFilter`.
+- **Contraseñas** cifradas con **BCrypt**.
+- **CSRF deshabilitado** (API sin sesión) y **CORS** configurado para los orígenes:
+  `http://localhost:3000`, `http://localhost:4200` y `http://localhost:8080`.
+- **Rutas públicas:** `/auth/**`, Swagger/OpenAPI, `/static/**` y `/public/**`. Cualquier otra requiere autenticación.
+- **Bloqueo de cuenta** tras intentos fallidos consecutivos.
+- **Verificación de correo obligatoria** antes de poder iniciar sesión.
+
+---
+
+## 🚨 Manejo de errores
+
+Las excepciones se centralizan en `GlobalExceptionHandler`:
+
+| Excepción | Uso |
+|-----------|-----|
+| `BusinessException` | Violaciones de reglas de negocio. |
+| `ResourceNotFoundException` | Recurso inexistente. |
+| Errores de validación | Mensajes definidos en los DTO (`@Valid`). |
+
+---
+
+## 🌿 Flujo de trabajo con Git
+
+Se recomienda trabajar con ramas por funcionalidad:
+
+```bash
+git checkout -b feature/nombre-de-la-funcionalidad
+git add .
+git commit -m "feat: descripción breve del cambio"
+git push origin feature/nombre-de-la-funcionalidad
 ```
-1. Cliente ──POST /auth/login {email,password}──► AuthController
-2. AuthService ──► AuthenticationManager ──► DaoAuthenticationProvider
-   (CustomUserDetailsService carga el Owner por email; BCrypt verifica hash)
-3. JwtService firma JWT HS512: {sub=email, iss=HostFlow, iat, exp=+24h}
-4. Cliente guarda el token y lo envía en cada request:
-      Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
-5. JwtAuthenticationFilter (antes de UsernamePasswordAuthenticationFilter):
-   - Endpoints públicos (/auth/**, swagger) → continúa sin validar
-   - Extrae el token, valida firma y expiración, carga UserDetails
-   - Establece SecurityContextHolder → request autenticada
-6. @PreAuthorize evalúa roles a nivel de método
-```
 
-**Hardening aplicado:**
-- 🔐 Contraseñas solo como hash **BCrypt** (`PasswordEncoderConfig`).
-- 🔐 **Anti-enumeración:** `forgot-password` siempre responde éxito, aunque el email no exista.
-- 🔐 **Anti-replay de códigos:** expiración de 60 min, un solo uso, invalidación de anteriores.
-- 🔐 Emails **ofuscados** en respuestas (`u***@d***.com`).
-- 🔐 Sesión **STATELESS** (sin cookies de sesión) + **CSRF deshabilitado** (API sin estado).
-- 🔐 **CORS** restringido a orígenes de desarrollo (`localhost:3000/4200/8080`).
+Convención de commits sugerida: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`. Los cambios se integran mediante *Pull Request* con revisión de al menos un compañero.
 
 ---
 
-## 11. Manejo de excepciones (`GlobalExceptionHandler`)
+## 🏭 Consideraciones para producción
 
-| Excepción | HTTP | Escenario |
-|---|---|---|
-| `ResourceNotFoundException` | `404` | Dueño no encontrado por ID/email. |
-| `BusinessException` | `400` | Email duplicado, términos no aceptados, código inválido/expirado/usado. |
-| `MethodArgumentNotValidException` | `400` | Fallo de Bean Validation en DTOs (`@NotBlank`, `@Email`, `@Size`, …). |
-| `UsernameNotFoundException` | `401` | Credenciales inexistentes (Spring Security). |
-| Acceso denegado / sin autenticación | `401` / `403` | Token ausente/inválido o rol insuficiente (`@PreAuthorize`). |
+Antes de desplegar, revisa esta lista:
 
----
-
-## 12. Solución de problemas comunes
-
-| Síntoma | Causa | Solución |
-|---|---|---|
-| `mvnw: Permission denied` (Linux/Mac) | Falta permiso de ejecución | `chmod +x mvnw` |
-| `Port 8080 already in use` | Puerto ocupado | Cambiar `server.port` o liberar: `lsof -i :8080` → `kill <PID>` |
-| `Connection refused` a PostgreSQL | Servidor BD caído o BD inexistente | Iniciar PostgreSQL y ejecutar `CREATE DATABASE hostflow;` |
-| Error `jwt.secret` / app no arranca | Falta la propiedad o < 64 bytes (HS512) | Definir `JWT_SECRET` con ≥ 64 caracteres |
-| El correo de recuperación no llega | SMTP bloqueado o credenciales | Usar *app password* (Gmail) o MailHog en desarrollo |
-| `401 Unauthorized` en `/owners/**` | Token ausente o expirado | Header: `Authorization: Bearer <token>`; renovar vía login |
-| `403 Forbidden` en listado de dueños | Rol insuficiente | Solo `ADMIN` puede `GET /owners` y cambiar estados |
-| Lombok no genera getters en el IDE | Annotations processing desactivado | IntelliJ: `Settings → Build → Compiler → Annotation Processors → Enable` |
+- [ ] Cambiar `spring.jpa.hibernate.ddl-auto` a **`validate`** y activar **Flyway**.
+- [ ] Deshabilitar `DataInitializer` fuera de desarrollo (por ejemplo con `@Profile("dev")`).
+- [ ] **Eliminar la contraseña del administrador escrita en el código** del inicializador y usar `ADMIN_PASSWORD` (propiedad `app.admin.password`).
+- [ ] Definir `JWT_SECRET` robusto (32+ caracteres) mediante variable de entorno.
+- [ ] Ajustar los orígenes **CORS** al dominio real del frontend.
+- [ ] Reducir los niveles de log (`DEBUG` → `INFO`) y desactivar `show-sql`.
+- [ ] Usar una cuenta de correo transaccional dedicada y no personal.
+- [ ] Restringir o proteger el acceso a Swagger UI.
 
 ---
 
-## 13. Buenas prácticas aplicadas en el código
+## 👥 Equipo y licencia
 
-- ✅ **DTOs de entrada/salida** separados de las entidades (`OwnerRegisterRequest`, `AuthResponse`, `OwnerResponse`…).
-- ✅ **Bean Validation** en los DTOs (`@Valid` en los controladores).
-- ✅ **Hash BCrypt** y tokens de recuperación con expiración y un solo uso.
-- ✅ **Configuración externalizada** (`@Value` con valores por defecto seguros, ej. `spring.mail.username:no-reply@hostflow.com`).
-- ✅ **Transaccionalidad** explícita (`@Transactional`, lecturas con `readOnly = true`).
-- ✅ **Documentación viva** con anotaciones OpenAPI (`@Operation`, `@ApiResponses`, `@SecurityRequirement`, `@Tag`).
-- ✅ **Respuestas de error uniformes** vía `@RestControllerAdvice`.
-- ✅ **Constructor injection** con Lombok `@RequiredArgsConstructor` (inmutabilidad y testabilidad).
+Desarrollado por el **HostFlow Team**.
 
----
-
-*Documentación técnica del equipo Backend — HostFlow v1.0.0*
+Licencia: _por definir_ (agrega un archivo `LICENSE` en la raíz del repositorio).
