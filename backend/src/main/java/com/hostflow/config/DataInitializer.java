@@ -1,4 +1,4 @@
-﻿package com.hostflow.config;
+package com.hostflow.config;
 
 import com.hostflow.enums.RoleType;
 import com.hostflow.model.Owner;
