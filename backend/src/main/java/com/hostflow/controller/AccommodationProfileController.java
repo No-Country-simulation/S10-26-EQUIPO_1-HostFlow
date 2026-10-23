@@ -45,7 +45,7 @@ public class AccommodationProfileController {
             description = "Crea el perfil del propietario autenticado. No se recibe ownerId desde el cliente y solo se permite un perfil por propietario. No modifica la desactivación temporal ni la disponibilidad.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
-                    description = "Datos generales, capacidad, precio, identidad visual, contacto y datos bancarios.",
+                    description = "Datos generales, capacidad, precio, identidad visual y contacto.",
                     content = @Content(schema = @Schema(implementation = AccommodationProfileRequest.class),
                             examples = @ExampleObject(name = "Perfil de ejemplo", value = """
                                     {
@@ -59,13 +59,7 @@ public class AccommodationProfileController {
                                       "welcomeMessage": "¡Te damos la bienvenida!",
                                       "email": "reservas@example.com",
                                       "phone": "+54 11 5555 5555",
-                                      "address": "Delta del Tigre",
-                                      "bankName": "Banco de ejemplo",
-                                      "bankAccountHolder": "Alojamiento Ejemplo",
-                                      "bankAccountNumber": "123456789",
-                                      "bankCbuCvu": "0000000000000000000000",
-                                      "bankAlias": "CABANAS.RIO",
-                                      "bankCuit": "20123456789"
+                                      "address": "Delta del Tigre"
                                     }
                                     """)))
     )
