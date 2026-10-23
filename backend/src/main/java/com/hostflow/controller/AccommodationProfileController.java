@@ -97,38 +97,22 @@ public class AccommodationProfileController {
         return ResponseEntity.ok(AccommodationProfileResponse.from(accommodation));
     }
 
-    @PutMapping("/profile")
+    @PatchMapping("/profile")
     @Operation(operationId = "updateAccommodationProfile",
-            summary = "Actualizar mi perfil de alojamiento",
-            description = "Actualiza los datos del perfil existente. No permite seleccionar un propietario mediante un ID enviado por el cliente ni modifica la desactivación temporal.",
+            summary = "Actualizar parcialmente mi perfil de alojamiento",
+            description = "Actualiza únicamente los campos informados en la solicitud. Los campos omitidos o enviados como null permanecen sin cambios. No permite seleccionar un propietario mediante un ID enviado por el cliente ni modifica la desactivación temporal.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = true, description = "Datos actualizados del alojamiento.",
+                    required = true, description = "Enviar solo los campos que se desean modificar. Los campos omitidos o null se conservan sin cambios.",
                     content = @Content(schema = @Schema(implementation = AccommodationProfileRequest.class),
-                            examples = @ExampleObject(name = "Perfil actualizado", value = """
+                            examples = @ExampleObject(name = "Actualización parcial de precio", value = """
                                     {
-                                      "name": "Cabañas del Río Azul",
-                                      "roomCount": 8,
-                                      "bathroomCount": 4,
-                                      "guestCapacity": 20,
-                                      "basePrice": 90000.00,
-                                      "logoUrl": "https://example.com/logo-azul.png",
-                                      "primaryColor": "#123456",
-                                      "welcomeMessage": "Te esperamos.",
-                                      "email": "reservas@example.com",
-                                      "phone": "+54 11 5555 5555",
-                                      "address": "Delta del Tigre",
-                                      "bankName": "Banco de ejemplo",
-                                      "bankAccountHolder": "Alojamiento Ejemplo",
-                                      "bankAccountNumber": "123456789",
-                                      "bankCbuCvu": "0000000000000000000000",
-                                      "bankAlias": "CABANAS.RIO",
-                                      "bankCuit": "20123456789"
+                                      "basePrice": 90000.00
                                     }
                                     """)))
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Perfil actualizado correctamente", content = @Content(schema = @Schema(implementation = AccommodationProfileResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos o solicitud sin campos modificables", content = @Content),
             @ApiResponse(responseCode = "401", description = "Token ausente o inválido", content = @Content),
             @ApiResponse(responseCode = "403", description = "El usuario no tiene el rol OWNER", content = @Content),
             @ApiResponse(responseCode = "404", description = "No existe un perfil para el propietario autenticado", content = @Content)
