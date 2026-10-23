@@ -33,22 +33,31 @@ public class AccommodationProfileService {
         if (accommodationRepository.existsByOwner_Id(ownerId)) {
             throw new BusinessException("Ya existe un alojamiento asociado a este propietario.", "ACCOMMODATION_ALREADY_EXISTS");
         }
+        if (request.getName() == null || request.getName().isBlank()) {
+            throw new BusinessException("El nombre del alojamiento es obligatorio.");
+        }
         Owner owner = ownerRepository.findById(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontró el propietario autenticado."));
         Accommodation accommodation = new Accommodation();
         accommodation.setOwner(owner);
         applyRequest(accommodation, request);
         // El modelo de autenticación también conserva el nombre comercial registrado inicialmente.
-        owner.setAccommodationName(request.name().trim());
+        owner.setAccommodationName(request.getName().trim());
         return accommodationRepository.save(accommodation);
     }
 
     @Transactional
     public Accommodation updateProfile(Long ownerId, AccommodationProfileRequest request) {
+        if (isEmptyPatch(request)) {
+            throw new BusinessException("Debe enviar al menos un campo para actualizar.");
+        }
         Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("No existe un alojamiento para editar. Regístrelo primero."));
-        applyRequest(accommodation, request);
-        accommodation.getOwner().setAccommodationName(request.name().trim());
+        applyPatch(accommodation, request);
+        // Solo sincronizar el nombre del modelo de autenticación si se modificó en el PATCH.
+        if (request.getName() != null) {
+            accommodation.getOwner().setAccommodationName(request.getName().trim());
+        }
         return accommodationRepository.save(accommodation);
     }
 
@@ -82,24 +91,76 @@ public class AccommodationProfileService {
         }
     }
 
+    private boolean isEmptyPatch(AccommodationProfileRequest r) {
+        return r.getName() == null
+                && r.getRoomCount() == null
+                && r.getBathroomCount() == null
+                && r.getGuestCapacity() == null
+                && r.getBasePrice() == null
+                && r.getLogoUrl() == null
+                && r.getPrimaryColor() == null
+                && r.getWelcomeMessage() == null
+                && r.getEmail() == null
+                && r.getPhone() == null
+                && r.getAddress() == null
+                && r.getBankName() == null
+                && r.getBankAccountHolder() == null
+                && r.getBankAccountNumber() == null
+                && r.getBankCbuCvu() == null
+                && r.getBankAlias() == null
+                && r.getBankCuit() == null;
+    }
+
+    /** Aplica todos los campos para la creación del perfil. */
     private void applyRequest(Accommodation a, AccommodationProfileRequest r) {
-        a.setName(r.name().trim());
-        a.setRoomCount(r.roomCount());
-        a.setBathroomCount(r.bathroomCount());
-        a.setGuestCapacity(r.guestCapacity());
-        a.setBasePrice(r.basePrice());
-        a.setLogoUrl(blankToNull(r.logoUrl()));
-        a.setPrimaryColor(blankToNull(r.primaryColor()));
-        a.setWelcomeMessage(blankToNull(r.welcomeMessage()));
-        a.setEmail(blankToNull(r.email()));
-        a.setPhone(blankToNull(r.phone()));
-        a.setAddress(blankToNull(r.address()));
-        a.setBankName(blankToNull(r.bankName()));
-        a.setBankAccountHolder(blankToNull(r.bankAccountHolder()));
-        a.setBankAccountNumber(blankToNull(r.bankAccountNumber()));
-        a.setBankCbuCvu(blankToNull(r.bankCbuCvu()));
-        a.setBankAlias(blankToNull(r.bankAlias()));
-        a.setBankCuit(blankToNull(r.bankCuit()));
+        a.setName(r.getName().trim());
+        a.setRoomCount(r.getRoomCount());
+        a.setBathroomCount(r.getBathroomCount());
+        a.setGuestCapacity(r.getGuestCapacity());
+        a.setBasePrice(r.getBasePrice());
+        a.setLogoUrl(blankToNull(r.getLogoUrl()));
+        a.setPrimaryColor(blankToNull(r.getPrimaryColor()));
+        a.setWelcomeMessage(blankToNull(r.getWelcomeMessage()));
+        a.setEmail(blankToNull(r.getEmail()));
+        a.setPhone(blankToNull(r.getPhone()));
+        a.setAddress(blankToNull(r.getAddress()));
+        a.setBankName(blankToNull(r.getBankName()));
+        a.setBankAccountHolder(blankToNull(r.getBankAccountHolder()));
+        a.setBankAccountNumber(blankToNull(r.getBankAccountNumber()));
+        a.setBankCbuCvu(blankToNull(r.getBankCbuCvu()));
+        a.setBankAlias(blankToNull(r.getBankAlias()));
+        a.setBankCuit(blankToNull(r.getBankCuit()));
+    }
+
+    /**
+     * Aplica únicamente los campos no nulos. En este contrato, tanto un campo omitido
+     * como uno enviado explícitamente como null significan "no modificar".
+     * Para limpiar campos de texto opcionales, se puede enviar una cadena vacía cuando
+     * sus validaciones lo permitan; blankToNull la persiste como null.
+     */
+    private void applyPatch(Accommodation a, AccommodationProfileRequest r) {
+        if (r.getName() != null) {
+            if (r.getName().isBlank()) {
+                throw new BusinessException("El nombre del alojamiento no puede estar vacío.");
+            }
+            a.setName(r.getName().trim());
+        }
+        if (r.getRoomCount() != null) a.setRoomCount(r.getRoomCount());
+        if (r.getBathroomCount() != null) a.setBathroomCount(r.getBathroomCount());
+        if (r.getGuestCapacity() != null) a.setGuestCapacity(r.getGuestCapacity());
+        if (r.getBasePrice() != null) a.setBasePrice(r.getBasePrice());
+        if (r.getLogoUrl() != null) a.setLogoUrl(blankToNull(r.getLogoUrl()));
+        if (r.getPrimaryColor() != null) a.setPrimaryColor(blankToNull(r.getPrimaryColor()));
+        if (r.getWelcomeMessage() != null) a.setWelcomeMessage(blankToNull(r.getWelcomeMessage()));
+        if (r.getEmail() != null) a.setEmail(blankToNull(r.getEmail()));
+        if (r.getPhone() != null) a.setPhone(blankToNull(r.getPhone()));
+        if (r.getAddress() != null) a.setAddress(blankToNull(r.getAddress()));
+        if (r.getBankName() != null) a.setBankName(blankToNull(r.getBankName()));
+        if (r.getBankAccountHolder() != null) a.setBankAccountHolder(blankToNull(r.getBankAccountHolder()));
+        if (r.getBankAccountNumber() != null) a.setBankAccountNumber(blankToNull(r.getBankAccountNumber()));
+        if (r.getBankCbuCvu() != null) a.setBankCbuCvu(blankToNull(r.getBankCbuCvu()));
+        if (r.getBankAlias() != null) a.setBankAlias(blankToNull(r.getBankAlias()));
+        if (r.getBankCuit() != null) a.setBankCuit(blankToNull(r.getBankCuit()));
     }
 
     private String blankToNull(String value) {
