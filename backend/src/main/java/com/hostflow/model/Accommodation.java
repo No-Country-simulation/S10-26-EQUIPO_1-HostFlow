@@ -33,12 +33,10 @@ public class Accommodation {
     @Column(length = 150) private String email;
     @Column(length = 40) private String phone;
     @Column(columnDefinition = "TEXT") private String address;
-    @Column(name = "bank_name", length = 150) private String bankName;
-    @Column(name = "bank_account_holder", length = 200) private String bankAccountHolder;
-    @Column(name = "bank_account_number", length = 100) private String bankAccountNumber;
-    @Column(name = "bank_cbu_cvu", length = 22) private String bankCbuCvu;
-    @Column(name = "bank_alias", length = 100) private String bankAlias;
-    @Column(name = "bank_cuit", length = 20) private String bankCuit;
+
+    @OneToMany(mappedBy = "accommodation", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<AccommodationPaymentMethod> paymentMethods = new ArrayList<>();
 
     @OneToMany(mappedBy = "accommodation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC, id ASC")

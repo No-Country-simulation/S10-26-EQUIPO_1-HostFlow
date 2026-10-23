@@ -51,30 +51,6 @@ public class AccommodationProfileRequest {
     @Size(max = 5000)
     private String address;
 
-    @Schema(description = "Nombre del banco o billetera.", example = "Banco de ejemplo", maxLength = 150, nullable = true)
-    @Size(max = 150)
-    private String bankName;
-
-    @Schema(description = "Titular de la cuenta bancaria.", example = "Alojamiento Ejemplo", maxLength = 200, nullable = true)
-    @Size(max = 200)
-    private String bankAccountHolder;
-
-    @Schema(description = "Número de cuenta bancaria, cuando corresponda.", example = "123456789", maxLength = 100, nullable = true)
-    @Size(max = 100)
-    private String bankAccountNumber;
-
-    @Schema(description = "CBU o CVU para transferencias.", example = "0000000000000000000000", maxLength = 22, nullable = true)
-    @Size(max = 22)
-    private String bankCbuCvu;
-
-    @Schema(description = "Alias bancario para transferencias.", example = "CABANAS.RIO", maxLength = 100, nullable = true)
-    @Size(max = 100)
-    private String bankAlias;
-
-    @Schema(description = "Identificación fiscal del titular.", example = "20123456789", maxLength = 20, nullable = true)
-    @Size(max = 20)
-    private String bankCuit;
-
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public Integer getRoomCount() { return roomCount; }
@@ -97,16 +73,4 @@ public class AccommodationProfileRequest {
     public void setPhone(String phone) { this.phone = phone; }
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
-    public String getBankName() { return bankName; }
-    public void setBankName(String bankName) { this.bankName = bankName; }
-    public String getBankAccountHolder() { return bankAccountHolder; }
-    public void setBankAccountHolder(String bankAccountHolder) { this.bankAccountHolder = bankAccountHolder; }
-    public String getBankAccountNumber() { return bankAccountNumber; }
-    public void setBankAccountNumber(String bankAccountNumber) { this.bankAccountNumber = bankAccountNumber; }
-    public String getBankCbuCvu() { return bankCbuCvu; }
-    public void setBankCbuCvu(String bankCbuCvu) { this.bankCbuCvu = bankCbuCvu; }
-    public String getBankAlias() { return bankAlias; }
-    public void setBankAlias(String bankAlias) { this.bankAlias = bankAlias; }
-    public String getBankCuit() { return bankCuit; }
-    public void setBankCuit(String bankCuit) { this.bankCuit = bankCuit; }
 }
