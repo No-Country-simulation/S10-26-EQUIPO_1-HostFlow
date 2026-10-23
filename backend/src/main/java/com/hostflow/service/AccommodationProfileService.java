@@ -103,12 +103,7 @@ public class AccommodationProfileService {
                 && r.getEmail() == null
                 && r.getPhone() == null
                 && r.getAddress() == null
-                && r.getBankName() == null
-                && r.getBankAccountHolder() == null
-                && r.getBankAccountNumber() == null
-                && r.getBankCbuCvu() == null
-                && r.getBankAlias() == null
-                && r.getBankCuit() == null;
+                ;
     }
 
     /** Aplica todos los campos para la creación del perfil. */
@@ -124,12 +119,6 @@ public class AccommodationProfileService {
         a.setEmail(blankToNull(r.getEmail()));
         a.setPhone(blankToNull(r.getPhone()));
         a.setAddress(blankToNull(r.getAddress()));
-        a.setBankName(blankToNull(r.getBankName()));
-        a.setBankAccountHolder(blankToNull(r.getBankAccountHolder()));
-        a.setBankAccountNumber(blankToNull(r.getBankAccountNumber()));
-        a.setBankCbuCvu(blankToNull(r.getBankCbuCvu()));
-        a.setBankAlias(blankToNull(r.getBankAlias()));
-        a.setBankCuit(blankToNull(r.getBankCuit()));
     }
 
     /**
@@ -155,12 +144,6 @@ public class AccommodationProfileService {
         if (r.getEmail() != null) a.setEmail(blankToNull(r.getEmail()));
         if (r.getPhone() != null) a.setPhone(blankToNull(r.getPhone()));
         if (r.getAddress() != null) a.setAddress(blankToNull(r.getAddress()));
-        if (r.getBankName() != null) a.setBankName(blankToNull(r.getBankName()));
-        if (r.getBankAccountHolder() != null) a.setBankAccountHolder(blankToNull(r.getBankAccountHolder()));
-        if (r.getBankAccountNumber() != null) a.setBankAccountNumber(blankToNull(r.getBankAccountNumber()));
-        if (r.getBankCbuCvu() != null) a.setBankCbuCvu(blankToNull(r.getBankCbuCvu()));
-        if (r.getBankAlias() != null) a.setBankAlias(blankToNull(r.getBankAlias()));
-        if (r.getBankCuit() != null) a.setBankCuit(blankToNull(r.getBankCuit()));
     }
 
     private String blankToNull(String value) {
