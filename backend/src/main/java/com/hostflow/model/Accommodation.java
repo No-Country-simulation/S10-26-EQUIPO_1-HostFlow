@@ -28,6 +28,7 @@ public class Accommodation {
     @Column(name = "base_price", precision = 12, scale = 2) private BigDecimal basePrice;
 
     @Column(name = "logo_url", length = 2048) private String logoUrl;
+    @Column(name = "logo_public_id", length = 255) private String logoPublicId;
     @Column(name = "primary_color", length = 20) private String primaryColor;
     @Column(name = "welcome_message", columnDefinition = "TEXT") private String welcomeMessage;
     @Column(length = 150) private String email;
