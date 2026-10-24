@@ -54,7 +54,6 @@ class AccommodationProfileRollbackIntegrationTest {
         owner.setPassword("test-password");
         owner.setTermsAccepted(true);
         owner.setEnabled(true);
-        owner.setEmailVerified(true);
 
         owner = ownerRepository.saveAndFlush(owner);
 
