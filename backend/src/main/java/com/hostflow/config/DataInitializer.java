@@ -140,6 +140,7 @@ public class DataInitializer implements CommandLineRunner {
                     .password(passwordEncoder.encode("adminPassword")) // Encriptación BCrypt obligatoria
                     .termsAccepted(true)
                     .enabled(true)
+                    .emailVerified(false)
                     .roles(Set.of(adminRole, ownerRole))
                     .build();
 
