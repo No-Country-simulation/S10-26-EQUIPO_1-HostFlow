@@ -2,6 +2,7 @@ package com.hostflow.service;
 
 import com.hostflow.dto.request.AccommodationImageRequest;
 import com.hostflow.dto.request.AccommodationProfileRequest;
+import com.hostflow.dto.response.CloudinaryUploadResult;
 import com.hostflow.exception.BusinessException;
 import com.hostflow.exception.ResourceNotFoundException;
 import com.hostflow.model.Accommodation;
@@ -11,16 +12,22 @@ import com.hostflow.repository.AccommodationImageRepository;
 import com.hostflow.repository.AccommodationRepository;
 import com.hostflow.repository.OwnerRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AccommodationProfileService {
     private final AccommodationRepository accommodationRepository;
     private final AccommodationImageRepository imageRepository;
     private final OwnerRepository ownerRepository;
+    private final CloudinaryImageService cloudinaryImageService;
 
     @Transactional(readOnly = true)
     public Accommodation getProfile(Long ownerId) {
@@ -67,6 +74,81 @@ public class AccommodationProfileService {
         return imageRepository.findAllByAccommodation_IdOrderByCreatedAtAscIdAsc(accommodation.getId());
     }
 
+    /**
+     * Sube una imagen a Cloudinary y registra su URL segura en la galería del alojamiento.
+     */
+    @Transactional
+    public AccommodationImage uploadGalleryImage(Long ownerId, MultipartFile file) {
+        Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Registre los datos generales del alojamiento antes de agregar imágenes."));
+
+        CloudinaryUploadResult uploaded = cloudinaryImageService.uploadImage(file);
+        AccommodationImage image = AccommodationImage.builder()
+                .accommodation(accommodation)
+                .imageUrl(uploaded.secureUrl())
+                .cloudinaryPublicId(uploaded.publicId())
+                .build();
+        return imageRepository.save(image);
+    }
+
+    /**
+     * Sube el logotipo a Cloudinary y actualiza el logoUrl del alojamiento.
+     */
+    @Transactional
+    public Accommodation uploadLogo(Long ownerId, MultipartFile file) {
+        Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Registre los datos generales del alojamiento antes de actualizar el logotipo."));
+
+        // Conservamos el logo actual hasta que el nuevo esté subido y la BD confirme el cambio.
+        String previousPublicId = accommodation.getLogoPublicId();
+        String previousLogoUrl = accommodation.getLogoUrl();
+        CloudinaryUploadResult uploaded = cloudinaryImageService.uploadImage(file);
+
+        accommodation.setLogoUrl(uploaded.secureUrl());
+        accommodation.setLogoPublicId(uploaded.publicId());
+
+        // Cloudinary no participa en la transacción de la BD. Por eso la limpieza remota
+        // se ejecuta solo cuando la transacción termina, evitando borrar el logo anterior
+        // si la persistencia del nuevo logo falla.
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            // No borramos el recurso anterior fuera de una sincronización transaccional:
+            // no podríamos garantizar que el cambio de la BD haya quedado confirmado.
+            log.warn("No hay sincronización transaccional activa al sustituir el logo; se conserva el logo anterior en Cloudinary.");
+        } else {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status == STATUS_COMMITTED) {
+                        if (previousPublicId != null && !previousPublicId.isBlank()
+                                && !previousPublicId.equals(uploaded.publicId())) {
+                            try {
+                                cloudinaryImageService.deleteImage(previousPublicId);
+                            } catch (RuntimeException ex) {
+                                log.warn("El logo nuevo quedó guardado, pero no se pudo eliminar el logo anterior {}. Requiere limpieza posterior.", previousPublicId, ex);
+                            }
+                        } else if (previousLogoUrl != null && !previousLogoUrl.isBlank()
+                                && (previousPublicId == null || previousPublicId.isBlank())) {
+                            log.info("El logo anterior {} no tiene logo_public_id registrado; se conserva en Cloudinary para evitar eliminar un recurso incorrecto.", previousLogoUrl);
+                        }
+                    } else {
+                        // La BD rechazó el cambio: el logo nuevo no debe quedar huérfano.
+                        try {
+                            cloudinaryImageService.deleteImage(uploaded.publicId());
+                        } catch (RuntimeException ex) {
+                            log.warn("La actualización del logo no se confirmó y tampoco se pudo limpiar el nuevo recurso {}.", uploaded.publicId(), ex);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Guardamos después de registrar el callback: si save() falla, la finalización
+        // de la transacción limpiará el recurso nuevo que acabamos de subir.
+        return accommodationRepository.save(accommodation);
+    }
+
     @Transactional
     public AccommodationImage addImage(Long ownerId, AccommodationImageRequest request) {
         Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
@@ -80,11 +162,16 @@ public class AccommodationProfileService {
     public void deleteImage(Long ownerId, Long imageId) {
         Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("No existe un alojamiento para este propietario."));
-        imageRepository.findByIdAndAccommodation_Id(imageId, accommodation.getId())
+        AccommodationImage image = imageRepository.findByIdAndAccommodation_Id(imageId, accommodation.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontró esa imagen en la galería de tu alojamiento."));
 
-        // DELETE explícito y acotado por alojamiento: no depende del estado de la colección
-        // images que pueda estar cargada en memoria dentro del contexto de persistencia.
+        // Solo borramos en Cloudinary recursos subidos por esta aplicación. Las URLs externas
+        // registradas mediante POST /gallery no tienen un public_id administrado por HostFlow.
+        if (image.getCloudinaryPublicId() != null && !image.getCloudinaryPublicId().isBlank()) {
+            cloudinaryImageService.deleteImage(image.getCloudinaryPublicId());
+        }
+
+        // El registro se elimina únicamente después de confirmar la operación remota.
         int deletedRows = imageRepository.deleteImageFromAccommodation(imageId, accommodation.getId());
         if (deletedRows == 0) {
             throw new ResourceNotFoundException("No se encontró esa imagen en la galería de tu alojamiento.");
@@ -97,7 +184,6 @@ public class AccommodationProfileService {
                 && r.getBathroomCount() == null
                 && r.getGuestCapacity() == null
                 && r.getBasePrice() == null
-                && r.getLogoUrl() == null
                 && r.getPrimaryColor() == null
                 && r.getWelcomeMessage() == null
                 && r.getEmail() == null
@@ -113,7 +199,6 @@ public class AccommodationProfileService {
         a.setBathroomCount(r.getBathroomCount());
         a.setGuestCapacity(r.getGuestCapacity());
         a.setBasePrice(r.getBasePrice());
-        a.setLogoUrl(blankToNull(r.getLogoUrl()));
         a.setPrimaryColor(blankToNull(r.getPrimaryColor()));
         a.setWelcomeMessage(blankToNull(r.getWelcomeMessage()));
         a.setEmail(blankToNull(r.getEmail()));
@@ -138,7 +223,6 @@ public class AccommodationProfileService {
         if (r.getBathroomCount() != null) a.setBathroomCount(r.getBathroomCount());
         if (r.getGuestCapacity() != null) a.setGuestCapacity(r.getGuestCapacity());
         if (r.getBasePrice() != null) a.setBasePrice(r.getBasePrice());
-        if (r.getLogoUrl() != null) a.setLogoUrl(blankToNull(r.getLogoUrl()));
         if (r.getPrimaryColor() != null) a.setPrimaryColor(blankToNull(r.getPrimaryColor()));
         if (r.getWelcomeMessage() != null) a.setWelcomeMessage(blankToNull(r.getWelcomeMessage()));
         if (r.getEmail() != null) a.setEmail(blankToNull(r.getEmail()));

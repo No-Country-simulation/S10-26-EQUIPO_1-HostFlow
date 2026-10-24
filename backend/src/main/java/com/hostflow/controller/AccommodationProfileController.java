@@ -26,6 +26,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
@@ -54,7 +56,6 @@ public class AccommodationProfileController {
                                       "bathroomCount": 4,
                                       "guestCapacity": 20,
                                       "basePrice": 85000.00,
-                                      "logoUrl": "https://example.com/logo.png",
                                       "primaryColor": "#1E293B",
                                       "welcomeMessage": "¡Te damos la bienvenida!",
                                       "email": "reservas@example.com",
@@ -154,15 +155,56 @@ public class AccommodationProfileController {
         return ResponseEntity.status(HttpStatus.CREATED).body(AccommodationImageResponse.from(image));
     }
 
+    @PostMapping(value = "/gallery/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(operationId = "uploadAccommodationGalleryImage",
+            summary = "Subir una imagen a mi galería",
+            description = "Recibe un archivo de imagen, lo sube a Cloudinary y registra su URL segura en la galería del alojamiento del propietario autenticado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Imagen subida y registrada correctamente", content = @Content(schema = @Schema(implementation = AccommodationImageResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Archivo ausente, vacío, no válido o superior a 5 MB", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Token ausente o inválido", content = @Content),
+            @ApiResponse(responseCode = "403", description = "El usuario no tiene el rol OWNER", content = @Content),
+            @ApiResponse(responseCode = "404", description = "No existe un perfil para el propietario autenticado", content = @Content),
+            @ApiResponse(responseCode = "502", description = "No fue posible subir la imagen a Cloudinary", content = @Content)
+    })
+    public ResponseEntity<AccommodationImageResponse> uploadGalleryImage(
+            @Parameter(description = "Archivo de imagen (máximo 5 MB).", required = true)
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+        AccommodationImage image = profileService.uploadGalleryImage(getCurrentOwnerId(authentication), file);
+        return ResponseEntity.status(HttpStatus.CREATED).body(AccommodationImageResponse.from(image));
+    }
+
+    @PostMapping(value = "/profile/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(operationId = "uploadAccommodationLogo",
+            summary = "Subir o reemplazar el logotipo de mi alojamiento",
+            description = "Recibe un archivo de imagen, lo sube a Cloudinary y actualiza logoUrl del alojamiento del propietario autenticado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Logotipo actualizado correctamente", content = @Content(schema = @Schema(implementation = AccommodationProfileResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Archivo ausente, vacío, no válido o superior a 5 MB", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Token ausente o inválido", content = @Content),
+            @ApiResponse(responseCode = "403", description = "El usuario no tiene el rol OWNER", content = @Content),
+            @ApiResponse(responseCode = "404", description = "No existe un perfil para el propietario autenticado", content = @Content),
+            @ApiResponse(responseCode = "502", description = "No fue posible subir el logotipo a Cloudinary", content = @Content)
+    })
+    public ResponseEntity<AccommodationProfileResponse> uploadLogo(
+            @Parameter(description = "Archivo del logotipo (máximo 5 MB).", required = true)
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+        Accommodation accommodation = profileService.uploadLogo(getCurrentOwnerId(authentication), file);
+        return ResponseEntity.ok(AccommodationProfileResponse.from(accommodation));
+    }
+
     @DeleteMapping("/gallery/{imageId}")
     @Operation(operationId = "deleteAccommodationGalleryImage",
             summary = "Eliminar una imagen de mi galería",
-            description = "Elimina la imagen únicamente si pertenece al alojamiento del propietario autenticado.")
+            description = "Si la imagen fue subida a Cloudinary por HostFlow, elimina primero el recurso remoto y luego el registro. Las URLs externas agregadas manualmente solo se eliminan de la galería.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Imagen eliminada correctamente"),
             @ApiResponse(responseCode = "401", description = "Token ausente o inválido", content = @Content),
             @ApiResponse(responseCode = "403", description = "El usuario no tiene el rol OWNER", content = @Content),
-            @ApiResponse(responseCode = "404", description = "La imagen no existe o no pertenece al propietario autenticado", content = @Content)
+            @ApiResponse(responseCode = "404", description = "La imagen no existe o no pertenece al propietario autenticado", content = @Content),
+            @ApiResponse(responseCode = "502", description = "Cloudinary no confirmó la eliminación; el registro se conserva", content = @Content)
     })
     public ResponseEntity<Void> deleteImage(
             @Parameter(description = "Identificador de la imagen que se desea eliminar.", example = "12", required = true)

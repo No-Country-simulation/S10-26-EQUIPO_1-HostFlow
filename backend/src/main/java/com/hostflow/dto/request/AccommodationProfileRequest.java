@@ -2,7 +2,6 @@ package com.hostflow.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
-import org.hibernate.validator.constraints.URL;
 import java.math.BigDecimal;
 
 @Schema(name = "AccommodationProfileRequest", description = "Datos generales y de configuración del alojamiento. Para PATCH, los campos omitidos o null no se modifican.")
@@ -26,10 +25,6 @@ public class AccommodationProfileRequest {
     @Schema(description = "Precio base del alojamiento. Se admite un máximo de dos decimales y no puede ser negativo.", example = "85000.00", minimum = "0", nullable = true)
     @DecimalMin("0.00") @Digits(integer = 10, fraction = 2)
     private BigDecimal basePrice;
-
-    @Schema(description = "URL HTTPS del logotipo.", example = "https://example.com/logo.png", maxLength = 2048, nullable = true)
-    @URL(protocol = "https", message = "logoUrl debe ser una URL HTTPS válida") @Size(max = 2048)
-    private String logoUrl;
 
     @Schema(description = "Color principal en formato hexadecimal de 3 o 6 dígitos.", example = "#1E293B", pattern = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", nullable = true)
     @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "primaryColor debe ser un color hexadecimal, por ejemplo #AABBCC")
@@ -61,8 +56,6 @@ public class AccommodationProfileRequest {
     public void setGuestCapacity(Integer guestCapacity) { this.guestCapacity = guestCapacity; }
     public BigDecimal getBasePrice() { return basePrice; }
     public void setBasePrice(BigDecimal basePrice) { this.basePrice = basePrice; }
-    public String getLogoUrl() { return logoUrl; }
-    public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
     public String getPrimaryColor() { return primaryColor; }
     public void setPrimaryColor(String primaryColor) { this.primaryColor = primaryColor; }
     public String getWelcomeMessage() { return welcomeMessage; }
