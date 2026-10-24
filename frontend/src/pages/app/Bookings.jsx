@@ -3,7 +3,7 @@ import { CalendarDays, Search } from "lucide-react";
 import { Badge, EmptyState } from "../../components/ui";
 import { BookingCard } from "../../components/BookingCard";
 import { useStore } from "../../data/useStore";
-import { useSession } from "../../context/SessionContext";
+import { useSession } from "@features/auth/context/SessionContext";
 import { cn, toISODate } from "../../lib/format";
 
 const FILTERS = [

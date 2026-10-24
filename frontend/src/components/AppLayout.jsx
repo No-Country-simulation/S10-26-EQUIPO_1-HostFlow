@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { Avatar, Brand, ThemeToggle } from "./ui";
-import { useSession } from "../context/SessionContext";
+import { useSession } from "@features/auth/context/SessionContext";
 import { cn } from "../lib/format";
 
 const hostNav = [

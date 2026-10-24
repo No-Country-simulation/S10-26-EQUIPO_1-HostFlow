@@ -2,11 +2,11 @@ import { Navigate } from "react-router"
 import RequireAuth from "./components/RequireAuth"
 import AppLayout from "./components/AppLayout"
 import AuthLayout from "./layouts/AuthLayout"
-import { useSession } from "./context/SessionContext"
+import { useSession } from "@features/auth/context/SessionContext"
 import Home from "./pages/Home"
-import Login from "./pages/auth/Login"
-import Register from "./pages/auth/Register"
-import Recover from "./pages/auth/Recover"
+import LoginPage from "@features/auth/pages/LoginPage"
+import CreateAccountPage from "@features/auth/pages/CreateAccountPage"
+import PasswordRecoveryPage from "@features/auth/pages/PasswordRecoveryPage"
 import Dashboard from "./pages/app/Dashboard"
 import Bookings from "./pages/app/Bookings"
 import Lodging from "./pages/app/Lodging"
@@ -27,9 +27,9 @@ export const routes = [
     path: "/auth",
     Component: AuthLayout,
     children: [
-      { path: "login", Component: Login },
-      { path: "registro", Component: Register },
-      { path: "recuperar", Component: Recover },
+      { path: "login", Component: LoginPage },
+      { path: "registro", Component: CreateAccountPage },
+      { path: "recuperar", Component: PasswordRecoveryPage },
     ],
   },
   {

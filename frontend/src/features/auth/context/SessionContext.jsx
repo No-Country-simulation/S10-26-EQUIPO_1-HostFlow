@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo } from "react";
-import { api } from "../services";
-import { useStore } from "../data/useStore";
+import { api } from "@/services";
+import { useStore } from "@/data/useStore";
 
 const SessionContext = createContext(null);
 

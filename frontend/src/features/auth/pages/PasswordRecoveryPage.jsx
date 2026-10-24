@@ -9,10 +9,10 @@ import {
   OtpInput,
   PasswordField,
   Spinner,
-} from "../../components/ui";
-import { isEmail, maskEmail } from "../../lib/format";
-import { useSession } from "../../context/SessionContext";
-import { DEMO_MODE } from "../../config/env";
+} from "@components/ui";
+import { isEmail, maskEmail } from "@lib/format";
+import { useSession } from "../context/SessionContext";
+import { DEMO_MODE } from "@/config/env";
 
 const RESEND_SECONDS = 30;
 
@@ -20,7 +20,7 @@ const RESEND_SECONDS = 30;
 //   1. email → se solicita el código
 //   2. OTP (6 dígitos) → se verifica
 //   3. nueva clave + confirmación → se define
-export default function Recover() {
+export default function PasswordRecoveryPage() {
   const navigate = useNavigate();
   const { actions } = useSession();
 

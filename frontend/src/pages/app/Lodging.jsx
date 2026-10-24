@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { BedDouble, ImagePlus, MapPin, Plus, Trash2 } from "lucide-react";
 import { Alert, Badge, Button, Card, Field } from "../../components/ui";
 import { useStore } from "../../data/useStore";
-import { useSession } from "../../context/SessionContext";
+import { useSession } from "@features/auth/context/SessionContext";
 import { CURRENCIES, formatMoney, plural } from "../../lib/format";
 
 export default function Lodging() {

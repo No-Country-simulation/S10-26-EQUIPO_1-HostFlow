@@ -8,12 +8,12 @@ import {
   Field,
   PasswordField,
   Spinner,
-} from "../../components/ui";
-import { isEmail } from "../../lib/format";
-import { useSession } from "../../context/SessionContext";
-import { DEMO_MODE } from "../../config/env";
+} from "@components/ui";
+import { isEmail } from "@lib/format";
+import { useSession } from "../context/SessionContext";
+import { DEMO_MODE } from "@/config/env";
 
-export default function Login() {
+export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { actions } = useSession();

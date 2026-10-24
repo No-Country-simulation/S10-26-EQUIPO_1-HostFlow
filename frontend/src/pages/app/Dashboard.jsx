@@ -12,7 +12,7 @@ import {
 import { Badge, Card, Stat } from "../../components/ui";
 import { BookingCard } from "../../components/BookingCard";
 import { useStore } from "../../data/useStore";
-import { useSession } from "../../context/SessionContext";
+import { useSession } from "@features/auth/context/SessionContext";
 import { addDays, formatMoney, toISODate } from "../../lib/format";
 
 export default function Dashboard() {
