@@ -1,6 +1,7 @@
 package com.hostflow.exception;
 
 import org.springframework.http.HttpStatus;
+import com.hostflow.exception.CloudinaryDeleteException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -8,6 +9,9 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,6 +38,9 @@ import java.util.Map;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
      * Maneja las excepciones de recurso no encontrado.
@@ -143,5 +150,53 @@ public class GlobalExceptionHandler {
         errorResponse.put("errorCode", errorCode);
 
         return ResponseEntity.status(status).body(errorResponse);
+    }
+
+    @ExceptionHandler(CloudinaryUploadException.class)
+    public ResponseEntity<Map<String, Object>> handleCloudinaryUploadException(
+            CloudinaryUploadException ex) {
+
+        log.error("Error durante la carga de una imagen en Cloudinary", ex);
+
+        return buildErrorResponse(
+                HttpStatus.BAD_GATEWAY,
+                "No fue posible procesar la imagen con el servicio de almacenamiento.",
+                "CLOUDINARY_UPLOAD_FAILED"
+        );
+    }
+
+    @ExceptionHandler(CloudinaryDeleteException.class)
+    public ResponseEntity<Map<String, Object>> handleCloudinaryDeleteException(
+            CloudinaryDeleteException ex) {
+
+        log.error("Error durante la eliminación de una imagen en Cloudinary", ex);
+
+        return buildErrorResponse(
+                HttpStatus.BAD_GATEWAY,
+                "No fue posible eliminar la imagen del servicio de almacenamiento. El registro de la galería se conservó.",
+                "CLOUDINARY_DELETE_FAILED"
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingServletRequestPart(
+            MissingServletRequestPartException ex) {
+
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "Debes seleccionar una imagen para subir.",
+                "INVALID_IMAGE"
+        );
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceeded(
+            MaxUploadSizeExceededException ex) {
+
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "El archivo supera el tamaño máximo permitido de 5 MB.",
+                "FILE_TOO_LARGE"
+        );
     }
 }

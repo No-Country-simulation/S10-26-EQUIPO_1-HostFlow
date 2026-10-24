@@ -16,6 +16,9 @@ public class AccommodationImage {
     private Accommodation accommodation;
     @Column(name = "image_url", nullable = false, length = 2048)
     private String imageUrl;
+    // Null para URLs externas registradas manualmente; informado para archivos subidos a Cloudinary.
+    @Column(name = "cloudinary_public_id", length = 255)
+    private String cloudinaryPublicId;
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     @PrePersist void onCreate() { createdAt = LocalDateTime.now(); }
