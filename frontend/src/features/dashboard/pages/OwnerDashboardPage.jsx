@@ -15,7 +15,7 @@ import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { addDays, formatMoney, toISODate } from "@utils/format";
 
-export default function HostDashboardPage() {
+export default function OwnerDashboardPage() {
   const { user, actions } = useSession();
   const bookings = useStore((s) => s.bookings);
   const lodging = useStore((s) => s.lodging);

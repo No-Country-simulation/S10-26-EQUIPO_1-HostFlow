@@ -1,8 +1,8 @@
 # HostFlow · Paleta de colores
 
 Paleta definida a partir de las capturas de referencia (**Booksy**). Se usa en todo el
-frontend. Los valores viven como tokens de Tailwind en `src/styles/globals.css` (bloque `@theme` para el
-modo claro y bloque `.dark` para el oscuro) y se consumen como utilidades
+frontend. Los valores viven como tokens de Tailwind en `src/styles/globals.css` (bloque
+`@theme` para el modo claro y bloque `.dark` para el oscuro) y se consumen como utilidades
 (`bg-lime`, `text-teal`, `border-line`, `bg-paper`, …).
 
 ## Neutros (modo claro · preseleccionado)
