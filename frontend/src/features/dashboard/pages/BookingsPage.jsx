@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, Search } from "lucide-react";
-import { Badge, EmptyState } from "../../components/ui";
-import { BookingCard } from "../../components/BookingCard";
-import { useStore } from "../../data/useStore";
+import { Badge, EmptyState } from "@components/ui";
+import { BookingCard } from "@/components/BookingCard";
+import { useStore } from "@/data/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
-import { cn, toISODate } from "../../lib/format";
+import { cn, toISODate } from "@lib/format";
 
 const FILTERS = [
   { id: "all", label: "Todas" },
@@ -13,7 +13,7 @@ const FILTERS = [
   { id: "past", label: "Pasadas" },
 ];
 
-export default function Bookings() {
+export default function BookingsPage() {
   const { actions } = useSession();
   const bookings = useStore((s) => s.bookings);
   const [filter, setFilter] = useState("all");

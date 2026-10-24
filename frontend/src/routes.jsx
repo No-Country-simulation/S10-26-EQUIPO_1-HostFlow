@@ -3,26 +3,26 @@ import RequireAuth from "./components/RequireAuth"
 import AppLayout from "./components/AppLayout"
 import AuthLayout from "./layouts/AuthLayout"
 import { useSession } from "@features/auth/context/SessionContext"
-import Home from "./pages/Home"
 import LoginPage from "@features/auth/pages/LoginPage"
 import CreateAccountPage from "@features/auth/pages/CreateAccountPage"
 import PasswordRecoveryPage from "@features/auth/pages/PasswordRecoveryPage"
-import Dashboard from "./pages/app/Dashboard"
-import Bookings from "./pages/app/Bookings"
-import Lodging from "./pages/app/Lodging"
-import Availability from "./pages/app/Availability"
-import Payments from "./pages/app/Payments"
-import Profile from "./pages/app/Profile"
+import HomePage from "@features/home/pages/HomePage"
+import HostDashboardPage from "@/features/dashboard/pages/OwnerDashboardPage"
+import BookingsPage from "@features/dashboard/pages/BookingsPage"
+import LodgingPage from "@features/dashboard/pages/LodgingPage"
+import AvailabilityPage from "@features/dashboard/pages/AvailabilityPage"
+import PaymentMethodsPage from "@features/dashboard/pages/PaymentMethodsPage"
+import LodgingProfilePage from "@features/dashboard/pages/LodgingProfilePage"
 import AdminDashboard from "./pages/admin/AdminDashboard"
 
 // El panel de anfitrión no aplica a un administrador: se lo manda a su dashboard.
 function PanelIndex() {
   const { isAdmin } = useSession()
-  return isAdmin ? <Navigate to="/admin" replace /> : <Dashboard />
+  return isAdmin ? <Navigate to="/admin" replace /> : <HostDashboardPage />
 }
 
 export const routes = [
-  { path: "/", Component: Home },
+  { path: "/", Component: HomePage },
   {
     path: "/auth",
     Component: AuthLayout,
@@ -41,11 +41,11 @@ export const routes = [
         Component: AppLayout,
         children: [
           { index: true, Component: PanelIndex },
-          { path: "reservas", Component: Bookings },
-          { path: "alojamiento", Component: Lodging },
-          { path: "disponibilidad", Component: Availability },
-          { path: "pagos", Component: Payments },
-          { path: "perfil", Component: Profile },
+          { path: "reservas", Component: BookingsPage },
+          { path: "alojamiento", Component: LodgingPage },
+          { path: "disponibilidad", Component: AvailabilityPage },
+          { path: "pagos", Component: PaymentMethodsPage },
+          { path: "perfil", Component: LodgingProfilePage },
         ],
       },
     ],

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Coins, CreditCard, Plus, Wallet } from "lucide-react";
-import { Alert, Badge, Button, Card, Switch } from "../../components/ui";
-import { useStore } from "../../data/useStore";
+import { Alert, Badge, Button, Card, Switch } from "@components/ui";
+import { useStore } from "@/data/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
-import { CURRENCIES, WALLETS, cn, formatMoney } from "../../lib/format";
+import { CURRENCIES, WALLETS, cn, formatMoney } from "@lib/format";
 
-export default function Payments() {
+export default function PaymentMethodsPage() {
   const { actions } = useSession();
   const payments = useStore((s) => s.payments);
   const lodging = useStore((s) => s.lodging);

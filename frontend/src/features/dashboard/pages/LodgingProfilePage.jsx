@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Building2, Check, ImagePlus, MapPin, Palette, Phone, Trash2 } from "lucide-react";
-import { Alert, Badge, Button, Card, Field } from "../../components/ui";
-import { useStore } from "../../data/useStore";
+import { Alert, Badge, Button, Card, Field } from "@components/ui";
+import { useStore } from "@/data/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 
 const COLOR_PRESETS = [
@@ -20,7 +20,7 @@ const RADII = [
   { id: "pill", label: "Píldora", class: "rounded-full" },
 ];
 
-export default function Profile() {
+export default function LodgingProfilePage() {
   const { actions } = useSession();
   const lodging = useStore((s) => s.lodging);
   const [saved, setSaved] = useState(false);

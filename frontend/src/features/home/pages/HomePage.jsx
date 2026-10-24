@@ -15,8 +15,8 @@ import {
   Star,
   X,
 } from "lucide-react";
-import { Brand, buttonClass, DemoBanner, ThemeToggle } from "../components/ui";
-import { cn } from "../lib/format";
+import { Brand, buttonClass, DemoBanner, ThemeToggle } from "@components/ui";
+import { cn } from "@lib/format";
 
 const features = [
   {
@@ -84,7 +84,7 @@ const plans = [
   },
 ];
 
-export default function Home() {
+export default function HomePage() {
   return (
     <div className="min-h-dvh bg-paper text-ink antialiased">
       <DemoBanner />

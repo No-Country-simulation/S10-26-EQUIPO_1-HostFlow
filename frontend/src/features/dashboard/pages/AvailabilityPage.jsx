@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { CalendarX, ChevronLeft, ChevronRight, Info } from "lucide-react";
-import { Alert, Badge, Card } from "../../components/ui";
-import { useStore } from "../../data/useStore";
+import { Alert, Badge, Card } from "@components/ui";
+import { useStore } from "@/data/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
-import { cn, formatDate, toISODate, weekdayShort } from "../../lib/format";
+import { cn, formatDate, toISODate, weekdayShort } from "@lib/format";
 
 const WEEK = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -11,7 +11,7 @@ function startOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-export default function Availability() {
+export default function AvailabilityPage() {
   const { actions } = useSession();
   const blockedDays = useStore((s) => s.blockedDays);
   const [month, setMonth] = useState(() => startOfMonth(new Date()));

@@ -9,13 +9,13 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import { Badge, Card, Stat } from "../../components/ui";
-import { BookingCard } from "../../components/BookingCard";
-import { useStore } from "../../data/useStore";
+import { Badge, Card, Stat } from "@components/ui";
+import { BookingCard } from "@/components/BookingCard";
+import { useStore } from "@/data/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
-import { addDays, formatMoney, toISODate } from "../../lib/format";
+import { addDays, formatMoney, toISODate } from "@lib/format";
 
-export default function Dashboard() {
+export default function HostDashboardPage() {
   const { user, actions } = useSession();
   const bookings = useStore((s) => s.bookings);
   const lodging = useStore((s) => s.lodging);
