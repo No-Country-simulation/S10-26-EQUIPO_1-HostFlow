@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Building2, CalendarDays, CheckCircle2, Search, ShieldCheck, Users } from "lucide-react";
 import { Badge, Card, EmptyState, Stat } from "@components/ui";
-import { useStore } from "@/data/useStore";
+import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 
 export default function AdminOverviewPage() {

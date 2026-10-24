@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Building2, Check, ImagePlus, MapPin, Palette, Phone, Trash2 } from "lucide-react";
 import { Alert, Badge, Button, Card, Field } from "@components/ui";
-import { useStore } from "@/data/useStore";
+import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 
 const COLOR_PRESETS = [

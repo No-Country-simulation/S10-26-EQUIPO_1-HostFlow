@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { CalendarDays, Search } from "lucide-react";
 import { Badge, EmptyState } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
-import { useStore } from "@/data/useStore";
+import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { cn, toISODate } from "@lib/format";
 

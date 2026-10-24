@@ -3,7 +3,7 @@
 // El endpoint todavía no tiene `path` en endpoints.js (contrato pendiente).
 export class ApiNotConfiguredError extends Error {
   constructor(name) {
-    super(`Endpoint "${name}" sin configurar (ver src/services/endpoints.js).`)
+    super(`Endpoint "${name}" sin configurar (ver src/lib/api/endpoints.js).`)
     this.name = "ApiNotConfiguredError"
   }
 }

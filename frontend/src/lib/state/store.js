@@ -2,12 +2,12 @@
 //
 // Es la fuente de verdad del frontend cuando `VITE_API_URL` no está definida.
 // Expone el MISMO contrato que el backend (ver docs/swagger-api.md): cuando se
-// conecte el backend real, `src/services/index.js` pasará a usar `httpApi` y este
+// conecte el backend real, `src/lib/api/index.js` pasará a usar `httpApi` y este
 // archivo se usa solo como referencia de datos de ejemplo.
 //
 // Persistencia: sessionStorage (se borra al cerrar la pestaña, como un token real).
 
-import { addDays, toISODate } from "../lib/format";
+import { addDays, toISODate } from "../format";
 
 const STORAGE_KEY = "hostflow.app.v1";
 const today = toISODate();

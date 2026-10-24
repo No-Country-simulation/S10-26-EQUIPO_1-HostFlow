@@ -12,7 +12,7 @@ import {
 } from "@components/ui";
 import { isEmail, maskEmail } from "@lib/format";
 import { useSession } from "../context/SessionContext";
-import { DEMO_MODE } from "@/config/env";
+import { DEMO_MODE } from "@lib/config/env";
 
 const RESEND_SECONDS = 30;
 

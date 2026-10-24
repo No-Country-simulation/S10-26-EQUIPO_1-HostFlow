@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Badge, Card, Stat } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
-import { useStore } from "@/data/useStore";
+import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { addDays, formatMoney, toISODate } from "@lib/format";
 

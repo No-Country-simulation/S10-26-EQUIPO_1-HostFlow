@@ -1,12 +1,12 @@
 // Punto único de acceso a datos para la interfaz.
 // Las pantallas importan `api` (o `actions` desde el contexto) y nunca hablan con fetch
 // ni con datos de prueba directamente.
-//   Sin VITE_API_URL → demoApi (datos en memoria, src/services/demoApi.js).
-//   Con    VITE_API_URL → httpApi (backend real Java Spring Boot, src/services/httpApi.js).
+//   Sin VITE_API_URL → demoApi (datos en memoria, src/lib/api/demoApi.js).
+//   Con    VITE_API_URL → httpApi (backend real Java Spring Boot, src/lib/api/httpApi.js).
 import { DEMO_MODE } from "../config/env"
 import { demoApi } from "./demoApi"
 import { httpApi } from "./httpApi"
-import { actions, store } from "../data/store"
+import { actions, store } from "../state/store"
 import { tokenStorage } from "./tokenStorage"
 
 const impl = DEMO_MODE ? demoApi : httpApi
