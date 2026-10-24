@@ -10,7 +10,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { Badge, Card, Stat } from "@components/ui";
-import { BookingCard } from "@/components/BookingCard";
+import { BookingSummaryCard } from "../components/BookingSummaryCard";
 import { useStore } from "@/data/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { addDays, formatMoney, toISODate } from "@lib/format";
@@ -83,7 +83,7 @@ export default function HostDashboardPage() {
               Ver todas <ArrowUpRight size={15} />
             </Link>
           </div>
-          <BookingCard
+          <BookingSummaryCard
             booking={next}
             onConfirm={(id) => actions.setBookingStatus(id, "CONFIRMED")}
             onCancel={(id) => actions.setBookingStatus(id, "CANCELLED")}
@@ -122,7 +122,7 @@ export default function HostDashboardPage() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {upcoming.slice(0, 4).map((booking) => (
-              <BookingCard
+              <BookingSummaryCard
                 key={booking.id}
                 booking={booking}
                 onConfirm={(id) => actions.setBookingStatus(id, "CONFIRMED")}

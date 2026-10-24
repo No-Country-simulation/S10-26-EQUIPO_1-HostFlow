@@ -1,11 +1,11 @@
 import { useEffect } from "react"
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router"
 import { useSession } from "@features/auth/context/SessionContext"
-import { AUTH_EXPIRED_EVENT } from "../services/httpClient"
+import { AUTH_EXPIRED_EVENT } from "@/services/httpClient"
 
 // Protege rutas privadas: sin sesión redirige al login, y si el backend responde 401
 // en una llamada autenticada, también vuelve al login.
-export default function RequireAuth({ adminOnly = false }) {
+export default function ProtectedRoute({ adminOnly = false }) {
   const { isAuthenticated, isAdmin } = useSession()
   const location = useLocation()
   const navigate = useNavigate()

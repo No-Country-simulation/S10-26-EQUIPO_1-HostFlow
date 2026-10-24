@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { Building2, CalendarDays, CheckCircle2, Search, ShieldCheck, Users } from "lucide-react";
-import { Badge, Card, EmptyState, Stat } from "../../components/ui";
-import { useStore } from "../../data/useStore";
+import { Badge, Card, EmptyState, Stat } from "@components/ui";
+import { useStore } from "@/data/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 
-export default function AdminDashboard() {
+export default function AdminOverviewPage() {
   const { actions } = useSession();
   const lodgings = useStore((s) => s.admin.lodgings);
   const [query, setQuery] = useState("");

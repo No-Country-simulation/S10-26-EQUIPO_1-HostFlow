@@ -12,9 +12,9 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { Avatar, Brand, ThemeToggle } from "./ui";
+import { Avatar, Brand, ThemeToggle } from "@components/ui";
 import { useSession } from "@features/auth/context/SessionContext";
-import { cn } from "../lib/format";
+import { cn } from "@lib/format";
 
 const hostNav = [
   { to: "/panel", label: "Panel", icon: LayoutDashboard, end: true },
@@ -27,7 +27,7 @@ const hostNav = [
 
 const adminNav = [{ to: "/admin", label: "Control interno", icon: ShieldCheck, end: true }];
 
-// Estos dos componentes viven FUERA de AppLayout a propósito: si se declaran
+// Estos dos componentes viven FUERA de AuthenticatedAppLayout a propósito: si se declaran
 // dentro, React los remonta en cada render (pierden el foco y se reconstruyen).
 function NavItems({ items, onNavigate }) {
   return (
@@ -75,7 +75,7 @@ function UserCard({ user, isAdmin, onLogout }) {
   );
 }
 
-export default function AppLayout() {
+export default function AuthenticatedAppLayout() {
   const { user, logout, isAdmin } = useSession();
   const navigate = useNavigate();
   const location = useLocation();

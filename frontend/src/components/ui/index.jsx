@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router";
 import { Eye, EyeOff, Moon, Sun } from "lucide-react";
-import { DEMO_MODE } from "../config/env";
-import { useTheme } from "../context/ThemeContext";
-import { cn, initials } from "../lib/format";
+import { DEMO_MODE } from "@/config/env";
+import { useTheme } from "@/context/ThemeContext";
+import { cn, initials } from "@lib/format";
 
 export { cn };
 

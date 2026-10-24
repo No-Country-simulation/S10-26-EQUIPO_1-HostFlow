@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, Search } from "lucide-react";
 import { Badge, EmptyState } from "@components/ui";
-import { BookingCard } from "@/components/BookingCard";
+import { BookingSummaryCard } from "../components/BookingSummaryCard";
 import { useStore } from "@/data/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { cn, toISODate } from "@lib/format";
@@ -81,7 +81,7 @@ export default function BookingsPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {list.map((booking) => (
-            <BookingCard
+            <BookingSummaryCard
               key={booking.id}
               booking={booking}
               onConfirm={(id) => actions.setBookingStatus(id, "CONFIRMED")}

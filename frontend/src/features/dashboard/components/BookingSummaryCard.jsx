@@ -1,6 +1,6 @@
 import { ArrowRight, CalendarDays, Users } from "lucide-react";
-import { Badge } from "./ui";
-import { daysBetween, formatDateShort, formatMoney } from "../lib/format";
+import { Badge } from "@components/ui";
+import { daysBetween, formatDateShort, formatMoney } from "@lib/format";
 
 const STATUS = {
   CONFIRMED: { tone: "success", label: "Confirmada" },
@@ -14,7 +14,7 @@ export function StatusBadge({ status }) {
   return <Badge tone={config.tone}>{config.label}</Badge>;
 }
 
-export function BookingCard({ booking, onConfirm, onCancel }) {
+export function BookingSummaryCard({ booking, onConfirm, onCancel }) {
   const { guestName, guestEmail, checkIn, checkOut, guests, total, currency, status, additional } = booking;
   const nights = daysBetween(checkIn, checkOut);
 

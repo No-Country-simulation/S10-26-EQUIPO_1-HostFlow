@@ -1,5 +1,5 @@
 import { Outlet } from "react-router";
-import { Brand, DemoBanner, ThemeToggle } from "../components/ui";
+import { Brand, DemoBanner, ThemeToggle } from "@components/ui";
 
 export default function AuthLayout() {
   return (
