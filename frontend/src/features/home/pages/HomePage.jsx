@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { Brand, buttonClass, DemoBanner, ThemeToggle } from "@components/ui";
-import { cn } from "@lib/format";
+import { cn } from "@utils/format";
 
 const features = [
   {

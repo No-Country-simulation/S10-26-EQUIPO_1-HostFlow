@@ -10,7 +10,7 @@ import {
   PasswordField,
   Spinner,
 } from "@components/ui";
-import { isEmail, maskEmail } from "@lib/format";
+import { isEmail, maskEmail } from "@utils/format";
 import { useSession } from "../context/SessionContext";
 import { DEMO_MODE } from "@lib/config/env";
 

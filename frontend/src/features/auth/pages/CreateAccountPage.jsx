@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { Alert, buttonClass, Eyebrow, Field, PasswordField, Spinner } from "@components/ui";
-import { isEmail } from "@lib/format";
+import { isEmail } from "@utils/format";
 import { useSession } from "../context/SessionContext";
 
 const EMAIL_TAKEN = "Ese correo ya tiene una cuenta. Ingresá o recuperá tu contraseña.";

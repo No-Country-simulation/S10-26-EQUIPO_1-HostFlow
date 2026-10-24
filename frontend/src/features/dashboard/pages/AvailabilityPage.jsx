@@ -3,7 +3,7 @@ import { CalendarX, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { Alert, Badge, Card } from "@components/ui";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
-import { cn, formatDate, toISODate, weekdayShort } from "@lib/format";
+import { cn, formatDate, toISODate, weekdayShort } from "@utils/format";
 
 const WEEK = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 

@@ -13,7 +13,7 @@ import { Badge, Card, Stat } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
-import { addDays, formatMoney, toISODate } from "@lib/format";
+import { addDays, formatMoney, toISODate } from "@utils/format";
 
 export default function HostDashboardPage() {
   const { user, actions } = useSession();

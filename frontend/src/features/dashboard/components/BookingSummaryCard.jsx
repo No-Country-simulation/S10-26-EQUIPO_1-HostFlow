@@ -1,6 +1,6 @@
 import { ArrowRight, CalendarDays, Users } from "lucide-react";
 import { Badge } from "@components/ui";
-import { daysBetween, formatDateShort, formatMoney } from "@lib/format";
+import { daysBetween, formatDateShort, formatMoney } from "@utils/format";
 
 const STATUS = {
   CONFIRMED: { tone: "success", label: "Confirmada" },

@@ -7,7 +7,7 @@
 //
 // Persistencia: sessionStorage (se borra al cerrar la pestaña, como un token real).
 
-import { addDays, toISODate } from "../format";
+import { addDays, toISODate } from "@utils/format";
 
 const STORAGE_KEY = "hostflow.app.v1";
 const today = toISODate();

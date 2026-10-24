@@ -1,7 +1,7 @@
 # HostFlow · Paleta de colores
 
 Paleta definida a partir de las capturas de referencia (**Booksy**). Se usa en todo el
-frontend. Los valores viven como tokens de Tailwind en `src/index.css` (bloque `@theme` para el
+frontend. Los valores viven como tokens de Tailwind en `src/styles/globals.css` (bloque `@theme` para el
 modo claro y bloque `.dark` para el oscuro) y se consumen como utilidades
 (`bg-lime`, `text-teal`, `border-line`, `bg-paper`, …).
 
@@ -67,7 +67,7 @@ modo claro y bloque `.dark` para el oscuro) y se consumen como utilidades
 ## Modo claro / oscuro
 
 1. El **modo claro** es el preseleccionado (`localStorage` → `hostflow.theme`).
-2. La clase `.dark` se agrega/quita en `<html>` desde `src/context/ThemeContext.jsx`.
+2. La clase `.dark` se agrega/quita en `<html>` desde `src/lib/theme/ThemeContext.jsx`.
 3. `.dark` re-declara los tokens `--color-*`, así que todo el sistema (incluidos los formularios,
    que usan `appearance-none` para no heredar el estilo nativo) cambia de golpe.
 
@@ -77,6 +77,6 @@ modo claro y bloque `.dark` para el oscuro) y se consumen como utilidades
 2. El teal acompaña a datos, enlaces y acciones secundarias.
 3. El rosa se usa con moderación: precios, avisos suaves y detalles decorativos.
 4. Nunca poner texto oscuro sobre lima con bajo contraste: usar siempre `--color-lime-ink`.
-5. Respetar `prefers-reduced-motion` (ya gestionado en `index.css`).
+5. Respetar `prefers-reduced-motion` (ya gestionado en `src/styles/globals.css`).
 6. Los colores de marca del alojamiento (Perfil → Personalización visual) son independientes del
    tema: se mantienen iguales en modo claro y oscuro.

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Avatar, Brand, ThemeToggle } from "@components/ui";
 import { useSession } from "@features/auth/context/SessionContext";
-import { cn } from "@lib/format";
+import { cn } from "@utils/format";
 
 const hostNav = [
   { to: "/panel", label: "Panel", icon: LayoutDashboard, end: true },

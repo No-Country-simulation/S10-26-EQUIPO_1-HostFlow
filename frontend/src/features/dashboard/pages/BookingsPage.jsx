@@ -4,7 +4,7 @@ import { Badge, EmptyState } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
-import { cn, toISODate } from "@lib/format";
+import { cn, toISODate } from "@utils/format";
 
 const FILTERS = [
   { id: "all", label: "Todas" },

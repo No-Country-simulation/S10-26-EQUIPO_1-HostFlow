@@ -3,7 +3,7 @@ import { BedDouble, ImagePlus, MapPin, Plus, Trash2 } from "lucide-react";
 import { Alert, Badge, Button, Card, Field } from "@components/ui";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
-import { CURRENCIES, formatMoney, plural } from "@lib/format";
+import { CURRENCIES, formatMoney, plural } from "@utils/format";
 
 export default function LodgingPage() {
   const { actions } = useSession();

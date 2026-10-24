@@ -11,7 +11,7 @@
    Tipografía: DM Sans (interfaz y titulares) + Fraunces (wordmark).
 
    Modo claro/oscuro: los tokens viven en @theme (se emiten como --color-*)
-   y la clase `.dark` en <html> los sobreescribe. Ver src/context/ThemeContext.jsx.
+   y la clase `.dark` en <html> los sobreescribe. Ver src/lib/theme/ThemeContext.jsx.
    ══════════════════════════════════════════════════════════════════════════ */
 
 @custom-variant dark (&:where(.dark, .dark *));
