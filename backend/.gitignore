@@ -1,5 +1,8 @@
 HELP.md
 target/
+
+### Variables de entorno locales (credenciales) ###
+.env
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
