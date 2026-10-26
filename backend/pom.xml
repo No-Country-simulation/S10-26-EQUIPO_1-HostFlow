@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<!-- ============================================ -->
+	<!-- Información del proyecto HostFlow            -->
+	<!-- ============================================ -->
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.2.5</version>
+		<relativePath/>
+	</parent>
+
+	<groupId>com.hostflow</groupId>
+	<artifactId>hostflow-backend</artifactId>
+	<version>1.0.0</version>
+	<name>HostFlow Backend</name>
+	<description>
+		Sistema de gestión de alojamientos - Backend API REST
+		con autenticación JWT, roles y documentación Swagger.
+	</description>
+
+	<properties>
+		<java.version>17</java.version>
+		<jjwt.version>0.12.5</jjwt.version>
+		<springdoc.version>2.5.0</springdoc.version>
+	</properties>
+
+	<dependencies>
+
+		<!-- ============================================ -->
+		<!-- Spring Boot Web: REST API, MVC, Tomcat       -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- Spring Data JPA: Persistencia con Hibernate  -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- Spring Security: Autenticación y Autorización-->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- Validación de datos con Bean Validation      -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- PostgreSQL Driver: Base de datos producción  -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- JWT: JSON Web Token para autenticación       -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>${jjwt.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>${jjwt.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>${jjwt.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- Swagger / OpenAPI 3: Documentación de API    -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- Lombok: Reduce código boilerplate            -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- Spring Boot DevTools: Hot reload en dev      -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- Testing                                      -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- Spring Boot Mail: Envío de correos           -->
+		<!-- ============================================ -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
+		<!-- ============================================ -->
+		<!-- Flyway: Migraciones de base de datos         -->
+		<!-- ============================================ -->
+		<!-- Flyway core es suficiente para PostgreSQL en
+             Spring Boot 3.2.5 (Flyway 9.x).
+             El módulo flyway-database-postgresql solo es
+             necesario en Flyway 10+ -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<excludes>
+						<exclude>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
