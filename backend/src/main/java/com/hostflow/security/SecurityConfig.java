@@ -222,7 +222,8 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",  // React/Next.js
                 "http://localhost:4200",  // Angular
-                "http://localhost:8080"   // Otro backend o frontend
+                "http://localhost:8080",   // Otro backend o frontend
+                "http://localhost:5173"  // Vite
         ));
 
         // Métodos HTTP permitidos
