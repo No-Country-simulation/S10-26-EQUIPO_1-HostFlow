@@ -48,7 +48,7 @@ export default function AvailabilityPage() {
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-bold text-ink first-letter:uppercase">{monthLabel}</h2>
             <div className="flex gap-1.5">
@@ -61,13 +61,13 @@ export default function AvailabilityPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-muted">
+          <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold uppercase tracking-wide text-muted sm:gap-1.5">
             {WEEK.map((d) => (
               <span key={d} className="pb-2">{d}</span>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
             {cells.map((iso, index) => {
               if (!iso) return <span key={`blank-${index}`} />;
               const isToday = iso === today;
@@ -81,7 +81,7 @@ export default function AvailabilityPage() {
                   onClick={() => actions.toggleBlockedDay(iso)}
                   title={formatDate(iso)}
                   className={cn(
-                    "grid aspect-square cursor-pointer place-items-center rounded-xl text-sm font-semibold transition-all",
+                    "grid aspect-square cursor-pointer place-items-center rounded-lg text-[13px] font-semibold transition-all sm:rounded-xl sm:text-sm",
                     isBlocked
                       ? "bg-pink text-white shadow-pop hover:bg-pink-strong"
                       : isPast

@@ -249,7 +249,8 @@ function Hero() {
           {/* Visual */}
           <div className="relative animate-rise">
             <HeroCard />
-            <div className="absolute -bottom-5 -left-3 animate-float rounded-2xl border border-line bg-paper px-4 py-3 shadow-pop sm:-left-6">
+            {/* En móvil va en flujo (sin superponerse a las stats); ≥sm flota sobre la card */}
+            <div className="mt-4 w-fit animate-float rounded-2xl border border-line bg-paper px-4 py-3 shadow-pop sm:absolute sm:-bottom-5 sm:-left-6 sm:mt-0">
               <div className="flex items-center gap-3">
                 <span className="grid size-9 place-items-center rounded-xl bg-lime text-lime-ink">
                   <Sparkles size={17} />
@@ -285,21 +286,23 @@ function HeroCard() {
       </div>
       <div className="grid gap-3">
         {rows.map((row) => (
-          <div key={row.title} className="flex items-center gap-3 rounded-2xl border border-line bg-cloud p-3.5">
+          <div key={row.title} className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-cloud p-3.5">
             <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", row.tone)}>
               <row.icon size={18} />
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-ink">{row.title}</p>
-              <p className="truncate text-xs text-muted">{row.text}</p>
+            <div className="min-w-0 flex-auto">
+              {/* Sin truncate: el texto siempre sale completo (envuelve a 2 líneas en pantallas angostas) */}
+              <p className="text-sm font-bold leading-tight text-ink">{row.title}</p>
+              <p className="mt-0.5 text-xs leading-snug text-muted">{row.text}</p>
             </div>
+            {/* En móvil angosto el badge baja a su propia línea en vez de robarle ancho al texto */}
             <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold", row.badgeTone)}>
               {row.badge}
             </span>
           </div>
         ))}
       </div>
-      <div className="mt-5 grid grid-cols-3 gap-3 border-t border-line pt-5 text-center">
+      <div className="mt-5 grid grid-cols-3 gap-1.5 border-t border-line pt-5 text-center sm:gap-3">
         {[
           ["12", "Reservas"],
           ["4", "Habitaciones"],
@@ -307,7 +310,7 @@ function HeroCard() {
         ].map(([value, label]) => (
           <div key={label}>
             <p className="text-lg font-extrabold text-ink">{value}</p>
-            <p className="text-[11px] text-muted">{label}</p>
+            <p className="text-[10px] leading-tight text-muted sm:text-[11px]">{label}</p>
           </div>
         ))}
       </div>
@@ -425,8 +428,8 @@ function Stats() {
   ];
   return (
     <section className="mx-auto max-w-6xl px-5 py-20 sm:px-6">
-      <div className="rounded-[28px] border border-line bg-gradient-to-r from-lime-soft via-teal-soft to-pink-soft px-8 py-12">
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+      <div className="rounded-[28px] border border-line bg-gradient-to-r from-lime-soft via-teal-soft to-pink-soft px-5 py-10 sm:px-8 sm:py-12">
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-4 sm:gap-8">
           {stats.map((stat) => (
             <div key={stat.label} className="text-center">
               <p className="text-[clamp(30px,4vw,44px)] font-extrabold leading-none text-ink">{stat.value}</p>
@@ -460,7 +463,7 @@ function Pricing() {
             <article
               key={plan.name}
               className={cn(
-                "card relative overflow-hidden p-8",
+                "card relative overflow-hidden p-6 sm:p-8",
                 plan.highlight && "border-lime ring-2 ring-lime/40",
               )}
             >
@@ -519,11 +522,21 @@ function FAQ() {
           const isOpen = open === index;
           return (
             <div key={faq.q} className="card overflow-hidden">
-              <button onClick={() => setOpen(isOpen ? -1 : index)} className="flex w-full cursor-pointer items-center justify-between gap-4 px-6 py-4 text-left">
+              <button
+                id={`faq-btn-${index}`}
+                onClick={() => setOpen(isOpen ? -1 : index)}
+                aria-expanded={isOpen}
+                aria-controls={`faq-panel-${index}`}
+                className="flex w-full cursor-pointer items-center justify-between gap-4 px-6 py-4 text-left"
+              >
                 <span className="font-bold text-ink">{faq.q}</span>
-                <ChevronDown size={18} className={cn("shrink-0 text-muted transition-transform duration-300", isOpen && "rotate-180")} />
+                <ChevronDown size={18} aria-hidden="true" className={cn("shrink-0 text-muted transition-transform duration-300", isOpen && "rotate-180")} />
               </button>
-              {isOpen && <p className="px-6 pb-5 text-sm leading-relaxed text-muted animate-fade">{faq.a}</p>}
+              {isOpen && (
+                <p id={`faq-panel-${index}`} aria-labelledby={`faq-btn-${index}`} className="px-6 pb-5 text-sm leading-relaxed text-muted animate-fade">
+                  {faq.a}
+                </p>
+              )}
             </div>
           );
         })}
@@ -537,21 +550,24 @@ function FAQ() {
 function FinalCTA() {
   return (
     <section className="mx-auto max-w-6xl px-5 pb-20 sm:px-6">
-      <div className="relative overflow-hidden rounded-[28px] bg-ink px-6 py-16 text-center text-paper sm:px-12">
-        <div className="absolute inset-0 dot-grid opacity-15 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
+      {/* Card "inversa" de firma: usa neutros FIJOS (#111 / #f4f4f1) en vez de los
+          tokens del tema, porque `ink`/`paper` se invierten en modo oscuro y la
+          card quedaba clara sobre fondo oscuro (al revés del tema). */}
+      <div className="relative overflow-hidden rounded-[28px] bg-[#111111] px-6 py-16 text-center text-[#f4f4f1] sm:px-12">
+        <div className="absolute inset-0 [background-image:radial-gradient(rgba(244,244,241,0.14)_1px,transparent_1px)] opacity-100 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
         <div className="relative mx-auto max-w-2xl">
-          <Palette size={32} className="mx-auto mb-5 text-lime" />
+          <Palette size={32} className="mx-auto mb-5 text-lime" aria-hidden="true" />
           <h2 className="text-[clamp(26px,4vw,42px)] font-extrabold leading-tight">
             Empezá a recibir huéspedes hoy
           </h2>
-          <p className="mx-auto mt-4 max-w-md text-paper/70">
+          <p className="mx-auto mt-4 max-w-md text-[#f4f4f1]/70">
             Creá tu cuenta, personalizá tu alojamiento y compartí el enlace. Sin tarjeta.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link to="/auth/registro" className={buttonClass("primary", "min-h-[52px] px-7")}>
               Crear cuenta gratis <ArrowRight size={18} />
             </Link>
-            <Link to="/auth/login" className="inline-flex min-h-[52px] items-center rounded-xl border border-paper/25 px-6 text-sm font-bold text-paper transition hover:bg-paper/10">
+            <Link to="/auth/login" className="inline-flex min-h-[52px] items-center rounded-xl border border-[#f4f4f1]/25 px-6 text-sm font-bold text-[#f4f4f1] transition hover:bg-[#f4f4f1]/10">
               Ya tengo cuenta
             </Link>
           </div>

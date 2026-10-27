@@ -24,4 +24,18 @@ export const ENDPOINTS = {
   getAllOwners: { method: "GET", path: "/owners" },
   // Solo ROLE_ADMIN → ?enabled=true|false
   toggleOwnerStatus: { method: "PATCH", path: "/owners/{id}/status" },
+
+  // ── Reservado: módulos PENDIENTES en el backend ─────────────────────────
+  // El backend todavía no expone estas rutas (ver docs/swagger-api.md). Mientras
+  // tanto, src/lib/api/index.js cae al store local y las pantallas siguen
+  // siendo usables. Cuando el backend las implemente, alcanza con quitar el
+  // comentario de la entrada correspondiente: las pantallas no cambian.
+  // Alojamiento:        "/lodgings/mine"
+  // Disponibilidad:     "/lodgings/mine/blocked-days"
+  // Reservas:           "/lodgings/mine/bookings", "/bookings/{id}"
+  // Estado del pago:    "/bookings/{id}/payment-status"
+  // Datos bancarios:    "/lodgings/mine/bank-details"
+  // Servicios:          "/lodgings/mine/services"
+  // Onboarding huésped: "/onboarding/{lodgingId}/{bookingId}" (público)
+  // Cotización lancha:  "/bookings/{id}/boat-quote"
 }

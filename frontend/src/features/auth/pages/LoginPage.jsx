@@ -105,7 +105,7 @@ export default function LoginPage() {
       </Link>
 
       {DEMO_MODE && (
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => quickLogin("anfitrion@hostflow.app")}

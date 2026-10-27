@@ -122,12 +122,12 @@ export default function PasswordRecoveryPage() {
       </Link>
 
       {/* Stepper */}
-      <ol className="mb-6 flex items-center gap-2 text-xs font-bold text-muted">
+      <ol className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-2 text-xs font-bold text-muted">
         {["Correo", "Código", "Nueva clave"].map((label, index) => {
           const active = index === { email: 0, otp: 1, password: 2 }[step];
           const done = index < { email: 0, otp: 1, password: 2 }[step];
           return (
-            <li key={label} className="flex items-center gap-2">
+            <li key={label} className="flex items-center gap-1.5 sm:gap-2">
               <span
                 className={`grid size-6 place-items-center rounded-full text-[11px] ${
                   done ? "bg-success text-white" : active ? "bg-lime text-lime-ink" : "bg-overlay text-muted"
@@ -136,7 +136,7 @@ export default function PasswordRecoveryPage() {
                 {done ? "✓" : index + 1}
               </span>
               <span className={active ? "text-ink" : ""}>{label}</span>
-              {index < 2 && <span className="h-px w-6 bg-line" />}
+              {index < 2 && <span className="hidden h-px w-6 bg-line sm:block" />}
             </li>
           );
         })}

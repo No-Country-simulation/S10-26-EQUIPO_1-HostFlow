@@ -110,3 +110,21 @@ export function maskEmail(email = "") {
   const head = user.slice(0, 2);
   return `${head}${"•".repeat(Math.max(1, user.length - 2))}@${domain}`;
 }
+
+// ── Totales de una reserva ────────────────────────────────────────────────
+// El campo `total` de la reserva es SOLO el alojamiento. El total real (lo
+// que el huésped paga) incluye los servicios adicionales que registró en el
+// onboarding (booking.selectedServices): el importe debe reflejarse siempre
+// en el total y en su detallado.
+
+export function bookingServices(booking) {
+  return Array.isArray(booking?.selectedServices) ? booking.selectedServices : [];
+}
+
+export function bookingServicesTotal(booking) {
+  return bookingServices(booking).reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+}
+
+export function bookingGrandTotal(booking) {
+  return (Number(booking?.total) || 0) + bookingServicesTotal(booking);
+}

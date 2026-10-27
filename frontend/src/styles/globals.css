@@ -244,10 +244,13 @@
       border-color 0.25s,
       box-shadow 0.25s;
   }
-  .card-hover:hover {
-    transform: translateY(-3px);
-    border-color: var(--color-line-strong);
-    box-shadow: var(--shadow-pop);
+  /* Solo con puntero real: en táctil el hover "se queda pegado" tras el tap */
+  @media (hover: hover) {
+    .card-hover:hover {
+      transform: translateY(-3px);
+      border-color: var(--color-line-strong);
+      box-shadow: var(--shadow-pop);
+    }
   }
   .glass {
     background: color-mix(in srgb, var(--color-paper) 78%, transparent);

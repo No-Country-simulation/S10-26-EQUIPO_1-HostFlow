@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Coins, CreditCard, Plus, Wallet } from "lucide-react";
-import { Alert, Badge, Button, Card, Switch } from "@components/ui";
+import { Coins, CreditCard, Landmark, Plus, Wallet } from "lucide-react";
+import { Alert, Badge, Button, Card, Field, Switch } from "@components/ui";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { CURRENCIES, WALLETS, cn, formatMoney } from "@utils/format";
@@ -9,8 +9,10 @@ export default function PaymentMethodsPage() {
   const { actions } = useSession();
   const payments = useStore((s) => s.payments);
   const lodging = useStore((s) => s.lodging);
+  const bankDetails = payments.bankDetails;
   const [newWallet, setNewWallet] = useState("");
   const [saved, setSaved] = useState(false);
+  const [savedBank, setSavedBank] = useState(false);
 
   const flashSaved = () => {
     setSaved(true);
@@ -34,6 +36,19 @@ export default function PaymentMethodsPage() {
     actions.addPaymentMethod(label, "WALLET");
     setNewWallet("");
     flashSaved();
+  };
+
+  const saveBankDetails = (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    actions.updateBankDetails({
+      holder: String(form.get("holder") || "").trim(),
+      alias: String(form.get("alias") || "").trim(),
+      cbu: String(form.get("cbu") || "").trim(),
+      notes: String(form.get("notes") || "").trim(),
+    });
+    setSavedBank(true);
+    setTimeout(() => setSavedBank(false), 2200);
   };
 
   return (
@@ -69,8 +84,10 @@ export default function PaymentMethodsPage() {
                   onClick={() => setPrimary(currency.code)}
                   className={cn(
                     "flex items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-all",
+                    // En oscuro, lime-soft sigue siendo un lima muy claro y el texto (ink→blanco)
+                    // queda ilegible: se usa lima translúcido (mismo patrón que teal-soft).
                     active
-                      ? "border-lime bg-lime-soft"
+                      ? "border-lime bg-lime-soft dark:bg-lime/12"
                       : "border-line bg-paper hover:border-line-strong",
                   )}
                 >
@@ -113,11 +130,11 @@ export default function PaymentMethodsPage() {
               const currency = CURRENCIES[code];
               const active = payments.wallets.includes(code);
               return (
-                <div key={code} className="flex items-center justify-between rounded-xl border border-line px-4 py-3.5">
-                  <span className="flex items-center gap-3">
-                    <span className="grid size-9 place-items-center rounded-lg bg-cloud text-sm font-extrabold text-muted">{currency.symbol}</span>
-                    <span>
-                      <span className="block text-sm font-bold text-ink">{currency.label}</span>
+                <div key={code} className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-line px-4 py-3.5">
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-cloud text-sm font-extrabold text-muted">{currency.symbol}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-ink">{currency.label}</span>
                       <span className="block text-xs text-muted">{currency.code}</span>
                     </span>
                   </span>
@@ -149,15 +166,15 @@ export default function PaymentMethodsPage() {
             <div
               key={method.id}
               className={cn(
-                "flex items-center justify-between rounded-xl border px-4 py-3.5 transition-all",
+                "flex min-w-0 items-center justify-between gap-2 rounded-xl border px-4 py-3.5 transition-all",
                 method.enabled ? "border-lime/70 bg-lime-soft/40" : "border-line bg-paper",
               )}
             >
-              <div className="flex items-center gap-3">
-                <span className={cn("grid size-9 place-items-center rounded-lg", method.enabled ? "bg-lime text-lime-ink" : "bg-cloud text-muted")}>
+              <div className="flex min-w-0 items-center gap-3">
+                <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg", method.enabled ? "bg-lime text-lime-ink" : "bg-cloud text-muted")}>
                   <CreditCard size={17} />
                 </span>
-                <span className="text-sm font-bold text-ink">{method.label}</span>
+                <span className="truncate text-sm font-bold text-ink">{method.label}</span>
               </div>
               <Switch checked={method.enabled} onChange={() => { actions.togglePaymentMethod(method.id); flashSaved(); }} label={method.enabled ? "On" : "Off"} />
             </div>
@@ -177,6 +194,42 @@ export default function PaymentMethodsPage() {
         </form>
 
         <p className="mt-4 text-xs text-muted">Sugeridas: {WALLETS.join(" · ")}</p>
+      </Card>
+
+      {/* Datos para transferencia (información de pago que ve el huésped) */}
+      <Card className="p-6">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="grid size-10 place-items-center rounded-xl bg-teal-soft text-teal-strong">
+              <Landmark size={20} />
+            </span>
+            <div>
+              <h2 className="font-bold text-ink">Datos para transferencia</h2>
+              <p className="text-xs text-muted">
+                La plataforma no procesa pagos: el huésped transfiere a estos datos y vos marcás la reserva como pagada.
+              </p>
+            </div>
+          </div>
+          {savedBank && <Alert tone="success">Datos bancarios actualizados.</Alert>}
+        </div>
+
+        <form onSubmit={saveBankDetails} className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Titular de la cuenta" name="holder" defaultValue={bankDetails.holder} placeholder="Ej. Cabañas del Arroyo" />
+            <Field label="Alias" name="alias" defaultValue={bankDetails.alias} placeholder="Ej. cabañas.arroyo" />
+          </div>
+          <Field label="CBU / CVU" name="cbu" defaultValue={bankDetails.cbu} placeholder="0000000000000000000000" />
+          <Field
+            as="textarea"
+            label="Indicaciones para el huésped (opcional)"
+            name="notes"
+            defaultValue={bankDetails.notes}
+            placeholder="Ej. Envíanos el comprobante por WhatsApp al +54 9 11 5555 0101."
+          />
+          <Button type="submit" className="mt-1 w-full sm:w-auto">
+            Guardar datos bancarios
+          </Button>
+        </form>
       </Card>
     </div>
   );

@@ -305,6 +305,7 @@ export function Switch({ checked, onChange, label, description }) {
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={label}
         onClick={() => onChange?.(!checked)}
         className={cn(
           "relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors duration-200",
@@ -319,6 +320,8 @@ export function Switch({ checked, onChange, label, description }) {
         />
       </button>
       {(label || description) && (
+        // El `<label>` nativo ya forwardea los clicks de esta zona al botón
+        // (button es "labelable"): tocar el texto alterna el switch una sola vez.
         <span className="grid">
           {label && <span className="text-sm font-semibold text-ink">{label}</span>}
           {description && <span className="text-xs text-muted">{description}</span>}
@@ -370,7 +373,7 @@ export function OtpInput({ value = "", onChange, length = 6, autoFocus = true, e
   };
 
   return (
-    <div className="flex justify-between gap-2" onPaste={handlePaste}>
+    <div className="flex justify-between gap-1.5 sm:gap-2" onPaste={handlePaste}>
       {digits.map((digit, index) => (
         <input
           key={index}
@@ -384,7 +387,7 @@ export function OtpInput({ value = "", onChange, length = 6, autoFocus = true, e
           onKeyDown={handleKeyDown(index)}
           aria-label={`Dígito ${index + 1}`}
           className={cn(
-            "size-12 appearance-none rounded-xl border bg-paper text-center text-xl font-extrabold text-ink outline-none transition-all duration-200 placeholder:text-muted",
+            "size-10 appearance-none rounded-xl border bg-paper text-center text-lg font-extrabold text-ink outline-none transition-all duration-200 placeholder:text-muted sm:size-12 sm:text-xl",
             error
               ? "border-danger"
               : "border-line-strong hover:border-ink/35 focus:border-teal focus:shadow-[0_0_0_4px_var(--color-teal-soft)]",

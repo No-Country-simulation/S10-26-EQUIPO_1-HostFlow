@@ -73,8 +73,25 @@ export const api = {
 
   // ── Reservas ────────────────────────────────────────────────────────────
   getBookings: op("getBookings"),
+  createBooking: op("createBooking"),
   updateBooking: op("updateBooking"),
   setBookingStatus: op("setBookingStatus"),
+  // Estado del pago de una reserva (Pendiente / Pagado).
+  setPaymentStatus: op("setPaymentStatus"),
+  // Renueva el enlace de llegada del huésped: nueva vigencia de 24 h.
+  regenerateOnboardingLink: op("regenerateOnboardingLink"),
+
+  // ── Onboarding del huésped (B2C) ────────────────────────────────────────
+  submitOnboarding: op("submitOnboarding"),
+  // Solicitud de cotización de lancha: genera el JSON; NO lo envía a otra API.
+  createBoatQuoteRequest: op("createBoatQuoteRequest"),
+  declineBoatQuote: op("declineBoatQuote"),
+
+  // ── Servicios adicionales ───────────────────────────────────────────────
+  addService: op("addService"),
+  updateService: op("updateService"),
+  removeService: op("removeService"),
+  toggleService: op("toggleService"),
 
   // ── Pagos ───────────────────────────────────────────────────────────────
   getPayments: op("getPayments"),
@@ -82,6 +99,8 @@ export const api = {
   toggleWallet: op("toggleWallet"),
   togglePaymentMethod: op("togglePaymentMethod"),
   addPaymentMethod: op("addPaymentMethod"),
+  // Datos bancarios del alojamiento (transferencia externa).
+  updateBankDetails: op("updateBankDetails"),
 
   // ── Admin ───────────────────────────────────────────────────────────────
   getAdminLodgings: op("getAdminLodgings"),

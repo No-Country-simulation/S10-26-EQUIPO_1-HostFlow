@@ -18,16 +18,18 @@ export default function LodgingPage() {
     const name = String(form.get("name") || "").trim();
     const rooms = Number(form.get("rooms"));
     const bathrooms = Number(form.get("bathrooms"));
+    const capacity = Number(form.get("capacity"));
     const pricePerNight = Number(form.get("pricePerNight"));
     const currency = String(form.get("currency") || "ARS");
 
     if (!name) return setError("Ingresá el nombre del alojamiento.");
     if (!rooms || rooms < 1) return setError("El número de habitaciones debe ser al menos 1.");
     if (bathrooms < 0) return setError("Ingresá una cantidad de baños válida.");
+    if (!capacity || capacity < 1) return setError("Ingresá la capacidad en huéspedes (al menos 1).");
     if (!pricePerNight || pricePerNight <= 0) return setError("Ingresá un precio por noche válido.");
 
     setError("");
-    actions.updateLodging({ name, rooms, bathrooms, pricePerNight, currency });
+    actions.updateLodging({ name, rooms, bathrooms, capacity, pricePerNight, currency });
     setSaved(true);
     setTimeout(() => setSaved(false), 2600);
   };
@@ -65,6 +67,14 @@ export default function LodgingPage() {
               <Field label="Número de habitaciones" name="rooms" type="number" min="1" defaultValue={lodging.rooms} />
               <Field label="Número de baños" name="bathrooms" type="number" min="0" defaultValue={lodging.bathrooms} />
             </div>
+            <Field
+              label="Capacidad (huéspedes)"
+              name="capacity"
+              type="number"
+              min="1"
+              defaultValue={lodging.capacity || 1}
+              placeholder="Ej. 10"
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Precio por noche" name="pricePerNight" type="number" min="0" step="1000" defaultValue={lodging.pricePerNight} />
               <Field as="select" label="Moneda principal" name="currency" defaultValue={lodging.currency}>
@@ -93,7 +103,7 @@ export default function LodgingPage() {
             <Badge tone="neutral">{plural(lodging.images.length, "imagen", "imágenes")}</Badge>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {lodging.images.map((src, index) => (
               <div key={index} className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-line">
                 <img src={src} alt={`Imagen ${index + 1}`} className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
@@ -101,7 +111,7 @@ export default function LodgingPage() {
                   type="button"
                   onClick={() => actions.removeImage(index)}
                   aria-label="Eliminar imagen"
-                  className="absolute right-2 top-2 grid size-8 cursor-pointer place-items-center rounded-lg bg-black/60 text-white opacity-0 transition group-hover:opacity-100 hover:bg-danger"
+                  className="absolute right-2 top-2 grid size-8 cursor-pointer place-items-center rounded-lg bg-black/60 text-white opacity-100 transition focus-visible:opacity-100 hover:bg-danger lg:opacity-0 lg:group-hover:opacity-100"
                 >
                   <Trash2 size={15} />
                 </button>

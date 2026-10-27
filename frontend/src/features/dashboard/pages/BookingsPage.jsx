@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Search } from "lucide-react";
-import { Badge, EmptyState } from "@components/ui";
+import { CalendarDays, Plus, Search } from "lucide-react";
+import { Badge, Button, EmptyState } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
+import { BookingDetailModal } from "../components/BookingDetailModal";
+import { BookingFormModal } from "../components/BookingFormModal";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { cn, toISODate } from "@utils/format";
@@ -18,8 +20,14 @@ export default function BookingsPage() {
   const bookings = useStore((s) => s.bookings);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [detailId, setDetailId] = useState(null);
 
   const today = toISODate();
+
+  // El detalle vive en un estado derivado: si la reserva cambia (estado, pago,
+  // onboarding), el modal abierto refleja el nuevo valor sin recargar.
+  const detail = useMemo(() => bookings.find((b) => b.id === detailId) || null, [bookings, detailId]);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -41,7 +49,12 @@ export default function BookingsPage() {
           <h1 className="text-[clamp(24px,4vw,32px)] font-extrabold">Reservas</h1>
           <p className="mt-1 text-sm text-muted">Gestioná las llegadas y el estado de cada reserva.</p>
         </div>
-        <Badge tone="teal">{list.length} resultado{list.length === 1 ? "" : "s"}</Badge>
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge tone="teal">{list.length} resultado{list.length === 1 ? "" : "s"}</Badge>
+          <Button type="button" icon={Plus} onClick={() => setCreating(true)}>
+            Nueva reserva
+          </Button>
+        </div>
       </header>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -86,10 +99,14 @@ export default function BookingsPage() {
               booking={booking}
               onConfirm={(id) => actions.setBookingStatus(id, "CONFIRMED")}
               onCancel={(id) => actions.setBookingStatus(id, "CANCELLED")}
+              onView={(id) => setDetailId(id)}
             />
           ))}
         </div>
       )}
+
+      <BookingDetailModal booking={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />
+      <BookingFormModal open={creating} onClose={() => setCreating(false)} />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router";
 import {
   ArrowRight,
@@ -11,15 +12,19 @@ import {
 } from "lucide-react";
 import { Badge, Card, Stat } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
+import { BookingDetailModal } from "../components/BookingDetailModal";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
-import { addDays, formatMoney, toISODate } from "@utils/format";
+import { addDays, bookingGrandTotal, formatMoney, toISODate } from "@utils/format";
 
 export default function OwnerDashboardPage() {
   const { user, actions } = useSession();
   const bookings = useStore((s) => s.bookings);
   const lodging = useStore((s) => s.lodging);
   const blockedDays = useStore((s) => s.blockedDays);
+  const [detailId, setDetailId] = useState(null);
+
+  const detail = bookings.find((b) => b.id === detailId) || null;
 
   const today = toISODate();
   const upcoming = bookings
@@ -29,11 +34,12 @@ export default function OwnerDashboardPage() {
   const next30 = addDays(today, 30);
   const next = upcoming.find((b) => b.checkIn <= next30);
   // Los ingresos se suman solo en la moneda principal del alojamiento:
-  // mezclar ARS con USD/EUR daría un total sin sentido.
+  // mezclar ARS con USD/EUR daría un total sin sentido. El importe de cada
+  // reserva incluye sus servicios adicionales (total real cobrado).
   const inWindow = upcoming.filter((b) => b.checkIn <= next30);
   const localBookings = inWindow.filter((b) => b.currency === lodging.currency);
   const foreignBookings = inWindow.filter((b) => b.currency !== lodging.currency);
-  const revenue = localBookings.reduce((sum, b) => sum + b.total, 0);
+  const revenue = localBookings.reduce((sum, b) => sum + bookingGrandTotal(b), 0);
   const pendingCount = upcoming.filter((b) => b.status === "PENDING").length;
 
   const quick = [
@@ -87,6 +93,7 @@ export default function OwnerDashboardPage() {
             booking={next}
             onConfirm={(id) => actions.setBookingStatus(id, "CONFIRMED")}
             onCancel={(id) => actions.setBookingStatus(id, "CANCELLED")}
+            onView={(id) => setDetailId(id)}
           />
         </section>
       )}
@@ -127,6 +134,7 @@ export default function OwnerDashboardPage() {
                 booking={booking}
                 onConfirm={(id) => actions.setBookingStatus(id, "CONFIRMED")}
                 onCancel={(id) => actions.setBookingStatus(id, "CANCELLED")}
+                onView={(id) => setDetailId(id)}
               />
             ))}
           </div>
@@ -152,6 +160,8 @@ export default function OwnerDashboardPage() {
           ))}
         </div>
       </section>
+
+      <BookingDetailModal booking={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />
     </div>
   );
 }

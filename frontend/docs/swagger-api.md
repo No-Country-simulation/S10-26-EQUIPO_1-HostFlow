@@ -140,5 +140,10 @@ pantallas ya consumen la capa de servicios y no cambian.
 | Alojamiento (datos, imágenes, precio) | `/lodgings/mine` |
 | Disponibilidad (días bloqueados) | `/lodgings/mine/blocked-days` |
 | Reservas | `/lodgings/mine/bookings`, `/bookings/{id}` |
+| Estado del pago de una reserva | `/bookings/{id}/payment-status` |
+| Datos bancarios del alojamiento | `/lodgings/mine/bank-details` |
+| Servicios adicionales | `/lodgings/mine/services` |
+| Onboarding del huésped (B2C, público) | `/onboarding/{lodgingId}/{bookingId}` |
+| Cotización de transporte en lancha | `/bookings/{id}/boat-quote` (ver [boat-quote-contract.md](boat-quote-contract.md)) |
 | Métodos de pago | `/lodgings/mine/payment-methods` |
 | Estadísticas de administración | `/admin/stats` |

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   Building2,
   CalendarDays,
   CalendarX,
+  ConciergeBell,
   CreditCard,
   LayoutDashboard,
   LogOut,
@@ -22,6 +23,7 @@ const hostNav = [
   { to: "/panel/alojamiento", label: "Alojamiento", icon: Building2 },
   { to: "/panel/disponibilidad", label: "Disponibilidad", icon: CalendarX },
   { to: "/panel/pagos", label: "Pagos", icon: CreditCard },
+  { to: "/panel/servicios", label: "Servicios", icon: ConciergeBell },
   { to: "/panel/perfil", label: "Perfil", icon: UserRound },
 ];
 
@@ -81,6 +83,22 @@ export default function AuthenticatedAppLayout() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Drawer móvil: al abrir bloquea el scroll del fondo (el panel tiene el suyo)
+  // y Escape lo cierra (consistente con el patrón del Modal).
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
+
   const nav = isAdmin ? adminNav : hostNav;
 
   const doLogout = () => {
@@ -123,7 +141,7 @@ export default function AuthenticatedAppLayout() {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade" onClick={() => setMobileOpen(false)} />
-          <div className="absolute inset-y-0 left-0 flex w-[280px] flex-col gap-6 bg-paper p-5 animate-rise">
+          <div className="absolute inset-y-0 left-0 flex w-[280px] max-w-[85vw] flex-col gap-6 overflow-y-auto overscroll-contain bg-paper p-5 animate-rise">
             <div className="flex items-center justify-between">
               <Brand />
               <button

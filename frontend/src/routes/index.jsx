@@ -13,7 +13,9 @@ import LodgingPage from "@features/dashboard/pages/LodgingPage"
 import AvailabilityPage from "@features/dashboard/pages/AvailabilityPage"
 import PaymentMethodsPage from "@features/dashboard/pages/PaymentMethodsPage"
 import LodgingProfilePage from "@features/dashboard/pages/LodgingProfilePage"
+import ServicesPage from "@features/dashboard/pages/ServicesPage"
 import AdminOverviewPage from "@features/admin/pages/AdminOverviewPage"
+import OnboardingPage from "@features/onboarding/pages/OnboardingPage"
 
 // El panel de anfitrión no aplica a un administrador: se lo manda a su dashboard.
 function PanelIndex() {
@@ -32,6 +34,9 @@ export const routes = [
       { path: "recuperar", Component: PasswordRecoveryPage },
     ],
   },
+  // Onboarding del huésped (B2C): enlace único por alojamiento y reserva,
+  // sin cuenta ni sesión. La identidad visual es la del alojamiento.
+  { path: "/llegada/:lodgingId/:bookingId", Component: OnboardingPage },
   {
     path: "/panel",
     Component: ProtectedRoute,
@@ -45,6 +50,7 @@ export const routes = [
           { path: "alojamiento", Component: LodgingPage },
           { path: "disponibilidad", Component: AvailabilityPage },
           { path: "pagos", Component: PaymentMethodsPage },
+          { path: "servicios", Component: ServicesPage },
           { path: "perfil", Component: LodgingProfilePage },
         ],
       },

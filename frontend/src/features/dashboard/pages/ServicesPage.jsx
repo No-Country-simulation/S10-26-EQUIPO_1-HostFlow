@@ -1,0 +1,225 @@
+import { useState } from "react";
+import { ConciergeBell, Pencil, Plus, Trash2 } from "lucide-react";
+import { Alert, Badge, Button, Card, EmptyState, Field, Switch } from "@components/ui";
+import Modal from "@components/ui/Modal";
+import { useStore } from "@lib/state/useStore";
+import { useSession } from "@features/auth/context/SessionContext";
+import { DEMO_MODE } from "@lib/config/env";
+import { cn, formatMoney } from "@utils/format";
+
+const EMPTY_FORM = { name: "", price: "", description: "" };
+
+export default function ServicesPage() {
+  const { actions } = useSession();
+  const services = useStore((s) => s.services);
+  const lodging = useStore((s) => s.lodging);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [editing, setEditing] = useState(null); // servicio en edición
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const flashSaved = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2200);
+  };
+
+  const setField = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+
+  const addService = (event) => {
+    event.preventDefault();
+    if (!form.name.trim()) return setError("Ingresá el nombre del servicio.");
+    if (Number(form.price) <= 0) return setError("Ingresá un precio válido (0 si es gratuito).");
+    setError("");
+    actions.addService({ name: form.name, price: form.price, description: form.description });
+    setForm(EMPTY_FORM);
+    flashSaved();
+  };
+
+  const saveEdit = (event) => {
+    event.preventDefault();
+    if (!editing) return;
+    if (!form.name.trim()) return setError("Ingresá el nombre del servicio.");
+    if (Number(form.price) < 0) return setError("Ingresá un precio válido.");
+    setError("");
+    actions.updateService(editing.id, {
+      name: form.name.trim(),
+      price: Number(form.price) || 0,
+      description: form.description.trim(),
+    });
+    closeEdit();
+    flashSaved();
+  };
+
+  const openEdit = (service) => {
+    setError("");
+    setEditing(service);
+    setForm({ name: service.name, price: String(service.price), description: service.description || "" });
+  };
+
+  const closeEdit = () => {
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    setError("");
+  };
+
+  const remove = (service) => {
+    // window.confirm evita borrados accidentales; es el patrón nativo del proyecto.
+    if (!window.confirm(`¿Eliminar el servicio "${service.name}"?`)) return;
+    actions.removeService(service.id);
+    flashSaved();
+  };
+
+  return (
+    <div className="grid gap-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[clamp(24px,4vw,32px)] font-extrabold">Servicios adicionales</h1>
+          <p className="mt-1 text-sm text-muted">
+            Ofrecé extras a tus huéspedes: se suman al pedido desde su enlace de llegada.
+          </p>
+        </div>
+        <Badge tone="lime">{services.filter((s) => s.enabled).length} activo{services.filter((s) => s.enabled).length === 1 ? "" : "s"}</Badge>
+      </header>
+
+      {!DEMO_MODE && (
+        <Alert tone="info">
+          El backend aún no expone el módulo de servicios: los cambios se guardan localmente en este navegador.
+        </Alert>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        {/* Listado */}
+        <div className="grid content-start gap-4">
+          {services.length === 0 ? (
+            <EmptyState
+              icon={ConciergeBell}
+              title="No hay servicios"
+              text="Agregá el primero con el formulario de al lado."
+            />
+          ) : (
+            services.map((service) => (
+              <Card key={service.id} className={cn("p-5 transition-all", !service.enabled && "opacity-70")}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-bold text-ink">{service.name}</p>
+                      {service.enabled ? (
+                        <Badge tone="teal">Activo</Badge>
+                      ) : (
+                        <Badge tone="neutral">Inactivo</Badge>
+                      )}
+                    </div>
+                    {service.description && <p className="mt-1 text-sm text-muted">{service.description}</p>}
+                  </div>
+                  <p className="text-lg font-extrabold text-ink">
+                    {service.price === 0 ? "Gratis" : formatMoney(service.price, lodging.currency)}
+                  </p>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3.5">
+                  <Switch
+                    checked={service.enabled}
+                    onChange={() => actions.toggleService(service.id)}
+                    label={service.enabled ? "Visible para huéspedes" : "Oculto"}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(service)}
+                      aria-label={`Editar el servicio ${service.name}`}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong px-3.5 py-2 text-xs font-bold text-ink-soft transition hover:border-ink/40 hover:text-ink"
+                    >
+                      <Pencil size={14} aria-hidden="true" /> Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => remove(service)}
+                      aria-label={`Eliminar el servicio ${service.name}`}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong px-3.5 py-2 text-xs font-bold text-ink-soft transition hover:border-danger hover:text-danger"
+                    >
+                      <Trash2 size={14} aria-hidden="true" /> Eliminar
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Alta */}
+        <Card className="h-fit p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="grid size-10 place-items-center rounded-xl bg-lime-soft text-lime-ink">
+              <Plus size={20} />
+            </span>
+            <div>
+              <h2 className="font-bold text-ink">Agregar servicio</h2>
+              <p className="text-xs text-muted">Nombre, precio y una descripción corta.</p>
+            </div>
+          </div>
+
+          <form onSubmit={addService} className="grid gap-4" noValidate>
+            <Field
+              label="Nombre del servicio"
+              name="name"
+              value={form.name}
+              onChange={setField("name")}
+              placeholder="Ej. Desayuno casero"
+            />
+            <Field
+              label={`Precio por ${lodging.currency}`}
+              name="price"
+              type="number"
+              min="0"
+              step="100"
+              value={form.price}
+              onChange={setField("price")}
+              placeholder="Ej. 3500"
+              hint="Usá 0 si el servicio es gratuito."
+            />
+            <Field
+              as="textarea"
+              label="Descripción (opcional)"
+              name="description"
+              value={form.description}
+              onChange={setField("description")}
+              placeholder="Ej. Café, medialunas y fruta por persona."
+            />
+
+            {error && <Alert>{error}</Alert>}
+
+            <Button type="submit" className="mt-1 w-full sm:w-auto">
+              Agregar servicio
+            </Button>
+          </form>
+        </Card>
+      </div>
+
+      {/* Modal de edición */}
+      <Modal open={Boolean(editing)} onClose={closeEdit} title="Editar servicio" subtitle={editing?.name}>
+        <form onSubmit={saveEdit} className="grid gap-4" noValidate>
+          <Field label="Nombre del servicio" name="name" value={form.name} onChange={setField("name")} autoFocus />
+          <Field
+            label={`Precio por ${lodging.currency}`}
+            name="price"
+            type="number"
+            min="0"
+            step="100"
+            value={form.price}
+            onChange={setField("price")}
+          />
+          <Field as="textarea" label="Descripción (opcional)" name="description" value={form.description} onChange={setField("description")} />
+
+          {error && <Alert>{error}</Alert>}
+
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={closeEdit}>
+              Cancelar
+            </Button>
+            <Button type="submit">Guardar cambios</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}

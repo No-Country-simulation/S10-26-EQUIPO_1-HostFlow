@@ -39,8 +39,10 @@ después de cambiar una clave).
 | `/panel/reservas` | Listado de reservas con filtros y búsqueda | sesión |
 | `/panel/alojamiento` | Datos del alojamiento (nombre, habitaciones, baños, precio, imágenes) | sesión |
 | `/panel/disponibilidad` | Calendario para **deshabilitar días** | sesión |
-| `/panel/pagos` | Métodos de pago (ARS principal, USD/EUR secundarias, billeteras digitales) | sesión |
-| `/panel/perfil` | Perfil: **subir logo** + personalización de la empresa (color, acento, formas) | sesión |
+| `/panel/pagos` | Métodos de pago (ARS principal, USD/EUR secundarias, billeteras digitales) + **datos para transferencia** | sesión |
+| `/panel/servicios` | **Servicios adicionales**: alta, edición, activación y precios | sesión |
+| `/panel/perfil` | Perfil: **subir logo** + personalización de la empresa (3 colores, formas) | sesión |
+| `/llegada/:lodgingId/:bookingId` | **Onboarding del huésped** (B2C, sin cuenta): ficha de llegada, alérgenos, servicios y **cotización opcional de lancha** | público (enlace único) |
 | `/admin` | **Control interno**: cantidad de alojamientos, listado y búsqueda por dueño / ID / correo | solo `role: ADMIN` |
 
 ## Tema claro / oscuro
@@ -68,24 +70,27 @@ después de cambiar una clave).
 src/
   features/home/pages/          HomePage (presentación)
   features/dashboard/
-    pages/      OwnerDashboardPage · BookingsPage · LodgingPage · AvailabilityPage · PaymentMethodsPage · LodgingProfilePage
-    components/ BookingSummaryCard
+    pages/      OwnerDashboardPage · BookingsPage · LodgingPage · AvailabilityPage · PaymentMethodsPage · ServicesPage · LodgingProfilePage
+    components/ BookingSummaryCard · BookingDetailModal · BookingFormModal
+  features/onboarding/
+    pages/        OnboardingPage (ficha de llegada del huésped, B2C)
+    components/   OnboardingShell (identidad del alojamiento) · BoatQuoteStep
   features/admin/pages/         AdminOverviewPage (control interno)
   features/auth/
     pages/        LoginPage · CreateAccountPage · PasswordRecoveryPage (OTP)
     context/      SessionContext (sesión y acciones)
   routes/         index.jsx (rutas) · guards/ProtectedRoute.jsx
   components/
-    ui/index.jsx  sistema visual compartido
-    layout/       AuthenticatedAppLayout · AuthLayout
+    ui/index.jsx  sistema visual compartido · Modal.jsx (diálogo reutilizable)
+    layout/       AuthenticatedAppLayout · AuthLayout · ScrollToTop
   lib/
     api/          index (fachada) · httpApi · demoApi · endpoints · httpClient · tokenStorage · errors
     state/        store.js (estado demo) · useStore.js (hook reactivo)
     config/env.js VITE_API_URL → DEMO_MODE
-    theme/        ThemeContext (claro/oscuro)
+    theme/        ThemeContext (claro/oscuro) · LodgingTheme (colores del alojamiento, scoped)
     format.js     cn, isEmail, monedas, fechas, textos
   styles/globals.css sistema visual (paleta, tema, animaciones)
-docs/             paleta-colores.md · swagger-api.md
+docs/             paleta-colores.md · swagger-api.md · boat-quote-contract.md
 ```
 
 Los imports compartidos pueden usar los aliases configurados (`@`, `@components`,
