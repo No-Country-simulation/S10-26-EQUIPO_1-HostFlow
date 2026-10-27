@@ -1,8 +1,11 @@
 package com.hostflow.model;
 
+import com.hostflow.enums.Currency;           // 🆕 Import necesario para el enum de moneda
 import com.hostflow.enums.PaymentMethodType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -11,7 +14,9 @@ import java.time.LocalDateTime;
 })
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class AccommodationPaymentMethod {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -59,17 +64,41 @@ public class AccommodationPaymentMethod {
     @Column(name = "is_active", nullable = false)
     private boolean isActive;
 
+    // =========================================================================
+    // 🆕 CONFIGURACIÓN MULTIMONEDA
+    // =========================================================================
+
+    /**
+     * 🆕 Moneda en la que se recibe el pago a través de este método.
+     * Permite que un mismo alojamiento tenga métodos de pago en distintas monedas
+     * (ej: Transferencia bancaria en ARS, PayPal en USD, Stripe en EUR).
+     * Por defecto es ARS para mantener compatibilidad con registros existentes.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "currency", nullable = false, length = 10)
+    @ColumnDefault("'ARS'")
+    @Builder.Default
+    private Currency currency = Currency.ARS;
+
+    // =========================================================================
+    // METADATOS DE AUDITORÍA
+    // =========================================================================
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @PrePersist void onCreate() {
+    @PrePersist
+    void onCreate() {
         LocalDateTime now = LocalDateTime.now();
         createdAt = now;
         updatedAt = now;
     }
 
-    @PreUpdate void onUpdate() { updatedAt = LocalDateTime.now(); }
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }
