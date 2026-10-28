@@ -86,6 +86,19 @@ export function strongOn(hex, bg, { dark = false } = {}) {
   return out;
 }
 
+// Color VISIBLE sobre un fondo (no texto, sino superficies/bandas/patrones):
+// si el fondo es oscuro aclara el color, si es claro lo oscurece, hasta que se
+// distinga del fondo. Evita que una marca oscura "desaparezca" en modo oscuro.
+export function visibleOn(hex, bg, min = 2.2) {
+  const bgRgb = hexToRgb(bg);
+  const dark = bgRgb ? relativeLuminance(bgRgb) < 0.5 : false;
+  let out = hexToRgb(hex) ? hex : "#0fa3a3";
+  for (let i = 0; i < 12 && contrastRatio(out, bg) < min; i += 1) {
+    out = dark ? lighten(out, 0.12) : darken(out, 0.12);
+  }
+  return out;
+}
+
 // Distancia euclídea entre dos colores (para descartar parecidos en paletas).
 export function colorDistance(a, b) {
   const dr = a.r - b.r;

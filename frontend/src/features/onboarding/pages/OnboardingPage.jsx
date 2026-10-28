@@ -5,20 +5,28 @@ import {
   ArrowRight,
   Check,
   ClipboardList,
+  Clock,
   Copy,
   HeartPulse,
-  MessageCircle,
+  IdCard,
+  Mail,
+  MessageSquare,
+  Phone,
+  ShieldCheck,
   Ship,
+  Sparkles,
   UserRound,
 } from "lucide-react";
-import { Alert, Badge, Button, EmptyState, Field } from "@components/ui";
+import { Alert, Badge, Button, EmptyState, Field, WhatsAppIcon } from "@components/ui";
 import OnboardingShell from "../components/OnboardingShell";
+import OnboardingIntro from "../components/OnboardingIntro";
 import BoatQuoteStep from "../components/BoatQuoteStep";
+import StayCard from "../components/StayCard";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { isOnboardingLinkExpired } from "@lib/state/store";
 import { DEMO_MODE } from "@lib/config/env";
-import { bookingGrandTotal, daysBetween, formatDate, formatMoney, isEmail, plural } from "@utils/format";
+import { bookingGrandTotal, cn, daysBetween, formatDate, formatMoney, isEmail, plural, serviceLineDetail, serviceLineTotal } from "@utils/format";
 
 const STEPS = [
   { id: 0, label: "Tus datos", icon: UserRound },
@@ -40,6 +48,79 @@ const EMPTY_QUOTE = {
   notes: "",
 };
 
+// Tope de unidades para un servicio de precio fijo (el huésped elige cuántos).
+const MAX_SERVICE_QTY = 20;
+
+// Validación del paso de datos. Devuelve un mensaje por campo (vacío si está
+// bien) para mostrarlo debajo de cada input, no en un aviso único al final.
+const GUEST_FIELDS = ["guestName", "guestDocument", "guestEmail", "guestPhone"];
+
+function validateGuest(guest) {
+  const errors = {};
+
+  // Nombre y apellido: se validan como un solo dato y toleran espacios de más.
+  const name = guest.guestName.trim().replace(/\s+/g, " ");
+  if (!name) errors.guestName = "Ingresá tu nombre y apellido.";
+  else if (name.length < 3) errors.guestName = "Escribí tu nombre completo.";
+  else if (!/^[\p{L}][\p{L}\s.'’-]*$/u.test(name)) {
+    errors.guestName = "Usá solo letras, espacios, puntos o guiones.";
+  } else if (!name.includes(" ")) errors.guestName = "Agregá también tu apellido.";
+
+  // Documento: DNI, CI o pasaporte (5 a 20 caracteres).
+  const document = guest.guestDocument.trim().replace(/\s+/g, " ");
+  if (!document) errors.guestDocument = "Ingresá tu DNI o pasaporte.";
+  else if (!/^[0-9A-Za-z][0-9A-Za-z.\- ]{4,19}$/.test(document)) {
+    errors.guestDocument = "Entre 5 y 20 caracteres: letras, números, puntos o guiones.";
+  }
+
+  const email = guest.guestEmail.trim();
+  if (!email) errors.guestEmail = "Ingresá tu correo electrónico.";
+  else if (!isEmail(email)) errors.guestEmail = "Ese correo no parece válido. Revisalo.";
+
+  // Teléfono: obligatorio, para poder coordinar la llegada.
+  const phone = guest.guestPhone.trim();
+  if (!phone) errors.guestPhone = "Ingresá tu teléfono.";
+  else {
+    const digits = phone.replace(/\D/g, "");
+    if (!/^[+0-9()\s.-]+$/.test(phone) || digits.length < 6 || digits.length > 15) {
+      errors.guestPhone = "Revisá el número: entre 6 y 15 dígitos.";
+    }
+  }
+
+  return errors;
+}
+
+// Limpia espacios de más antes de guardar (el backend recibe el dato prolijo).
+function cleanGuest(guest) {
+  return {
+    ...guest,
+    guestName: guest.guestName.trim().replace(/\s+/g, " "),
+    guestDocument: guest.guestDocument.trim().replace(/\s+/g, " "),
+    guestEmail: guest.guestEmail.trim(),
+    guestPhone: guest.guestPhone.trim(),
+  };
+}
+
+// Encabezado de cada paso: ícono en color de marca + etiqueta + título. Es
+// presentación (no cambia el flujo) y hereda la identidad del alojamiento.
+function StepHeading({ icon: Icon, eyebrow, title, text, aside }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-chip)] bg-teal-soft text-teal-strong">
+          <Icon size={19} aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-teal-strong">{eyebrow}</p>
+          <h1 className="mt-0.5 text-xl font-extrabold text-ink">{title}</h1>
+          {text && <p className="mt-1 text-sm text-muted">{text}</p>}
+        </div>
+      </div>
+      {aside}
+    </div>
+  );
+}
+
 // Onboarding B2C: el huésped accede con el enlace único de su reserva
 // (/llegada/:lodgingId/:bookingId), sin crear cuenta. La identidad visual es la
 // del alojamiento (OnboardingShell + LodgingTheme).
@@ -52,7 +133,9 @@ export default function OnboardingPage() {
   const bankDetails = useStore((s) => s.payments.bankDetails);
 
   const [step, setStep] = useState(0);
+  const [started, setStarted] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -61,7 +144,7 @@ export default function OnboardingPage() {
     guestName: booking?.guestName || "",
     guestDocument: "",
     guestEmail: booking?.guestEmail || "",
-    guestPhone: "",
+    guestPhone: booking?.guestPhone || "",
   });
   const [health, setHealth] = useState({ allergies: "", preferences: "", notes: "" });
   const [selected, setSelected] = useState([]); // [{ serviceId, name, price }]
@@ -69,9 +152,13 @@ export default function OnboardingPage() {
 
   const linkValid = lodgingId === lodging.id;
   const availableServices = useMemo(() => services.filter((sv) => sv.enabled), [services]);
+  // Fotos del alojamiento (0 a 4): una por paso, en el mismo orden del panel.
+  const stepPhotos = Array.isArray(lodging.images) ? lodging.images : [];
   const nights = booking ? daysBetween(booking.checkIn, booking.checkOut) : 0;
-  // Total REAL: alojamiento + servicios adicionales elegidos en el onboarding.
-  const servicesTotal = selected.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  // Huéspedes de la reserva: se usan en los servicios que se cobran por persona.
+  const guests = Math.max(1, Number(booking?.guests) || 1);
+  // Total REAL: alojamiento + servicios (por noche × noches, por huésped, fijos × cantidad).
+  const servicesTotal = selected.reduce((sum, item) => sum + serviceLineTotal(item, nights, guests), 0);
   const orderTotal = (Number(booking?.total) || 0) + servicesTotal;
   const savedTotal = booking ? bookingGrandTotal(booking) : orderTotal;
   const hasBankDetails = Boolean(bankDetails.holder || bankDetails.alias || bankDetails.cbu);
@@ -88,36 +175,75 @@ export default function OnboardingPage() {
     ? `Hola ${lodging.name}, soy ${booking.guestName}. Te mando el comprobante de pago de mi reserva (${formatMoney(savedTotal, booking.currency)}).`
     : `Hola ${lodging.name}, te mando el comprobante de pago de mi reserva.`;
 
-  const setGuestField = (key) => (event) => setGuest((g) => ({ ...g, [key]: event.target.value }));
+  const setGuestField = (key) => (event) => {
+    const value = event.target.value;
+    const nextGuest = { ...guest, [key]: value };
+    setGuest(nextGuest);
+    // Si el campo ya mostraba un error, se recalcula en vivo para que
+    // desaparezca apenas se corrige (sin esperar a reintentar el paso).
+    setFieldErrors((current) =>
+      current[key] ? { ...current, [key]: validateGuest(nextGuest)[key] || "" } : current,
+    );
+  };
+  // Al salir del campo se valida: el aviso aparece debajo del input.
+  const blurGuestField = (key) => () => {
+    const message = validateGuest(guest)[key] || "";
+    setFieldErrors((current) => ({ ...current, [key]: message }));
+  };
   const setHealthField = (key) => (event) => setHealth((h) => ({ ...h, [key]: event.target.value }));
 
   const toggleService = (service) => {
     setSelected((current) =>
       current.some((item) => item.serviceId === service.id)
         ? current.filter((item) => item.serviceId !== service.id)
-        : [...current, { serviceId: service.id, name: service.name, price: service.price }],
+        : [
+            ...current,
+            {
+              serviceId: service.id,
+              name: service.name,
+              price: service.price,
+              pricing: service.pricing === "PER_NIGHT" ? "PER_NIGHT" : "FIXED",
+              perGuest: Boolean(service.perGuest),
+              quantity: 1,
+            },
+          ],
+    );
+  };
+
+  // Cantidad de un servicio de precio fijo (mínimo 1, máximo 20).
+  const setQuantity = (serviceId, delta) => {
+    setSelected((current) =>
+      current.map((item) =>
+        item.serviceId === serviceId
+          ? { ...item, quantity: Math.min(MAX_SERVICE_QTY, Math.max(1, (Number(item.quantity) || 1) + delta)) }
+          : item,
+      ),
     );
   };
 
   const next = () => {
     setError("");
     if (step === 0) {
-      if (!guest.guestName.trim()) return setError("Ingresá tu nombre y apellido.");
-      const doc = guest.guestDocument.trim();
-      if (!doc) return setError("Ingresá tu DNI o pasaporte.");
-      if (!/^[0-9A-Za-z.\- ]{5,20}$/.test(doc)) {
-        return setError("El DNI/Pasaporte debe tener entre 5 y 20 caracteres (letras, números, puntos o guiones).");
+      const errors = validateGuest(guest);
+      setFieldErrors(errors);
+      const firstInvalid = GUEST_FIELDS.find((key) => errors[key]);
+      if (firstInvalid) {
+        document.querySelector(`[name="${firstInvalid}"]`)?.focus();
+        return;
       }
-      if (!guest.guestEmail || !isEmail(guest.guestEmail)) return setError("Ingresá un correo válido.");
-      if (guest.guestPhone && !/^[+0-9()\s-]{6,20}$/.test(guest.guestPhone.trim())) {
-        return setError("Ingresá un teléfono válido o dejalo vacío.");
-      }
+      setGuest(cleanGuest(guest));
     }
     setStep((current) => Math.min(current + 1, STEPS.length - 1));
   };
 
   const back = () => {
     setError("");
+    // En el primer paso, "Atrás" vuelve a la portada de presentación.
+    if (step === 0) {
+      setStarted(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     setStep((current) => Math.max(current - 1, 0));
   };
 
@@ -125,6 +251,16 @@ export default function OnboardingPage() {
   // onboarding. Protegido contra dobles envíos (submitting / done).
   const confirm = () => {
     if (submitting || completed) return;
+
+    // Última barrera: si el huésped volvió atrás y dejó algo mal, no se envía.
+    const errors = validateGuest(guest);
+    if (GUEST_FIELDS.some((key) => errors[key])) {
+      setFieldErrors(errors);
+      setStep(0);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (quote.decided && quote.wanted) {
@@ -216,7 +352,7 @@ export default function OnboardingPage() {
               rel="noreferrer"
               className="mt-2 inline-flex items-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-lime-ink transition hover:opacity-90"
             >
-              <MessageCircle size={16} aria-hidden="true" />
+              <WhatsAppIcon size={16} />
               Pedir enlace nuevo · {lodging.phone}
             </a>
           }
@@ -243,7 +379,7 @@ export default function OnboardingPage() {
     return (
       <OnboardingShell lodging={lodging}>
         <div className="grid gap-5">
-          <div className="card grid gap-3 p-6 text-center">
+          <div className="card grid gap-3 overflow-hidden p-6 text-center">
             <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-lime-soft text-lime-ink">
               <Check size={26} />
             </span>
@@ -293,7 +429,7 @@ export default function OnboardingPage() {
                 rel="noreferrer"
                 className="mx-auto inline-flex items-center gap-2 rounded-xl bg-lime px-5 py-3 text-sm font-bold text-lime-ink transition hover:opacity-90"
               >
-                <MessageCircle size={18} aria-hidden="true" />
+                <WhatsAppIcon size={18} />
                 Enviar capture al WhatsApp
               </a>
               <p className="text-xs text-muted">
@@ -340,20 +476,46 @@ export default function OnboardingPage() {
     );
   }
 
+  // ── Portada: presentación del alojamiento con sus fotos ──────────────────
+  if (!started) {
+    return (
+      <OnboardingShell lodging={lodging} wide>
+        <OnboardingIntro
+          lodging={lodging}
+          booking={booking}
+          nights={nights}
+          photos={stepPhotos}
+          stepsCount={STEPS.length}
+          waLink={waLink}
+          onStart={() => {
+            setStarted(true);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      </OnboardingShell>
+    );
+  }
+
   // ── Flujo por pasos ──────────────────────────────────────────────────────
   return (
     <OnboardingShell lodging={lodging}>
       <div className="grid gap-6">
-        {/* Progreso */}
-        <div>
-          <div className="mb-2 flex items-center justify-between text-xs font-bold text-muted">
-            <span aria-hidden="true">
+        {/* Progreso: etiqueta del paso + barra segmentada con la marca */}
+        <div className="grid gap-2">
+          <div className="flex items-center justify-between gap-3 text-[11px] font-bold">
+            <span className="inline-flex min-w-0 items-center gap-1.5 text-teal-strong">
+              {(() => {
+                const Icon = STEPS[step].icon;
+                return <Icon size={13} aria-hidden="true" />;
+              })()}
+              <span className="truncate">{STEPS[step].label}</span>
+            </span>
+            <span className="shrink-0 text-muted" aria-hidden="true">
               Paso {step + 1} de {STEPS.length}
             </span>
-            <span>{STEPS[step].label}</span>
           </div>
           <div
-            className="h-2 overflow-hidden rounded-full bg-overlay"
+            className="flex gap-1.5"
             role="progressbar"
             aria-label="Progreso de la ficha de llegada"
             aria-valuemin={1}
@@ -361,66 +523,139 @@ export default function OnboardingPage() {
             aria-valuenow={step + 1}
             aria-valuetext={`Paso ${step + 1} de ${STEPS.length}: ${STEPS[step].label}`}
           >
-            <div
-              className="h-full rounded-full bg-teal transition-all duration-300"
-              style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-            />
+            {STEPS.map((item, index) => (
+              <span
+                key={item.id}
+                className="h-2 flex-1 rounded-full transition-colors duration-300"
+                style={{
+                  backgroundColor:
+                    index <= step ? "var(--hf-hero)" : "var(--color-overlay, rgba(17, 17, 17, 0.06))",
+                }}
+              />
+            ))}
           </div>
         </div>
 
         {/* Paso 0: datos del huésped */}
         {step === 0 && (
-          <div className="card grid gap-4 p-6 animate-rise">
-            <div>
-              <h1 className="text-xl font-extrabold text-ink">¡Hola, {booking.guestName.split(" ")[0]}!</h1>
-              <p className="mt-1.5 text-sm text-muted">
-                Completá tu ficha de llegada para {lodging.name}. Solo toma un minuto y no necesitás crear cuenta.
-              </p>
-            </div>
+          <div className="card grid gap-4 overflow-hidden p-6 animate-rise">
+            <StepHeading
+              icon={UserRound}
+              eyebrow="Ficha de llegada"
+              title={`¡Hola, ${booking.guestName.split(" ")[0]}!`}
+              text={`Completá tus datos para ${lodging.name}. Solo toma un minuto y no necesitás crear cuenta.`}
+              aside={
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge tone="teal">
+                    <Clock size={11} /> 1 minuto
+                  </Badge>
+                  <Badge tone="lime">
+                    <ShieldCheck size={11} /> Sin cuenta
+                  </Badge>
+                </div>
+              }
+            />
 
-            <div className="grid gap-3 rounded-2xl bg-cloud p-4 text-sm">
-              <span className="font-semibold text-ink">
-                {formatDate(booking.checkIn)} → {formatDate(booking.checkOut)} · {plural(nights, "noche", "noches")}
-              </span>
-              <span className="text-muted">{plural(booking.guests, "huésped", "huéspedes")}</span>
-            </div>
+            {/* Tarjeta de la estadía: fechas, noches y huéspedes con la marca */}
+            <StayCard booking={booking} lodging={lodging} nights={nights} />
 
-            <Field label="Nombre y apellido" name="guestName" value={guest.guestName} onChange={setGuestField("guestName")} autoFocus />
             <Field
-              label="DNI / Pasaporte"
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <UserRound size={13} className="text-teal-strong" aria-hidden="true" /> Nombre y apellido
+                </span>
+              }
+              name="guestName"
+              autoComplete="name"
+              value={guest.guestName}
+              onChange={setGuestField("guestName")}
+              onBlur={blurGuestField("guestName")}
+              error={fieldErrors.guestName}
+              aria-invalid={Boolean(fieldErrors.guestName)}
+              autoFocus
+            />
+            <Field
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <IdCard size={13} className="text-teal-strong" aria-hidden="true" /> DNI / Pasaporte
+                </span>
+              }
               name="guestDocument"
               value={guest.guestDocument}
               onChange={setGuestField("guestDocument")}
+              onBlur={blurGuestField("guestDocument")}
+              error={fieldErrors.guestDocument}
+              aria-invalid={Boolean(fieldErrors.guestDocument)}
               placeholder="Ej. 30.123.456 o AB123456"
+              hint="Tal como figura en tu documento."
               required
             />
-            <Field label="Correo electrónico" name="guestEmail" type="email" value={guest.guestEmail} onChange={setGuestField("guestEmail")} />
             <Field
-              label="Teléfono / WhatsApp"
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <Mail size={13} className="text-teal-strong" aria-hidden="true" /> Correo electrónico
+                </span>
+              }
+              name="guestEmail"
+              type="email"
+              autoComplete="email"
+              value={guest.guestEmail}
+              onChange={setGuestField("guestEmail")}
+              onBlur={blurGuestField("guestEmail")}
+              error={fieldErrors.guestEmail}
+              aria-invalid={Boolean(fieldErrors.guestEmail)}
+            />
+            <Field
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <Phone size={13} className="text-teal-strong" aria-hidden="true" /> Teléfono / WhatsApp
+                </span>
+              }
               name="guestPhone"
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={guest.guestPhone}
               onChange={setGuestField("guestPhone")}
+              onBlur={blurGuestField("guestPhone")}
+              error={fieldErrors.guestPhone}
+              aria-invalid={Boolean(fieldErrors.guestPhone)}
               placeholder="Ej. +54 9 11 5555 0101"
+              hint="Con código de área. Lo usamos para coordinar tu llegada."
+              required
             />
 
             {error && <Alert>{error}</Alert>}
+
+            <div className="flex items-start gap-2 rounded-xl border border-line bg-cloud px-3.5 py-3 text-xs text-muted">
+              <ShieldCheck size={15} className="mt-0.5 shrink-0 text-teal-strong" aria-hidden="true" />
+              <span>Tus datos se comparten solo con {lodging.name} para preparar tu llegada.</span>
+            </div>
           </div>
         )}
 
         {/* Paso 1: alergias y preferencias */}
         {step === 1 && (
-          <div className="card grid gap-4 p-6 animate-rise">
-            <div>
-              <h1 className="text-xl font-extrabold text-ink">Alérgenos y preferencias</h1>
-              <p className="mt-1.5 text-sm text-muted">
-                Esta información ayuda a {lodging.name} a recibirte mejor.
-              </p>
-            </div>
+          <div className="card grid gap-4 overflow-hidden p-6 animate-rise">
+            <StepHeading
+              icon={HeartPulse}
+              eyebrow="Salud y preferencias"
+              title="Alérgenos y preferencias"
+              text={`Esta información ayuda a ${lodging.name} a recibirte mejor.`}
+            />
+
+            <Alert tone="info">
+              Solo la ve {lodging.name} y su equipo: no se comparte con otros huéspedes.
+            </Alert>
 
             <Field
               as="textarea"
-              label="Alergias alimentarias o de otro tipo"
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <HeartPulse size={13} className="text-teal-strong" aria-hidden="true" /> Alergias alimentarias o de
+                  otro tipo
+                </span>
+              }
               name="allergies"
               value={health.allergies}
               onChange={setHealthField("allergies")}
@@ -429,7 +664,11 @@ export default function OnboardingPage() {
             />
             <Field
               as="textarea"
-              label="Preferencias"
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-teal-strong" aria-hidden="true" /> Preferencias
+                </span>
+              }
               name="preferences"
               value={health.preferences}
               onChange={setHealthField("preferences")}
@@ -437,7 +676,12 @@ export default function OnboardingPage() {
             />
             <Field
               as="textarea"
-              label="Comentarios para el alojamiento (opcional)"
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <MessageSquare size={13} className="text-teal-strong" aria-hidden="true" /> Comentarios para el
+                  alojamiento (opcional)
+                </span>
+              }
               name="notes"
               value={health.notes}
               onChange={setHealthField("notes")}
@@ -448,47 +692,135 @@ export default function OnboardingPage() {
 
         {/* Paso 2: servicios adicionales */}
         {step === 2 && (
-          <div className="card grid gap-4 p-6 animate-rise">
-            <div>
-              <h1 className="text-xl font-extrabold text-ink">Servicios adicionales</h1>
-              <p className="mt-1.5 text-sm text-muted">
-                Sumá extras a tu estadía. Se agregan al total del pedido, que pagás por transferencia.
-              </p>
-            </div>
+          <div className="card grid gap-4 overflow-hidden p-6 animate-rise">
+            <StepHeading
+              icon={ClipboardList}
+              eyebrow="Extras de tu estadía"
+              title="Servicios adicionales"
+              text="Sumá extras a tu estadía. Se agregan al total del pedido, que pagás por transferencia."
+              aside={
+                <span className="rounded-full bg-lime-soft px-2.5 py-1 text-[11px] font-extrabold text-lime-ink">
+                  {selected.length === 0
+                    ? "Opcional"
+                    : `${selected.length} ${selected.length === 1 ? "elegido" : "elegidos"}${
+                        servicesTotal > 0 ? ` · ${formatMoney(servicesTotal, lodging.currency)}` : ""
+                      }`}
+                </span>
+              }
+            />
 
             {availableServices.length === 0 ? (
               <p className="text-sm text-muted">Este alojamiento no ofrece servicios adicionales por el momento.</p>
             ) : (
               <div className="grid gap-3">
                 {availableServices.map((service) => {
-                  const active = selected.some((item) => item.serviceId === service.id);
+                  const item = selected.find((entry) => entry.serviceId === service.id);
+                  const active = Boolean(item);
+                  const nightly = service.pricing === "PER_NIGHT";
+                  const quantity = item?.quantity || 1;
                   return (
-                    <button
+                    <div
                       key={service.id}
-                      type="button"
-                      onClick={() => toggleService(service)}
-                      aria-pressed={active}
-                      className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 py-3.5 text-left transition-all ${
-                        active ? "border-teal bg-teal-soft" : "border-line bg-paper hover:border-line-strong"
-                      }`}
+                      className={cn(
+                        "rounded-xl border transition-all",
+                        active ? "border-[color:var(--hf-hero)] bg-teal-soft" : "border-line bg-paper hover:border-line-strong",
+                      )}
                     >
-                      <span className="min-w-0">
-                        <span className="block text-sm font-bold text-ink">{service.name}</span>
-                        {service.description && <span className="block text-xs text-muted">{service.description}</span>}
-                      </span>
-                      <span className="flex shrink-0 items-center gap-2.5">
-                        <span className="text-sm font-extrabold text-ink">
-                          {service.price === 0 ? "Gratis" : formatMoney(service.price, lodging.currency)}
+                      <button
+                        type="button"
+                        onClick={() => toggleService(service)}
+                        aria-pressed={active}
+                        className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left"
+                      >
+                        <span className="min-w-0">
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <span className="block text-sm font-bold text-ink">{service.name}</span>
+                            <span className="rounded-full bg-overlay px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink-soft">
+                              {nightly ? "Por noche" : "Precio fijo"}
+                            </span>
+                            {service.perGuest && (
+                              <span className="rounded-full bg-lime-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-lime-ink">
+                                Por huésped
+                              </span>
+                            )}
+                          </span>
+                          {service.description && <span className="mt-0.5 block text-xs text-muted">{service.description}</span>}
                         </span>
-                        <span
-                          className={`grid size-6 place-items-center rounded-full border-2 ${
-                            active ? "border-teal bg-teal text-white" : "border-line-strong text-transparent"
-                          }`}
-                        >
-                          <Check size={14} />
+                        <span className="flex shrink-0 items-center gap-2.5">
+                          <span className="text-right">
+                            <span className="block text-sm font-extrabold text-ink">
+                              {service.price === 0 ? "Gratis" : formatMoney(service.price, lodging.currency)}
+                            </span>
+                            {service.price > 0 && (nightly || service.perGuest) && (
+                              <span className="block text-[10px] font-semibold text-muted">
+                                {nightly && service.perGuest
+                                  ? "por noche y huésped"
+                                  : nightly
+                                    ? "por noche"
+                                    : "por huésped"}
+                              </span>
+                            )}
+                          </span>
+                          <span
+                            className={cn(
+                              "grid size-6 place-items-center rounded-full border-2",
+                              active
+                                ? "border-[color:var(--hf-hero)] bg-[color:var(--hf-hero)] text-[color:var(--hf-hero-ink)]"
+                                : "border-line-strong text-transparent",
+                            )}
+                          >
+                            <Check size={14} />
+                          </span>
                         </span>
-                      </span>
-                    </button>
+                      </button>
+
+                      {/* Detalle de la selección: por noche y/o por huésped se
+                          calcula solo; el resto elige cantidad. */}
+                      {active && (
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
+                          {nightly || item.perGuest ? (
+                            <span className="text-xs font-semibold text-ink-soft">
+                              {nightly && <>{plural(nights, "noche", "noches")} × </>}
+                              {item.perGuest && <>{plural(guests, "huésped", "huéspedes")} × </>}
+                              {formatMoney(service.price, lodging.currency)} ={" "}
+                              <span className="font-extrabold text-ink">
+                                {formatMoney(serviceLineTotal(item, nights, guests), lodging.currency)}
+                              </span>
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-xs font-semibold text-ink-soft">Cantidad</span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setQuantity(service.id, -1)}
+                                  disabled={quantity <= 1}
+                                  aria-label={`Quitar una unidad de ${service.name}`}
+                                  className="grid size-9 cursor-pointer place-items-center rounded-lg border border-line-strong bg-paper text-base font-bold text-ink transition hover:border-ink/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  −
+                                </button>
+                                <span className="w-7 text-center text-sm font-extrabold text-ink" aria-live="polite" aria-label={`Cantidad de ${service.name}`}>
+                                  {quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setQuantity(service.id, 1)}
+                                  disabled={quantity >= MAX_SERVICE_QTY}
+                                  aria-label={`Agregar una unidad de ${service.name}`}
+                                  className="grid size-9 cursor-pointer place-items-center rounded-lg border border-line-strong bg-paper text-base font-bold text-ink transition hover:border-ink/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  +
+                                </button>
+                                <span className="ml-1.5 text-xs font-extrabold text-ink">
+                                  {formatMoney(serviceLineTotal(item, nights, guests), lodging.currency)}
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -498,18 +830,27 @@ export default function OnboardingPage() {
 
         {/* Paso 3: cotización de lancha (opcional) */}
         {step === 3 && (
-          <div className="card p-6 animate-rise">
-            <BoatQuoteStep quote={quote} onChange={setQuote} booking={booking} lodging={lodging} />
+          <div className="card overflow-hidden p-6 animate-rise">
+            <div className="mt-4">
+              <BoatQuoteStep quote={quote} onChange={setQuote} booking={booking} lodging={lodging} />
+            </div>
           </div>
         )}
 
         {/* Paso 4: resumen y confirmación */}
         {step === 4 && (
           <div className="card grid gap-4 p-6 animate-rise">
-            <div>
-              <h1 className="text-xl font-extrabold text-ink">Revisá tu información</h1>
-              <p className="mt-1.5 text-sm text-muted">Al confirmar, {lodging.name} recibe tu ficha de llegada.</p>
-            </div>
+            <StepHeading
+              icon={Check}
+              eyebrow="Último paso"
+              title="Revisá tu información"
+              text={`Al confirmar, ${lodging.name} recibe tu ficha de llegada.`}
+              aside={
+                <span className="rounded-full bg-lime-soft px-2.5 py-1 text-[11px] font-extrabold text-lime-ink">
+                  Total {formatMoney(orderTotal, booking.currency)}
+                </span>
+              }
+            />
 
             <div className="grid gap-3 break-words rounded-2xl bg-cloud p-4 text-sm">
               <p>
@@ -550,8 +891,15 @@ export default function OnboardingPage() {
               </div>
               {selected.map((item) => (
                 <div key={item.serviceId} className="flex min-w-0 items-center justify-between gap-3">
-                  <span className="min-w-0 truncate text-muted">{item.name}</span>
-                  <span className="shrink-0 font-semibold text-ink">{formatMoney(item.price, booking.currency)}</span>
+                  <span className="min-w-0 truncate text-muted">
+                    {item.name}
+                    {serviceLineDetail(item, nights, guests) && (
+                      <span className="ml-1.5 text-[11px] font-semibold text-muted">{serviceLineDetail(item, nights, guests)}</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 font-semibold text-ink">
+                    {formatMoney(serviceLineTotal(item, nights, guests), booking.currency)}
+                  </span>
                 </div>
               ))}
               <div className="mt-1 flex min-w-0 items-center justify-between gap-3 border-t border-line pt-2.5">
@@ -591,7 +939,7 @@ export default function OnboardingPage() {
 
         {/* Navegación entre pasos */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button type="button" variant="ghost" icon={ArrowLeft} onClick={back} disabled={step === 0 || submitting}>
+          <Button type="button" variant="ghost" icon={ArrowLeft} onClick={back} disabled={submitting}>
             Atrás
           </Button>
           {step < STEPS.length - 1 ? (
@@ -604,6 +952,20 @@ export default function OnboardingPage() {
             </Button>
           )}
         </div>
+
+        {waDigits && (
+          <p className="text-center text-xs text-muted">
+            ¿Tenés una duda?{" "}
+            <a
+              href={waLink(`Hola ${lodging.name}, tengo una consulta sobre mi llegada.`)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-semibold text-teal-strong transition-colors hover:text-teal"
+            >
+              <WhatsAppIcon size={14} /> Escribinos por WhatsApp
+            </a>
+          </p>
+        )}
       </div>
     </OnboardingShell>
   );

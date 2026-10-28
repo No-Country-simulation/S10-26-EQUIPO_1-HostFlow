@@ -31,7 +31,7 @@ export default function BoatQuoteStep({ quote, onChange, booking, lodging }) {
           aria-pressed={quote.decided && quote.wanted}
           className={cn(
             "card card-hover grid cursor-pointer gap-2 p-5 text-left transition-all",
-            quote.decided && quote.wanted ? "border-2 border-teal" : "hover:border-teal",
+            quote.decided && quote.wanted ? "border-2 border-[color:var(--hf-hero)]" : "hover:border-teal",
           )}
         >
           <span className="grid size-10 w-fit place-items-center rounded-xl bg-teal-soft text-teal-strong">

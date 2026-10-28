@@ -1,6 +1,6 @@
 import { ArrowRight, CalendarDays, Eye, Users } from "lucide-react";
 import { Badge } from "@components/ui";
-import { bookingGrandTotal, bookingServices, daysBetween, formatDateShort, formatMoney, plural } from "@utils/format";
+import { bookingGrandTotal, bookingServices, daysBetween, formatDateShort, formatMoney, plural, serviceLineDetail, serviceLineTotal } from "@utils/format";
 
 const STATUS = {
   CONFIRMED: { tone: "success", label: "Confirmada" },
@@ -120,8 +120,13 @@ export function BookingSummaryCard({ booking, onConfirm, onCancel, onView }) {
             </li>
             {services.map((item, index) => (
               <li key={item.serviceId || index} className="flex min-w-0 items-center justify-between gap-3">
-                <span className="min-w-0 truncate">{item.name}</span>
-                <span className="shrink-0 font-semibold text-ink">{formatMoney(item.price, currency)}</span>
+                <span className="min-w-0 truncate">
+                  {item.name}
+                  {serviceLineDetail(item, nights, guests) && (
+                    <span className="ml-1 font-semibold">{serviceLineDetail(item, nights, guests)}</span>
+                  )}
+                </span>
+                <span className="shrink-0 font-semibold text-ink">{formatMoney(serviceLineTotal(item, nights, guests), currency)}</span>
               </li>
             ))}
             <li className="flex min-w-0 items-center justify-between gap-3 border-t border-line pt-1.5 font-bold text-ink">

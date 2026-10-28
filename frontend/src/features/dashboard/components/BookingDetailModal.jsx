@@ -7,7 +7,7 @@ import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { ONBOARDING_LINK_TTL_MS, isOnboardingLinkExpired } from "@lib/state/store";
 import { DEMO_MODE } from "@lib/config/env";
-import { bookingGrandTotal, bookingServices, bookingServicesTotal, daysBetween, formatDate, formatMoney, plural } from "@utils/format";
+import { bookingGrandTotal, bookingServices, bookingServicesTotal, daysBetween, formatDate, formatMoney, plural, serviceLineDetail, serviceLineTotal } from "@utils/format";
 
 export function BookingDetailModal({ booking, open, onClose }) {
   const { actions } = useSession();
@@ -18,6 +18,8 @@ export function BookingDetailModal({ booking, open, onClose }) {
   if (!booking) return null;
 
   const nights = daysBetween(booking.checkIn, booking.checkOut);
+  // Huéspedes de la reserva (los servicios por persona se cobran por cada uno).
+  const guests = Math.max(1, Number(booking.guests) || 1);
   // Total REAL de la reserva: alojamiento + adicionales registrados por el huésped.
   const selected = bookingServices(booking);
   const servicesTotal = bookingServicesTotal(booking);
@@ -109,8 +111,15 @@ export function BookingDetailModal({ booking, open, onClose }) {
             </div>
             {selected.map((item, index) => (
               <div key={item.serviceId || index} className="flex min-w-0 items-center justify-between gap-3">
-                <span className="min-w-0 truncate text-muted">{item.name}</span>
-                <span className="shrink-0 font-semibold text-ink">{formatMoney(item.price, booking.currency)}</span>
+                <span className="min-w-0 truncate text-muted">
+                  {item.name}
+                  {serviceLineDetail(item, nights, guests) && (
+                    <span className="ml-1.5 text-[11px] font-semibold text-muted">{serviceLineDetail(item, nights, guests)}</span>
+                  )}
+                </span>
+                <span className="shrink-0 font-semibold text-ink">
+                  {formatMoney(serviceLineTotal(item, nights, guests), booking.currency)}
+                </span>
               </div>
             ))}
             <div className="mt-1 flex min-w-0 items-center justify-between gap-3 border-t border-line pt-2.5">

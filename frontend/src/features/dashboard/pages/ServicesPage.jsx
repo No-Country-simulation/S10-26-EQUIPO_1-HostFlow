@@ -7,7 +7,34 @@ import { useSession } from "@features/auth/context/SessionContext";
 import { DEMO_MODE } from "@lib/config/env";
 import { cn, formatMoney } from "@utils/format";
 
-const EMPTY_FORM = { name: "", price: "", description: "" };
+const EMPTY_FORM = { name: "", price: "", description: "", pricing: "FIXED", perGuest: false };
+
+const PRICING_OPTIONS = [
+  { id: "FIXED", label: "Precio fijo por unidad", hint: "El huésped elige la cantidad (ej. limpieza extra, cuna)." },
+  {
+    id: "PER_NIGHT",
+    label: "Por noche",
+    hint: "Se multiplica por las noches de la estadía (ej. desayuno, toallas).",
+  },
+];
+
+// Etiqueta del precio según cómo se cobra: noche, unidad y/o huésped.
+const priceLabel = (pricing, perGuest) => {
+  const parts = [];
+  if (pricing === "PER_NIGHT") parts.push("por noche");
+  else parts.push("por unidad");
+  if (perGuest) parts.push("por huésped");
+  return `Precio ${parts.join(" y ")}`;
+};
+
+// Sufijo corto en el listado: "/ noche", "/ huésped" o "/ noche × huésped".
+const priceSuffix = (service) => {
+  const perNight = service.pricing === "PER_NIGHT";
+  if (perNight && service.perGuest) return "/ noche × huésped";
+  if (perNight) return "/ noche";
+  if (service.perGuest) return "/ huésped";
+  return "";
+};
 
 export default function ServicesPage() {
   const { actions } = useSession();
@@ -28,9 +55,15 @@ export default function ServicesPage() {
   const addService = (event) => {
     event.preventDefault();
     if (!form.name.trim()) return setError("Ingresá el nombre del servicio.");
-    if (Number(form.price) <= 0) return setError("Ingresá un precio válido (0 si es gratuito).");
+    if (Number(form.price) < 0) return setError("Ingresá un precio válido (0 si es gratuito).");
     setError("");
-    actions.addService({ name: form.name, price: form.price, description: form.description });
+    actions.addService({
+      name: form.name,
+      price: form.price,
+      description: form.description,
+      pricing: form.pricing,
+      perGuest: form.perGuest,
+    });
     setForm(EMPTY_FORM);
     flashSaved();
   };
@@ -44,6 +77,8 @@ export default function ServicesPage() {
     actions.updateService(editing.id, {
       name: form.name.trim(),
       price: Number(form.price) || 0,
+      pricing: form.pricing,
+      perGuest: Boolean(form.perGuest),
       description: form.description.trim(),
     });
     closeEdit();
@@ -53,7 +88,13 @@ export default function ServicesPage() {
   const openEdit = (service) => {
     setError("");
     setEditing(service);
-    setForm({ name: service.name, price: String(service.price), description: service.description || "" });
+    setForm({
+      name: service.name,
+      price: String(service.price),
+      description: service.description || "",
+      pricing: service.pricing || "FIXED",
+      perGuest: Boolean(service.perGuest),
+    });
   };
 
   const closeEdit = () => {
@@ -108,11 +149,18 @@ export default function ServicesPage() {
                       ) : (
                         <Badge tone="neutral">Inactivo</Badge>
                       )}
+                      <Badge tone={service.pricing === "PER_NIGHT" ? "pink" : "lime"}>
+                        {service.pricing === "PER_NIGHT" ? "Por noche" : "Precio fijo"}
+                      </Badge>
+                      {service.perGuest && <Badge tone="teal">Por huésped</Badge>}
                     </div>
                     {service.description && <p className="mt-1 text-sm text-muted">{service.description}</p>}
                   </div>
                   <p className="text-lg font-extrabold text-ink">
                     {service.price === 0 ? "Gratis" : formatMoney(service.price, lodging.currency)}
+                    {service.price > 0 && priceSuffix(service) && (
+                      <span className="ml-1 text-xs font-semibold text-muted">{priceSuffix(service)}</span>
+                    )}
                   </p>
                 </div>
 
@@ -154,7 +202,7 @@ export default function ServicesPage() {
             </span>
             <div>
               <h2 className="font-bold text-ink">Agregar servicio</h2>
-              <p className="text-xs text-muted">Nombre, precio y una descripción corta.</p>
+              <p className="text-xs text-muted">Nombre, forma de cobro, precio y una descripción corta.</p>
             </div>
           </div>
 
@@ -167,7 +215,29 @@ export default function ServicesPage() {
               placeholder="Ej. Desayuno casero"
             />
             <Field
-              label={`Precio por ${lodging.currency}`}
+              as="select"
+              label="Forma de cobro"
+              name="pricing"
+              value={form.pricing}
+              onChange={setField("pricing")}
+              hint={PRICING_OPTIONS.find((option) => option.id === form.pricing)?.hint}
+            >
+              {PRICING_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </Field>
+            <div className="rounded-xl border border-line bg-cloud px-3.5 py-3">
+              <Switch
+                checked={Boolean(form.perGuest)}
+                onChange={(next) => setForm((current) => ({ ...current, perGuest: next }))}
+                label="Cobrar por huésped"
+                description="Se multiplica por la cantidad de huéspedes de la reserva (ej. comidas, toallas)."
+              />
+            </div>
+            <Field
+              label={`${priceLabel(form.pricing, form.perGuest)} (${lodging.currency})`}
               name="price"
               type="number"
               min="0"
@@ -200,7 +270,29 @@ export default function ServicesPage() {
         <form onSubmit={saveEdit} className="grid gap-4" noValidate>
           <Field label="Nombre del servicio" name="name" value={form.name} onChange={setField("name")} autoFocus />
           <Field
-            label={`Precio por ${lodging.currency}`}
+            as="select"
+            label="Forma de cobro"
+            name="pricing"
+            value={form.pricing}
+            onChange={setField("pricing")}
+            hint={PRICING_OPTIONS.find((option) => option.id === form.pricing)?.hint}
+          >
+            {PRICING_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </Field>
+          <div className="rounded-xl border border-line bg-cloud px-3.5 py-3">
+            <Switch
+              checked={Boolean(form.perGuest)}
+              onChange={(next) => setForm((current) => ({ ...current, perGuest: next }))}
+              label="Cobrar por huésped"
+              description="Se multiplica por la cantidad de huéspedes de la reserva (ej. comidas, toallas)."
+            />
+          </div>
+          <Field
+            label={`${priceLabel(form.pricing, form.perGuest)} (${lodging.currency})`}
             name="price"
             type="number"
             min="0"

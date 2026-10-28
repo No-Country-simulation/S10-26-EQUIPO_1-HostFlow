@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Building2, Check, ImagePlus, Moon, Palette, RotateCcw, Sparkles, Sun, Trash2, Undo2, Wand2 } from "lucide-react";
-import { Alert, Badge, Button, Card, Field, Switch } from "@components/ui";
+import { Building2, Check, ImagePlus, Moon, Palette, Pipette, RotateCcw, Sparkles, Sun, Trash2, Undo2, Wand2 } from "lucide-react";
+import { Alert, Badge, BrandLogo, Button, Card, Field, Switch } from "@components/ui";
 import { LodgingTheme } from "@lib/theme/LodgingTheme";
+import { PATTERNS, patternPreviewStyle } from "@lib/theme/patterns";
 import { extractPaletteFromImage, suggestBrandTrio } from "@lib/theme/extractPalette";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
@@ -9,27 +10,22 @@ import { BRAND_DEFAULTS } from "@lib/state/store";
 import { colorDistance, contrastRatio, hexToRgb, lighten, normalizeHex, readableOn, strongOn } from "@utils/color";
 import { cn } from "@utils/format";
 
+// Muestras sugeridas: colores con vida, sin negro ni grises (no aportan
+// identidad y ensucian la marca del alojamiento).
 const COLOR_PRESETS = [
   { name: "Teal", value: "#0fa3a3" },
   { name: "Lima", value: "#d4f53c" },
   { name: "Rosa", value: "#f4b8c4" },
-  { name: "Carbón", value: "#111111" },
   { name: "Azul", value: "#3b82f6" },
   { name: "Violeta", value: "#8b5cf6" },
+  { name: "Terracota", value: "#e07a5f" },
 ];
 
-const RADII = [
-  { id: "rounded", label: "Redondeado", class: "rounded-2xl" },
-  { id: "soft", label: "Suave", class: "rounded-lg" },
-  { id: "sharp", label: "Recto", class: "rounded-md" },
-  { id: "pill", label: "Píldora", class: "rounded-full" },
-];
-
-// Slots de marca (máximo 3 colores personalizados).
+// Los 3 colores tienen un ROL fijo: el dueño elige el color, no qué pinta.
 const SLOTS = [
-  { id: "primary", label: "Principal" },
-  { id: "accent", label: "Acento" },
-  { id: "tertiary", label: "Suave" },
+  { id: "primary", label: "Marca", where: "Cabecera y portada del enlace, logo y datos." },
+  { id: "accent", label: "Acción", where: "Botones, precio y servicios seleccionados." },
+  { id: "tertiary", label: "Fondo", where: "Superficie del enlace y acentos suaves." },
 ];
 
 // Umbral de jerarquía: por debajo de esta distancia (0-255) dos colores se
@@ -37,9 +33,8 @@ const SLOTS = [
 const MIN_DISTANCE = 60;
 const UNDO_MS = 6000;
 
-// Editor de UN slot de color: presets + color libre (input nativo) con medidor
-// de contraste WCAG en vivo y sugerencia de tono legible. Siempre 1 de los 3
-// colores permitidos.
+// Editor de UN color: 6 muestras sin negro + color libre (círculo con
+// cuentagotas) y medidor de contraste WCAG en vivo. Siempre 1 de los 3 roles.
 function SlotEditor({ slot, brand, onPick }) {
   const hex = normalizeHex(brand[slot.id], BRAND_DEFAULTS[slot.id]);
   const ratioWhite = contrastRatio(hex, "#ffffff");
@@ -48,9 +43,21 @@ function SlotEditor({ slot, brand, onPick }) {
   const aa = best >= 4.5;
 
   return (
-    <div>
-      <p className="mb-2 text-sm font-bold text-ink">Color {slot.label.toLowerCase()}</p>
-      <div className="flex flex-wrap gap-2.5">
+    <div className="rounded-2xl border border-line bg-cloud p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-ink">Color de {slot.label.toLowerCase()}</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted">{slot.where}</p>
+        </div>
+        <span
+          className="size-10 shrink-0 rounded-full border border-line-strong"
+          style={{ backgroundColor: hex }}
+          aria-hidden="true"
+        />
+      </div>
+
+      {/* Muestras circulares: el seleccionado se marca con un anillo, no con un borde cuadrado */}
+      <div className="mt-3 flex flex-wrap items-center gap-2.5">
         {COLOR_PRESETS.map((preset) => {
           const active = hex === preset.value.toLowerCase();
           return (
@@ -61,25 +68,37 @@ function SlotEditor({ slot, brand, onPick }) {
               title={preset.name}
               aria-pressed={active}
               aria-label={`Color ${preset.name} para ${slot.label.toLowerCase()}`}
-              className="grid size-11 cursor-pointer place-items-center rounded-xl border-2 transition-all hover:scale-105"
-              style={{ backgroundColor: preset.value, borderColor: active ? "var(--color-ink)" : "transparent" }}
+              className="grid size-9 cursor-pointer place-items-center rounded-full transition-transform hover:scale-110 focus-visible:outline-offset-4"
+              style={{
+                backgroundColor: preset.value,
+                boxShadow: active
+                  ? `0 0 0 2px var(--color-paper), 0 0 0 4px ${preset.value}`
+                  : "inset 0 0 0 1px rgba(17, 17, 17, 0.12)",
+              }}
             >
-              {/* El check usa la tinta legible: en Lima (#d4f53c) el blanco desaparece */}
-              {active && <Check size={18} aria-hidden="true" style={{ color: readableOn(preset.value) }} />}
+              {active && <Check size={16} strokeWidth={3} style={{ color: readableOn(preset.value) }} />}
             </button>
           );
         })}
+
+        {/* Color libre: mismo círculo, abre el selector nativo */}
+        <label
+          className="relative grid size-9 cursor-pointer place-items-center rounded-full border border-line-strong"
+          style={{ backgroundColor: hex }}
+          title="Elegir un color libre"
+        >
+          <input
+            type="color"
+            value={hex}
+            onChange={(event) => onPick(event.target.value)}
+            aria-label={`Elegir color libre para ${slot.label.toLowerCase()}`}
+            className="absolute inset-0 size-full cursor-pointer opacity-0"
+          />
+          <Pipette size={14} aria-hidden="true" style={{ color: readableOn(hex) }} />
+        </label>
       </div>
 
-      {/* Color libre (sigue siendo 1 de los 3 slots) + medidor WCAG */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <input
-          type="color"
-          value={hex}
-          onChange={(event) => onPick(event.target.value)}
-          aria-label={`Elegir color libre para ${slot.label.toLowerCase()}`}
-          className="size-9 cursor-pointer rounded-lg border border-line-strong bg-paper p-0.5"
-        />
         <span className="font-mono text-xs text-ink-soft">{hex}</span>
         <span
           className={cn(
@@ -217,6 +236,8 @@ export default function LodgingProfilePage() {
 
   // Marca efectiva del preview (con trío en hover, si hay).
   const previewBrand = trioPreview ? { ...lodging.brand, ...trioPreview } : lodging.brand;
+  // Fotos reales del alojamiento (0 a 3 en la vista previa).
+  const previewImages = (Array.isArray(lodging.images) ? lodging.images : []).slice(0, 3);
 
   const submit = (event) => {
     event.preventDefault();
@@ -275,15 +296,33 @@ export default function LodgingProfilePage() {
             </div>
           </div>
 
-          <div className="grid place-items-center gap-4 rounded-2xl border border-dashed border-line-strong bg-cloud px-6 py-10">
-            {lodging.logo ? (
-              <img src={lodging.logo} alt="Logo" className="max-h-32 max-w-full rounded-xl object-contain" />
-            ) : (
-              <span className="grid size-24 place-items-center rounded-2xl bg-lime text-2xl font-extrabold text-lime-ink">
-                {(lodging.name || "H").slice(0, 2).toUpperCase()}
-              </span>
-            )}
-            <p className="text-xs text-muted">{lodging.name}</p>
+          <div className="grid gap-3 rounded-2xl border border-dashed border-line-strong bg-cloud p-4">
+            <div className="grid place-items-center gap-3 px-2 py-5 text-center">
+              <BrandLogo src={lodging.logo} name={lodging.name} size="lg" />
+              <div>
+                <p className="text-sm font-bold text-ink">{lodging.name}</p>
+                <p className="text-xs text-muted">
+                  {lodging.logo
+                    ? "Tu logo completo, sin recortes ni deformaciones."
+                    : "Sin logo: se muestran tus iniciales con el color de marca."}
+                </p>
+              </div>
+            </div>
+
+            {/* Así se ve en la cabecera del enlace del huésped */}
+            <LodgingTheme brand={lodging.brand}>
+              <div
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
+                style={{ backgroundColor: "var(--hf-hero)", color: "var(--hf-hero-ink)" }}
+              >
+                <BrandLogo src={lodging.logo} name={lodging.name} size="sm" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-extrabold">{lodging.name}</p>
+                  <p className="truncate text-[10px] font-semibold opacity-80">Enlace de llegada</p>
+                </div>
+              </div>
+            </LodgingTheme>
+            <p className="text-center text-[11px] font-semibold text-muted">Así se ve en la cabecera del enlace</p>
           </div>
 
           <div className="mt-4 flex gap-2">
@@ -297,7 +336,10 @@ export default function LodgingProfilePage() {
             )}
           </div>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickLogo} />
-          <p className="mt-3 text-xs text-muted">PNG o SVG, fondo transparente recomendado.</p>
+          <p className="mt-3 text-xs text-muted">
+            PNG, JPG o SVG con fondo transparente. Se respeta la proporción del archivo: cuadrado, horizontal o
+            vertical.
+          </p>
 
           {/* Colores sugeridos desde el logo (extraídos en el navegador, sin enviar nada) */}
           {lodging.logo && (
@@ -457,7 +499,7 @@ export default function LodgingProfilePage() {
             </span>
             <div>
               <h2 className="font-bold text-ink">Personalización visual</h2>
-              <p className="text-xs text-muted">Definí los colores y la forma de los elementos de tu marca.</p>
+              <p className="text-xs text-muted">3 colores con rol, forma de las esquinas y patrón del enlace de llegada.</p>
             </div>
           </div>
           {/* Restaurar marca por defecto: confirmación en 2 pasos */}
@@ -508,22 +550,36 @@ export default function LodgingProfilePage() {
               <SlotEditor key={slot.id} slot={slot} brand={lodging.brand} onPick={pickSlot(slot.id)} />
             ))}
 
+            {/* Patrón de fondo del enlace: motivos elegantes, sin imágenes */}
             <div>
-              <p className="mb-2 text-sm font-bold text-ink">Forma de los elementos</p>
+              <p className="mb-1 text-sm font-bold text-ink">Patrón de fondo</p>
+              <p className="mb-2 text-[11px] text-muted">
+                Motivos dibujados con tu color de marca sobre el fondo del enlace. Se adaptan solos al modo claro y
+                oscuro.
+              </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {RADII.map((radius) => {
-                  const active = lodging.brand.radius === radius.id;
+                {PATTERNS.map((pattern) => {
+                  const active = (lodging.brand.pattern || "none") === pattern.id;
                   return (
                     <button
-                      key={radius.id}
+                      key={pattern.id}
                       type="button"
-                      onClick={() => { actions.updateBrand({ radius: radius.id }); flashSaved(); }}
+                      onClick={() => { actions.updateBrand({ pattern: pattern.id }); flashSaved(); }}
                       aria-pressed={active}
-                      className={`cursor-pointer border bg-cloud px-2 py-3 text-xs font-bold transition-all ${radius.class} ${
-                        active ? "border-teal text-teal-strong" : "border-line text-ink-soft hover:border-line-strong"
-                      }`}
+                      aria-label={`Patrón ${pattern.label}`}
+                      className={cn(
+                        "relative h-16 cursor-pointer overflow-hidden rounded-xl border bg-paper text-ink transition",
+                        active ? "border-teal ring-2 ring-teal/25" : "border-line hover:border-line-strong",
+                      )}
                     >
-                      {radius.label}
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 text-ink opacity-25"
+                        style={patternPreviewStyle(pattern.id)}
+                      />
+                      <span className="absolute inset-x-0 bottom-0 bg-paper/90 py-1 text-[10px] font-bold">
+                        {pattern.label}
+                      </span>
                     </button>
                   );
                 })}
@@ -552,56 +608,71 @@ export default function LodgingProfilePage() {
 
             <LodgingTheme
               brand={previewBrand}
-              className={cn("overflow-hidden rounded-2xl border border-line bg-paper", previewDark && "dark")}
+              className={cn("overflow-hidden rounded-2xl border border-line bg-paper shadow-card", previewDark && "dark")}
             >
-              {/* Barra superior (como el encabezado del enlace de llegada) */}
-              <div className="flex items-center gap-3 border-b border-line bg-paper px-4 py-3">
-                {lodging.logo ? (
-                  <img src={lodging.logo} alt="Logo" className="size-9 shrink-0 rounded-lg bg-white object-contain p-1" />
-                ) : (
+              <div className="hf-surface">
+                {/* Banda de marca: lo primero que ve el huésped */}
+                <div
+                  className="flex items-center gap-2.5 px-4 py-3"
+                  style={{ backgroundColor: "var(--hf-hero)", color: "var(--hf-hero-ink)" }}
+                >
+                  <BrandLogo src={lodging.logo} name={lodging.name} size="sm" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-extrabold">{lodging.name}</p>
+                    <p className="truncate text-[10px] font-semibold opacity-80">{lodging.tagline}</p>
+                  </div>
                   <span
-                    className="grid size-9 shrink-0 place-items-center bg-teal text-xs font-extrabold"
-                    style={{ borderRadius: "var(--radius-chip)", color: readableOn(previewBrand.primary) }}
+                    className="ml-auto shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold"
+                    style={{
+                      backgroundColor: "color-mix(in srgb, var(--hf-hero-ink) 16%, transparent)",
+                      color: "var(--hf-hero-ink)",
+                    }}
                   >
-                    {(lodging.name || "H").slice(0, 2).toUpperCase()}
+                    Huésped
                   </span>
+                </div>
+                <div className="h-[3px] w-full" style={{ backgroundColor: "var(--color-lime)" }} />
+
+                {/* Fotos del alojamiento (las mismas de /panel/alojamiento) */}
+                {previewImages.length > 0 && (
+                  <div className="flex gap-1.5 px-4 pt-4">
+                    {previewImages.map((src, index) => (
+                      <img
+                        key={index}
+                        src={src}
+                        alt=""
+                        aria-hidden="true"
+                        className="h-14 w-20 shrink-0 rounded-[var(--radius-chip)] border border-line object-cover"
+                      />
+                    ))}
+                  </div>
                 )}
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-extrabold text-ink">{lodging.name}</p>
-                  <p className="truncate text-[11px] text-muted">{lodging.tagline}</p>
-                </div>
-              </div>
 
-              {/* Hero con el color principal y tinta legible */}
-              <div
-                className="grid gap-2 px-4 py-5"
-                style={{
-                  background: `linear-gradient(135deg, ${previewBrand.primary}, color-mix(in srgb, ${previewBrand.primary} 55%, #111))`,
-                  color: readableOn(previewBrand.primary),
-                }}
-              >
-                <p className="text-lg font-extrabold leading-tight">{lodging.name}</p>
-                <p className="text-xs opacity-80">{lodging.location}</p>
-              </div>
-
-              {/* Componentes reales del sistema con la marca aplicada */}
-              <div className="grid gap-3 bg-cloud px-4 py-4">
-                <div className="flex flex-wrap gap-1.5">
-                  <Badge tone="teal">Principal</Badge>
-                  <Badge tone="lime">Acento</Badge>
-                  <Badge tone="pink">Suave</Badge>
-                </div>
-                <Field label="Fechas de tu estadía" placeholder="Ingreso → salida" readOnly />
-                <Switch
-                  checked={previewSwitch}
-                  onChange={setPreviewSwitch}
-                  label="Servicios extra"
-                  description="Desayuno y lancha al llegador"
-                />
-                <Alert tone="lime">Tu solicitud de lancha quedó registrada.</Alert>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button">Confirmar reserva</Button>
-                  <Button type="button" variant="secondary">Ver detalles</Button>
+                {/* Contenido real con la marca aplicada */}
+                <div className="grid gap-3 p-4">
+                  <div className="card grid gap-2.5 p-3.5">
+                    <div>
+                      <p className="text-sm font-extrabold text-ink">¡Hola, María!</p>
+                      <p className="mt-0.5 text-[11px] text-muted">Completá tu ficha de llegada para {lodging.name}.</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge tone="teal">Marca</Badge>
+                      <Badge tone="lime">Acción</Badge>
+                      <Badge tone="pink">Fondo</Badge>
+                    </div>
+                    <Field label="DNI / Pasaporte" placeholder="30.123.456" readOnly />
+                    <Switch
+                      checked={previewSwitch}
+                      onChange={setPreviewSwitch}
+                      label="Desayuno por noche"
+                      description="Se suma al total de la estadía"
+                    />
+                    <Alert tone="lime">Tu solicitud de lancha quedó registrada.</Alert>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button">Continuar</Button>
+                      <Button type="button" variant="secondary">Ver detalles</Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </LodgingTheme>
@@ -611,8 +682,8 @@ export default function LodgingProfilePage() {
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <Badge tone="neutral">Tema: automático (claro/oscuro)</Badge>
           <span className="text-xs text-muted">
-            Usás 3 colores de marca (principal, acento y suave): se aplican a tu alojamiento y a las páginas de
-            tus huéspedes, sin tocar el resto de la plataforma.
+            Los 3 colores tienen un rol fijo (marca, acción y fondo) y se adaptan solos al modo oscuro. Se aplican al
+            enlace de tus huéspedes y a esta vista previa: el panel queda neutro.
           </span>
         </div>
       </Card>

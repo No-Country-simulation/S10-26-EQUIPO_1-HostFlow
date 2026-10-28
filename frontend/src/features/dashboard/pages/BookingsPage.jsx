@@ -4,6 +4,8 @@ import { Badge, Button, EmptyState } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
 import { BookingDetailModal } from "../components/BookingDetailModal";
 import { BookingFormModal } from "../components/BookingFormModal";
+import { BookingRequirementsAlert } from "../components/BookingRequirementsAlert";
+import { getBookingRequirements } from "../lib/bookingRequirements";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { cn, toISODate } from "@utils/format";
@@ -18,12 +20,18 @@ const FILTERS = [
 export default function BookingsPage() {
   const { actions } = useSession();
   const bookings = useStore((s) => s.bookings);
+  const lodging = useStore((s) => s.lodging);
+  const payments = useStore((s) => s.payments);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [detailId, setDetailId] = useState(null);
 
   const today = toISODate();
+
+  // Aviso previo: si al alojamiento le falta configuración, no se puede crear
+  // una reserva. La alerta lleva a cada pantalla para completarla.
+  const requirements = useMemo(() => getBookingRequirements(lodging, payments), [lodging, payments]);
 
   // El detalle vive en un estado derivado: si la reserva cambia (estado, pago,
   // onboarding), el modal abierto refleja el nuevo valor sin recargar.
@@ -56,6 +64,11 @@ export default function BookingsPage() {
           </Button>
         </div>
       </header>
+
+      <BookingRequirementsAlert
+        requirements={requirements}
+        intro="Sin estos datos no se pueden crear reservas: el huésped los ve en su enlace de llegada y los necesita para pagar. Entrá a cada pantalla y completalos."
+      />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">

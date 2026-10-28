@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@utils/format";
 
@@ -33,6 +34,9 @@ export default function Modal({ open, onClose, title, subtitle, className, child
     previouslyFocused.current = lastFocusedOutsideDialog;
     const dialog = dialogRef.current;
     if (dialog && !dialog.contains(document.activeElement)) dialog.focus();
+    // Siempre se abre desde arriba: si un campo con autoFocus está debajo de una
+    // alerta, el navegador desplazaba el modal y ocultaba el título y el aviso.
+    if (dialog) dialog.scrollTop = 0;
 
     const onKey = (event) => {
       if (event.key === "Escape") {
@@ -72,7 +76,11 @@ export default function Modal({ open, onClose, title, subtitle, className, child
 
   if (!open) return null;
 
-  return (
+  // Se monta en <body> con un portal. Si el modal queda dentro de un contenedor
+  // con `transform` (por ejemplo `.animate-rise`, que conserva la matriz al
+  // terminar), `position: fixed` se calcula contra ese contenedor y no contra la
+  // ventana: el diálogo aparecía descolgado y más alto que la pantalla.
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
       <div className="absolute inset-0 bg-black/45 backdrop-blur-sm animate-fade" onClick={() => onCloseRef.current?.()} />
       <div
@@ -110,6 +118,7 @@ export default function Modal({ open, onClose, title, subtitle, className, child
 
         {footer && <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-line pt-4">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

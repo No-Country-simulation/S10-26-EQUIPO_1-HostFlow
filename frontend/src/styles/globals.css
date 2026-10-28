@@ -256,6 +256,29 @@
     background: color-mix(in srgb, var(--color-paper) 78%, transparent);
     backdrop-filter: blur(14px) saturate(1.2);
   }
+  /* Superficie de la marca: fondo teñido + patrón elegido por el alojamiento.
+     El patrón es una MÁSCARA en ::before, detrás del contenido, así cualquier
+     forma (hojas, olas, pétalos…) se pinta con el color de marca. Las variables
+     las define LodgingTheme dentro del scope de la marca. */
+  .hf-surface {
+    position: relative;
+    isolation: isolate;
+    background-color: var(--hf-surface, var(--color-cloud));
+  }
+  .hf-surface::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--hf-pattern-color, transparent);
+    -webkit-mask-image: var(--hf-pattern-mask, none);
+    mask-image: var(--hf-pattern-mask, none);
+    -webkit-mask-size: var(--hf-pattern-size, auto);
+    mask-size: var(--hf-pattern-size, auto);
+    -webkit-mask-repeat: repeat;
+    mask-repeat: repeat;
+  }
   .text-gradient-lime {
     background: linear-gradient(
       92deg,

@@ -12,6 +12,7 @@
 
 import { addDays, toISODate } from "@utils/format";
 import { normalizeHex } from "@utils/color";
+import { DEFAULT_PATTERN, PATTERN_IDS } from "@lib/theme/patterns";
 
 const STORAGE_KEY = "hostflow.app.v1";
 const today = toISODate();
@@ -52,27 +53,38 @@ const seedLodging = {
   logo: null,
   // Paleta extraída del logo: se persiste con el alojamiento (sugerencias de color).
   brandPalette: [],
-  // Marca del alojamiento: máximo 3 colores personalizados (primary, accent, tertiary).
-  brand: { primary: "#0fa3a3", accent: "#d4f53c", tertiary: "#f4b8c4", radius: "rounded" },
+  // Marca del alojamiento: 3 colores con rol fijo (marca, acción y fondo),
+  // la forma de las esquinas y el patrón de fondo del enlace de llegada.
+  brand: { primary: "#0fa3a3", accent: "#d4f53c", tertiary: "#f4b8c4", radius: "rounded", pattern: "none" },
   // Enlace de llegada (onboarding B2C): se compone con lodging.id + booking.id.
   onboardingPath: "/llegada",
 };
 
 // Colores por defecto de la marca: se re-aplican al cargar un estado guardado
 // por una versión anterior (que solo tenía primary/accent).
-export const BRAND_DEFAULTS = { primary: "#0fa3a3", accent: "#d4f53c", tertiary: "#f4b8c4", radius: "rounded" };
+export const BRAND_DEFAULTS = {
+  primary: "#0fa3a3",
+  accent: "#d4f53c",
+  tertiary: "#f4b8c4",
+  radius: "rounded",
+  pattern: DEFAULT_PATTERN,
+};
 
 // Valores válidos de la forma de la marca (los inválidos vuelven al default).
 const BRAND_RADIUS = ["rounded", "soft", "sharp", "pill"];
 
-// Sanitiza la marca guardada: normaliza cada hex y valida la forma, para que un
-// estado corrupto o de una versión vieja nunca deje slots en valores rotos.
+// Fotos del alojamiento: opcionales, de 0 a 4 (la primera es la portada).
+export const MAX_IMAGES = 4;
+
+// Sanitiza la marca guardada: normaliza cada hex y valida la forma y el patrón,
+// para que un estado corrupto o de una versión vieja nunca deje valores rotos.
 function sanitizeBrand(brand) {
   return {
     primary: normalizeHex(brand?.primary, BRAND_DEFAULTS.primary),
     accent: normalizeHex(brand?.accent, BRAND_DEFAULTS.accent),
     tertiary: normalizeHex(brand?.tertiary, BRAND_DEFAULTS.tertiary),
     radius: BRAND_RADIUS.includes(brand?.radius) ? brand.radius : BRAND_DEFAULTS.radius,
+    pattern: PATTERN_IDS.includes(brand?.pattern) ? brand.pattern : BRAND_DEFAULTS.pattern,
   };
 }
 
@@ -90,6 +102,7 @@ const seedBookings = [
     id: "bk_1",
     guestName: "María González",
     guestEmail: "maria@example.com",
+    guestPhone: "+54 9 11 5555 1201",
     checkIn: addDays(today, 3),
     checkOut: addDays(today, 6),
     guests: 3,
@@ -103,6 +116,7 @@ const seedBookings = [
     id: "bk_2",
     guestName: "Lucas Fernández",
     guestEmail: "lucas@example.com",
+    guestPhone: "+54 9 11 5555 1202",
     checkIn: addDays(today, 5),
     checkOut: addDays(today, 9),
     guests: 2,
@@ -116,6 +130,7 @@ const seedBookings = [
     id: "bk_3",
     guestName: "Sofía Ramírez",
     guestEmail: "sofia@example.com",
+    guestPhone: "+54 9 11 5555 1203",
     checkIn: addDays(today, 8),
     checkOut: addDays(today, 11),
     guests: 4,
@@ -129,6 +144,7 @@ const seedBookings = [
     id: "bk_4",
     guestName: "Diego Torres",
     guestEmail: "diego@example.com",
+    guestPhone: "+54 9 11 5555 1204",
     checkIn: addDays(today, 12),
     checkOut: addDays(today, 14),
     guests: 2,
@@ -142,6 +158,7 @@ const seedBookings = [
     id: "bk_5",
     guestName: "Camila Suárez",
     guestEmail: "camila@example.com",
+    guestPhone: "+54 9 11 5555 1205",
     checkIn: addDays(today, -10),
     checkOut: addDays(today, -7),
     guests: 2,
@@ -170,12 +187,15 @@ const seedPayments = {
   bankDetails: { holder: "", alias: "", cbu: "", notes: "" },
 };
 
-// Servicios adicionales que el alojamiento ofrece a sus huéspedes
-// (nombre + precio, según el panel administrativo del README).
+// Servicios adicionales que el alojamiento ofrece a sus huéspedes.
+// `pricing`: PER_NIGHT = se cobra por noche; FIXED = precio fijo por unidad
+// (el huésped elige la cantidad). `price` es siempre el precio unitario.
+// `perGuest`: además se multiplica por la cantidad de huéspedes (comidas).
 const seedServices = [
-  { id: "sv_1", name: "Desayuno casero", price: 3500, description: "Café, medialunas y fruta por persona.", enabled: true },
-  { id: "sv_2", name: "Excursión al delta", price: 18000, description: "Media jornada guiada en lancha.", enabled: true },
-  { id: "sv_3", name: "Cuna", price: 0, description: "Sujeta a disponibilidad.", enabled: false },
+  { id: "sv_1", name: "Desayuno casero", price: 3500, pricing: "PER_NIGHT", perGuest: true, description: "Café, medialunas y fruta por persona y por noche.", enabled: true },
+  { id: "sv_2", name: "Excursión al delta", price: 18000, pricing: "FIXED", perGuest: true, description: "Media jornada guiada en lancha.", enabled: true },
+  { id: "sv_3", name: "Cuna", price: 0, pricing: "FIXED", description: "Sujeta a disponibilidad.", enabled: false },
+  { id: "sv_4", name: "Limpieza extra", price: 8000, pricing: "FIXED", description: "Limpieza profunda adicional durante la estadía.", enabled: true },
 ];
 
 const seedAdmin = {
@@ -227,14 +247,30 @@ function normalizeStored(stored, fallback) {
     ...merged.lodging,
     brand: sanitizeBrand(merged.lodging?.brand),
     brandPalette: Array.isArray(merged.lodging?.brandPalette) ? merged.lodging.brandPalette : [],
+    // El límite bajó a 4 fotos: los estados viejos con más se recortan.
+    images: Array.isArray(merged.lodging?.images) ? merged.lodging.images.slice(0, MAX_IMAGES) : [],
   }
   merged.payments = { ...merged.payments, bankDetails: { ...seedPayments.bankDetails, ...merged.payments?.bankDetails } }
   if (!Array.isArray(merged.services)) merged.services = seedServices.map((s) => ({ ...s }))
+  // Servicios guardados por versiones anteriores: sin forma de cobro → precio fijo.
+  // `perGuest` no existía antes: los servicios de ejemplo toman su valor del seed.
+  merged.services = merged.services.map((sv) => ({
+    ...sv,
+    pricing: sv.pricing === "PER_NIGHT" ? "PER_NIGHT" : "FIXED",
+    perGuest: sv.perGuest ?? seedServices.find((seed) => seed.id === sv.id)?.perGuest ?? false,
+  }))
   // Reservas sin marca de vigencia (estados viejos): se emiten ahora y quedan persistidas.
+  // Además, las reservas de ejemplo guardadas antes de sumar el teléfono lo toman
+  // del seed: así el onboarding precarga los cuatro datos también en la demo.
   if (Array.isArray(merged.bookings)) {
-    merged.bookings = merged.bookings.map((b) =>
-      b.onboardingLinkIssuedAt ? b : { ...b, onboardingLinkIssuedAt: onboardingLinkIssuedAt() },
-    )
+    merged.bookings = merged.bookings.map((b) => {
+      const seed = seedBookings.find((s) => s.id === b.id);
+      return {
+        ...b,
+        guestPhone: b.guestPhone || seed?.guestPhone || "",
+        onboardingLinkIssuedAt: b.onboardingLinkIssuedAt || onboardingLinkIssuedAt(),
+      };
+    })
   }
   return merged
 }
@@ -465,7 +501,11 @@ export const actions = {
   },
 
   addImage(dataUrl) {
-    setState((s) => ({ ...s, lodging: { ...s.lodging, images: [...s.lodging.images, dataUrl] } }));
+    setState((s) => {
+      // Tope de 4 fotos: el enlace de llegada muestra 0 a 4 y la primera es portada.
+      if (s.lodging.images.length >= MAX_IMAGES) return s;
+      return { ...s, lodging: { ...s.lodging, images: [...s.lodging.images, dataUrl] } };
+    });
   },
 
   removeImage(index) {
@@ -511,6 +551,7 @@ export const actions = {
       id: `bk_${Date.now().toString(36)}`,
       guestName: String(data.guestName || "").trim(),
       guestEmail: String(data.guestEmail || "").trim(),
+      guestPhone: String(data.guestPhone || "").trim(),
       checkIn: data.checkIn,
       checkOut: data.checkOut,
       guests: Number(data.guests) || 1,
@@ -565,6 +606,7 @@ export const actions = {
               ...b,
               guestName: data.guestName || b.guestName,
               guestEmail: data.guestEmail || b.guestEmail,
+              guestPhone: data.guestPhone || b.guestPhone || "",
               selectedServices: Array.isArray(data.selectedServices) ? data.selectedServices : b.selectedServices || [],
               onboarding: { ...data, completedAt: new Date().toISOString() },
             }
@@ -653,11 +695,15 @@ export const actions = {
   },
 
   // ── Servicios adicionales ────────────────────────────────────────────────
-  addService({ name, price, description }) {
+  addService({ name, price, description, pricing, perGuest }) {
     const service = {
       id: `sv_${Date.now().toString(36)}`,
       name: String(name || "").trim(),
       price: Number(price) || 0,
+      pricing: pricing === "PER_NIGHT" ? "PER_NIGHT" : "FIXED",
+      // Cobro por huésped: el importe se multiplica por la cantidad de personas
+      // de la reserva (comidas, toallas, excursiones por persona).
+      perGuest: Boolean(perGuest),
       description: String(description || "").trim(),
       enabled: true,
     };
