@@ -30,6 +30,18 @@ public class AccommodationProfileRequest {
     @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "primaryColor debe ser un color hexadecimal, por ejemplo #AABBCC")
     private String primaryColor;
 
+    @Schema(description = "Color de acento en formato hexadecimal de 3 o 6 dígitos.", example = "#d4f53c", pattern = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", nullable = true)
+    @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "accentColor debe ser un color hexadecimal, por ejemplo #D4F53C")
+    private String accentColor;
+
+    @Schema(description = "Color terciario en formato hexadecimal de 3 o 6 dígitos.", example = "#f4b8c4", pattern = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", nullable = true)
+    @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "tertiaryColor debe ser un color hexadecimal, por ejemplo #F4B8C4")
+    private String tertiaryColor;
+
+    @Schema(description = "Identificador del patrón de fondo. Valores permitidos: none, leaves, waves, petals, arches, mountains, scales, sun.", example = "none", allowableValues = {"none", "leaves", "waves", "petals", "arches", "mountains", "scales", "sun"}, nullable = true)
+    @Pattern(regexp = "^(none|leaves|waves|petals|arches|mountains|scales|sun)$", message = "backgroundPattern debe ser uno de los identificadores permitidos")
+    private String backgroundPattern;
+
     @Schema(description = "Mensaje de bienvenida del alojamiento.", example = "¡Te damos la bienvenida!", maxLength = 5000, nullable = true)
     @Size(max = 5000)
     private String welcomeMessage;
@@ -58,6 +70,12 @@ public class AccommodationProfileRequest {
     public void setBasePrice(BigDecimal basePrice) { this.basePrice = basePrice; }
     public String getPrimaryColor() { return primaryColor; }
     public void setPrimaryColor(String primaryColor) { this.primaryColor = primaryColor; }
+    public String getAccentColor() { return accentColor; }
+    public void setAccentColor(String accentColor) { this.accentColor = accentColor; }
+    public String getTertiaryColor() { return tertiaryColor; }
+    public void setTertiaryColor(String tertiaryColor) { this.tertiaryColor = tertiaryColor; }
+    public String getBackgroundPattern() { return backgroundPattern; }
+    public void setBackgroundPattern(String backgroundPattern) { this.backgroundPattern = backgroundPattern; }
     public String getWelcomeMessage() { return welcomeMessage; }
     public void setWelcomeMessage(String welcomeMessage) { this.welcomeMessage = welcomeMessage; }
     public String getEmail() { return email; }

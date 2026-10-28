@@ -4,6 +4,8 @@ import com.hostflow.dto.response.CloudinaryUploadResult;
 import com.hostflow.exception.BusinessException;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.AccommodationImage;
+import com.hostflow.model.Owner;
+import com.hostflow.dto.request.AccommodationProfileRequest;
 import com.hostflow.repository.AccommodationImageRepository;
 import com.hostflow.repository.AccommodationRepository;
 import com.hostflow.repository.OwnerRepository;
@@ -48,6 +50,52 @@ class AccommodationProfileServiceTest {
         }
     }
 
+
+
+    @Test
+    void creaPerfilConValoresDeMarcaPredeterminadosCuandoSeOmiten() {
+        Owner owner = Owner.builder()
+                .id(1L)
+                .fullName("Propietario de prueba")
+                .accommodationName("Cabañas del Río")
+                .build();
+        when(accommodationRepository.existsByOwner_Id(1L)).thenReturn(false);
+        when(ownerRepository.findById(1L)).thenReturn(Optional.of(owner));
+        when(accommodationRepository.save(any(Accommodation.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AccommodationProfileRequest request = new AccommodationProfileRequest();
+        request.setName("Cabañas del Río");
+
+        Accommodation saved = service.createProfile(1L, request);
+
+        assertEquals("#0fa3a3", saved.getPrimaryColor());
+        assertEquals("#d4f53c", saved.getAccentColor());
+        assertEquals("#f4b8c4", saved.getTertiaryColor());
+        assertEquals("none", saved.getBackgroundPattern());
+    }
+
+    @Test
+    void patchDeColorDeAcentoNoModificaLosOtrosCamposDeMarca() {
+        Accommodation accommodation = new Accommodation();
+        accommodation.setPrimaryColor("#123456");
+        accommodation.setAccentColor("#d4f53c");
+        accommodation.setTertiaryColor("#f4b8c4");
+        accommodation.setBackgroundPattern("waves");
+        when(accommodationRepository.findByOwner_Id(1L)).thenReturn(Optional.of(accommodation));
+        when(accommodationRepository.save(any(Accommodation.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AccommodationProfileRequest request = new AccommodationProfileRequest();
+        request.setAccentColor("#abcdef");
+
+        Accommodation saved = service.updateProfile(1L, request);
+
+        assertEquals("#123456", saved.getPrimaryColor());
+        assertEquals("#abcdef", saved.getAccentColor());
+        assertEquals("#f4b8c4", saved.getTertiaryColor());
+        assertEquals("waves", saved.getBackgroundPattern());
+    }
 
     @Test
     void rechazaLaQuintaImagenDeGaleriaAntesDeSubirla() {

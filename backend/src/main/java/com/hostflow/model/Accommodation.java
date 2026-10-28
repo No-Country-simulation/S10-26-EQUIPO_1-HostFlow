@@ -29,7 +29,13 @@ public class Accommodation {
 
     @Column(name = "logo_url", length = 2048) private String logoUrl;
     @Column(name = "logo_public_id", length = 255) private String logoPublicId;
-    @Column(name = "primary_color", length = 20) private String primaryColor;
+    @Column(name = "primary_color", length = 20, columnDefinition = "varchar(20) default '#0fa3a3'") private String primaryColor;
+    @Column(name = "accent_color", length = 7, nullable = false, columnDefinition = "varchar(7) default '#d4f53c'")
+    private String accentColor;
+    @Column(name = "tertiary_color", length = 7, nullable = false, columnDefinition = "varchar(7) default '#f4b8c4'")
+    private String tertiaryColor;
+    @Column(name = "background_pattern", length = 20, nullable = false, columnDefinition = "varchar(20) default 'none'")
+    private String backgroundPattern;
     @Column(name = "welcome_message", columnDefinition = "TEXT") private String welcomeMessage;
     @Column(length = 150) private String email;
     @Column(length = 40) private String phone;

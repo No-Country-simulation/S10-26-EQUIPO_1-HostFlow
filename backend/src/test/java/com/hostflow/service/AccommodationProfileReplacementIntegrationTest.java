@@ -63,6 +63,13 @@ class AccommodationProfileReplacementIntegrationTest {
         Accommodation accommodation = new Accommodation();
         accommodation.setOwner(owner);
         accommodation.setName("Integration Test Accommodation");
+        // Los nuevos campos de marca son NOT NULL en el esquema; estos tests crean
+        // la entidad directamente, sin pasar por createProfile(), así que fijamos
+        // explícitamente una configuración de marca válida.
+        accommodation.setPrimaryColor("#0fa3a3");
+        accommodation.setAccentColor("#d4f53c");
+        accommodation.setTertiaryColor("#f4b8c4");
+        accommodation.setBackgroundPattern("none");
         accommodation.setLogoUrl(OLD_LOGO_URL);
         accommodation.setLogoPublicId(OLD_PUBLIC_ID);
         accommodation = accommodationRepository.saveAndFlush(accommodation);
@@ -109,6 +116,10 @@ class AccommodationProfileReplacementIntegrationTest {
         Accommodation persisted = accommodationRepository.findById(accommodationId).orElseThrow();
         assertThat(persisted.getLogoUrl()).isEqualTo(NEW_LOGO_URL);
         assertThat(persisted.getLogoPublicId()).isEqualTo(NEW_PUBLIC_ID);
+        assertThat(persisted.getPrimaryColor()).isEqualTo("#0fa3a3");
+        assertThat(persisted.getAccentColor()).isEqualTo("#d4f53c");
+        assertThat(persisted.getTertiaryColor()).isEqualTo("#f4b8c4");
+        assertThat(persisted.getBackgroundPattern()).isEqualTo("none");
 
         assertThat(logoUrlAtDeletion.get()).isEqualTo(NEW_LOGO_URL);
         assertThat(publicIdAtDeletion.get()).isEqualTo(NEW_PUBLIC_ID);

@@ -61,6 +61,12 @@ class AccommodationProfileRollbackIntegrationTest {
         Accommodation accommodation = new Accommodation();
         accommodation.setOwner(owner);
         accommodation.setName("Alojamiento de prueba");
+        // Estos tests persisten la entidad directamente y no pasan por el servicio
+        // de creación, por lo que configuran los nuevos campos NOT NULL explícitamente.
+        accommodation.setPrimaryColor("#0fa3a3");
+        accommodation.setAccentColor("#d4f53c");
+        accommodation.setTertiaryColor("#f4b8c4");
+        accommodation.setBackgroundPattern("none");
         accommodation.setLogoUrl(OLD_LOGO_URL);
         accommodation.setLogoPublicId(OLD_PUBLIC_ID);
 
@@ -104,6 +110,10 @@ class AccommodationProfileRollbackIntegrationTest {
         // El logo anterior debe permanecer intacto.
         assertThat(persisted.getLogoUrl()).isEqualTo(OLD_LOGO_URL);
         assertThat(persisted.getLogoPublicId()).isEqualTo(OLD_PUBLIC_ID);
+        assertThat(persisted.getPrimaryColor()).isEqualTo("#0fa3a3");
+        assertThat(persisted.getAccentColor()).isEqualTo("#d4f53c");
+        assertThat(persisted.getTertiaryColor()).isEqualTo("#f4b8c4");
+        assertThat(persisted.getBackgroundPattern()).isEqualTo("none");
 
         // La limpieza remota debe afectar al recurso nuevo, no al anterior.
         verify(cloudinaryImageService).uploadImage(any(MultipartFile.class));

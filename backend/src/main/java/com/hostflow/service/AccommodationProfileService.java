@@ -24,6 +24,10 @@ import java.util.List;
 @Slf4j
 public class AccommodationProfileService {
     private static final long MAX_GALLERY_IMAGES = 4;
+    private static final String DEFAULT_PRIMARY_COLOR = "#0fa3a3";
+    private static final String DEFAULT_ACCENT_COLOR = "#d4f53c";
+    private static final String DEFAULT_TERTIARY_COLOR = "#f4b8c4";
+    private static final String DEFAULT_BACKGROUND_PATTERN = "none";
     private final AccommodationRepository accommodationRepository;
     private final AccommodationImageRepository imageRepository;
     private final OwnerRepository ownerRepository;
@@ -187,6 +191,9 @@ public class AccommodationProfileService {
                 && r.getGuestCapacity() == null
                 && r.getBasePrice() == null
                 && r.getPrimaryColor() == null
+                && r.getAccentColor() == null
+                && r.getTertiaryColor() == null
+                && r.getBackgroundPattern() == null
                 && r.getWelcomeMessage() == null
                 && r.getEmail() == null
                 && r.getPhone() == null
@@ -201,7 +208,10 @@ public class AccommodationProfileService {
         a.setBathroomCount(r.getBathroomCount());
         a.setGuestCapacity(r.getGuestCapacity());
         a.setBasePrice(r.getBasePrice());
-        a.setPrimaryColor(blankToNull(r.getPrimaryColor()));
+        a.setPrimaryColor(defaultIfBlank(r.getPrimaryColor(), DEFAULT_PRIMARY_COLOR));
+        a.setAccentColor(defaultIfBlank(r.getAccentColor(), DEFAULT_ACCENT_COLOR));
+        a.setTertiaryColor(defaultIfBlank(r.getTertiaryColor(), DEFAULT_TERTIARY_COLOR));
+        a.setBackgroundPattern(defaultIfBlank(r.getBackgroundPattern(), DEFAULT_BACKGROUND_PATTERN));
         a.setWelcomeMessage(blankToNull(r.getWelcomeMessage()));
         a.setEmail(blankToNull(r.getEmail()));
         a.setPhone(blankToNull(r.getPhone()));
@@ -226,10 +236,17 @@ public class AccommodationProfileService {
         if (r.getGuestCapacity() != null) a.setGuestCapacity(r.getGuestCapacity());
         if (r.getBasePrice() != null) a.setBasePrice(r.getBasePrice());
         if (r.getPrimaryColor() != null) a.setPrimaryColor(blankToNull(r.getPrimaryColor()));
+        if (r.getAccentColor() != null) a.setAccentColor(blankToNull(r.getAccentColor()));
+        if (r.getTertiaryColor() != null) a.setTertiaryColor(blankToNull(r.getTertiaryColor()));
+        if (r.getBackgroundPattern() != null) a.setBackgroundPattern(blankToNull(r.getBackgroundPattern()));
         if (r.getWelcomeMessage() != null) a.setWelcomeMessage(blankToNull(r.getWelcomeMessage()));
         if (r.getEmail() != null) a.setEmail(blankToNull(r.getEmail()));
         if (r.getPhone() != null) a.setPhone(blankToNull(r.getPhone()));
         if (r.getAddress() != null) a.setAddress(blankToNull(r.getAddress()));
+    }
+
+    private String defaultIfBlank(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
     private String blankToNull(String value) {

@@ -16,7 +16,10 @@ public record AccommodationProfileResponse(
         @Schema(description = "Capacidad de huéspedes.", example = "20") Integer guestCapacity,
         @Schema(description = "Precio base.", example = "85000.00") BigDecimal basePrice,
         @Schema(description = "URL HTTPS del logotipo.", example = "https://example.com/logo.png") String logoUrl,
-        @Schema(description = "Color principal hexadecimal.", example = "#1E293B") String primaryColor,
+        @Schema(description = "Color principal hexadecimal.", example = "#0fa3a3") String primaryColor,
+        @Schema(description = "Color de acento hexadecimal.", example = "#d4f53c") String accentColor,
+        @Schema(description = "Color terciario hexadecimal.", example = "#f4b8c4") String tertiaryColor,
+        @Schema(description = "Identificador del patrón de fondo.", example = "none") String backgroundPattern,
         @Schema(description = "Mensaje de bienvenida.") String welcomeMessage,
         @Schema(description = "Correo de contacto.", example = "reservas@example.com") String email,
         @Schema(description = "Teléfono de contacto.", example = "+54 11 5555 5555") String phone,
@@ -28,7 +31,8 @@ public record AccommodationProfileResponse(
     public static AccommodationProfileResponse from(Accommodation a) {
         return new AccommodationProfileResponse(a.getId(), a.getOwner().getId(), a.getName(),
                 a.getRoomCount(), a.getBathroomCount(), a.getGuestCapacity(), a.getBasePrice(),
-                a.getLogoUrl(), a.getPrimaryColor(), a.getWelcomeMessage(), a.getEmail(), a.getPhone(),
+                a.getLogoUrl(), a.getPrimaryColor(), a.getAccentColor(), a.getTertiaryColor(),
+                a.getBackgroundPattern(), a.getWelcomeMessage(), a.getEmail(), a.getPhone(),
                 a.getAddress(),
                 a.getImages().stream().map(AccommodationImageResponse::from).toList(),
                 a.getCreatedAt(), a.getUpdatedAt());
