@@ -35,6 +35,9 @@ public class AccommodationPaymentMethod {
     @Column(name = "account_holder", length = 200)
     private String accountHolder;
 
+    @Column(name = "account_type", length = 80)
+    private String accountType;
+
     @Column(name = "account_number", length = 100)
     private String accountNumber;
 
@@ -46,6 +49,15 @@ public class AccommodationPaymentMethod {
 
     @Column(name = "tax_id", length = 30)
     private String taxId;
+
+    @Column(name = "user_identifier", length = 200)
+    private String userIdentifier;
+
+    @Column(name = "wallet_phone", length = 50)
+    private String walletPhone;
+
+    @Column(name = "wallet_email", length = 254)
+    private String walletEmail;
 
     @Column(columnDefinition = "TEXT")
     private String instructions;

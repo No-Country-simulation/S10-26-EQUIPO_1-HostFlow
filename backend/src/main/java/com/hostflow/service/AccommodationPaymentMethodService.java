@@ -5,6 +5,7 @@ import com.hostflow.exception.BusinessException;
 import com.hostflow.exception.ResourceNotFoundException;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.AccommodationPaymentMethod;
+import com.hostflow.enums.PaymentMethodType;
 import com.hostflow.repository.AccommodationPaymentMethodRepository;
 import com.hostflow.repository.AccommodationRepository;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class AccommodationPaymentMethodService {
         applyOptionalFields(method, request);
         method.setDefault(makeDefault);
         method.setActive(request.getIsActive() == null || request.getIsActive());
+        validateRequiredFieldsByType(method);
         return paymentMethodRepository.save(method);
     }
 
@@ -64,12 +66,17 @@ public class AccommodationPaymentMethodService {
         if (request.getProviderName() != null) method.setProviderName(blankToNull(request.getProviderName()));
         if (request.getBankName() != null) method.setBankName(blankToNull(request.getBankName()));
         if (request.getAccountHolder() != null) method.setAccountHolder(blankToNull(request.getAccountHolder()));
+        if (request.getAccountType() != null) method.setAccountType(blankToNull(request.getAccountType()));
         if (request.getAccountNumber() != null) method.setAccountNumber(blankToNull(request.getAccountNumber()));
         if (request.getCbuCvu() != null) method.setCbuCvu(blankToNull(request.getCbuCvu()));
         if (request.getAlias() != null) method.setAlias(blankToNull(request.getAlias()));
         if (request.getTaxId() != null) method.setTaxId(blankToNull(request.getTaxId()));
+        if (request.getUserIdentifier() != null) method.setUserIdentifier(blankToNull(request.getUserIdentifier()));
+        if (request.getWalletPhone() != null) method.setWalletPhone(blankToNull(request.getWalletPhone()));
+        if (request.getWalletEmail() != null) method.setWalletEmail(blankToNull(request.getWalletEmail()));
         if (request.getInstructions() != null) method.setInstructions(blankToNull(request.getInstructions()));
         if (request.getIsActive() != null) method.setActive(request.getIsActive());
+        validateRequiredFieldsByType(method);
         return paymentMethodRepository.save(method);
     }
 
@@ -98,8 +105,9 @@ public class AccommodationPaymentMethodService {
 
     private boolean isEmptyPatch(AccommodationPaymentMethodRequest r) {
         return r.getPaymentType() == null && r.getDisplayName() == null && r.getProviderName() == null
-                && r.getBankName() == null && r.getAccountHolder() == null && r.getAccountNumber() == null
-                && r.getCbuCvu() == null && r.getAlias() == null && r.getTaxId() == null
+                && r.getBankName() == null && r.getAccountHolder() == null && r.getAccountType() == null
+                && r.getAccountNumber() == null && r.getCbuCvu() == null && r.getAlias() == null && r.getTaxId() == null
+                && r.getUserIdentifier() == null && r.getWalletPhone() == null && r.getWalletEmail() == null
                 && r.getInstructions() == null && r.getIsDefault() == null && r.getIsActive() == null;
     }
 
@@ -107,11 +115,48 @@ public class AccommodationPaymentMethodService {
         m.setProviderName(blankToNull(r.getProviderName()));
         m.setBankName(blankToNull(r.getBankName()));
         m.setAccountHolder(blankToNull(r.getAccountHolder()));
+        m.setAccountType(blankToNull(r.getAccountType()));
         m.setAccountNumber(blankToNull(r.getAccountNumber()));
         m.setCbuCvu(blankToNull(r.getCbuCvu()));
         m.setAlias(blankToNull(r.getAlias()));
         m.setTaxId(blankToNull(r.getTaxId()));
+        m.setUserIdentifier(blankToNull(r.getUserIdentifier()));
+        m.setWalletPhone(blankToNull(r.getWalletPhone()));
+        m.setWalletEmail(blankToNull(r.getWalletEmail()));
         m.setInstructions(blankToNull(r.getInstructions()));
+    }
+
+    /**
+     * Valida los datos obligatorios según el tipo del método de pago.
+     * Se ejecuta después de aplicar los campos para que PATCH valide el estado final.
+     */
+    private void validateRequiredFieldsByType(AccommodationPaymentMethod method) {
+        if (method.getPaymentType() == PaymentMethodType.BANK_TRANSFER) {
+            requireField(method.getBankName(), "bankName", "BANK_TRANSFER");
+            requireField(method.getAccountHolder(), "accountHolder", "BANK_TRANSFER");
+            requireField(method.getAccountType(), "accountType", "BANK_TRANSFER");
+            requireField(method.getAccountNumber(), "accountNumber", "BANK_TRANSFER");
+            requireField(method.getCbuCvu(), "cbuCvu", "BANK_TRANSFER");
+            requireField(method.getAlias(), "alias", "BANK_TRANSFER");
+        } else if (method.getPaymentType() == PaymentMethodType.DIGITAL_WALLET) {
+            requireField(method.getAccountHolder(), "accountHolder", "DIGITAL_WALLET");
+            requireField(method.getUserIdentifier(), "userIdentifier", "DIGITAL_WALLET");
+            requireField(method.getWalletPhone(), "walletPhone", "DIGITAL_WALLET");
+            requireField(method.getWalletEmail(), "walletEmail", "DIGITAL_WALLET");
+            if (!isValidEmail(method.getWalletEmail())) {
+                throw new BusinessException("walletEmail debe ser un correo electrónico válido para DIGITAL_WALLET.");
+            }
+        }
+    }
+
+    private void requireField(String value, String fieldName, String paymentType) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessException(fieldName + " es obligatorio para " + paymentType + ".");
+        }
+    }
+
+    private boolean isValidEmail(String email) {
+        return email != null && email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     }
 
     private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }

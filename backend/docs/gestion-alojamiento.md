@@ -163,7 +163,15 @@ Para el logotipo, cambiar la ruta por `/api/v1/owners/accommodation/profile/logo
 | `PATCH` | `/{methodId}` | `200 OK` | Actualiza campos enviados. |
 | `DELETE` | `/{methodId}` | `204 No Content` | Elimina un método. |
 
-El cuerpo JSON admite `paymentType`, `displayName`, `providerName`, `bankName`, `accountHolder`, `accountNumber`, `cbuCvu`, `alias`, `taxId`, `instructions`, `isDefault` e `isActive`. `paymentType` y `displayName` son obligatorios al crear. Los valores de `paymentType` son `BANK_TRANSFER`, `DIGITAL_WALLET`, `CASH`, `CARD` y `OTHER`.
+El cuerpo JSON admite `paymentType`, `displayName`, `providerName`, `bankName`, `accountHolder`, `accountType`, `accountNumber`, `cbuCvu`, `alias`, `taxId`, `userIdentifier`, `walletPhone`, `walletEmail`, `instructions`, `isDefault` e `isActive`. `paymentType` y `displayName` son obligatorios al crear. Los valores de `paymentType` son `BANK_TRANSFER`, `DIGITAL_WALLET`, `CASH`, `CARD` y `OTHER`.
+
+Los campos obligatorios dependen de `paymentType` y se validan en el servicio del backend:
+
+- `BANK_TRANSFER`: `bankName`, `accountHolder`, `accountType`, `accountNumber`, `cbuCvu` y `alias`.
+- `DIGITAL_WALLET`: `accountHolder`, `userIdentifier`, `walletPhone` y `walletEmail`; el correo debe tener formato válido.
+- `CASH`, `CARD` y `OTHER`: no heredan los requisitos de banco ni de billetera; además de `paymentType` y `displayName`, no tienen campos específicos obligatorios en esta implementación.
+
+En `PATCH`, se combinan los campos enviados con los valores ya guardados y se valida el estado final. Por eso, un cambio que deje incompletos los campos requeridos para el tipo actual será rechazado. Los campos específicos se mantienen nullable en SQL porque no corresponden a todos los tipos de método de pago.
 
 Reglas implementadas: el primer método se establece como predeterminado si todavía no existe uno; al marcar otro como predeterminado se desmarca el anterior; si se elimina el predeterminado y quedan métodos, se elige otro. Las consultas, actualizaciones y eliminaciones limitan el método al alojamiento del propietario autenticado.
 
