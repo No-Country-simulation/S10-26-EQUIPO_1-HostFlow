@@ -1,7 +1,9 @@
 package com.hostflow.service;
 
 import com.hostflow.dto.response.CloudinaryUploadResult;
+import com.hostflow.exception.BusinessException;
 import com.hostflow.model.Accommodation;
+import com.hostflow.model.AccommodationImage;
 import com.hostflow.repository.AccommodationImageRepository;
 import com.hostflow.repository.AccommodationRepository;
 import com.hostflow.repository.OwnerRepository;
@@ -15,7 +17,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 class AccommodationProfileServiceTest {
@@ -42,6 +46,42 @@ class AccommodationProfileServiceTest {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.clearSynchronization();
         }
+    }
+
+
+    @Test
+    void rechazaLaQuintaImagenDeGaleriaAntesDeSubirla() {
+        Accommodation accommodation = new Accommodation();
+        // En producción la entidad ya está persistida y tiene ID; el mock debe reflejarlo.
+        accommodation.setId(100L);
+        when(accommodationRepository.findByOwner_IdForUpdate(1L)).thenReturn(Optional.of(accommodation));
+        when(imageRepository.countByAccommodation_Id(100L)).thenReturn(4L);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.uploadGalleryImage(1L,
+                        new MockMultipartFile("file", "imagen.jpg", "image/jpeg", new byte[512_000])));
+
+        assertEquals("GALLERY_IMAGE_LIMIT_EXCEEDED", exception.getErrorCode());
+        verify(cloudinaryImageService, never()).uploadImage(any());
+        verify(imageRepository, never()).save(any());
+    }
+
+    @Test
+    void permiteSubirImagenCuandoLaGaleriaTieneTresImagenes() {
+        Accommodation accommodation = new Accommodation();
+        accommodation.setId(100L);
+        when(accommodationRepository.findByOwner_IdForUpdate(1L)).thenReturn(Optional.of(accommodation));
+        when(imageRepository.countByAccommodation_Id(100L)).thenReturn(3L);
+        when(cloudinaryImageService.uploadImage(any())).thenReturn(new CloudinaryUploadResult(
+                "hostflow/galeria-4", "https://res.cloudinary.com/demo/galeria-4.jpg", "jpg", 512_000L, "hostflow"));
+        when(imageRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AccommodationImage saved = service.uploadGalleryImage(1L,
+                new MockMultipartFile("file", "imagen.jpg", "image/jpeg", new byte[512_000]));
+
+        assertEquals("hostflow/galeria-4", saved.getCloudinaryPublicId());
+        verify(cloudinaryImageService).uploadImage(any());
+        verify(imageRepository).save(any());
     }
 
     @Test

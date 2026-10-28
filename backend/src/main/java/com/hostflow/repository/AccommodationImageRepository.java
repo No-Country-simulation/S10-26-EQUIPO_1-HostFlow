@@ -11,6 +11,7 @@ import java.util.Optional;
 public interface AccommodationImageRepository extends JpaRepository<AccommodationImage, Long> {
     List<AccommodationImage> findAllByAccommodation_IdOrderByCreatedAtAscIdAsc(Long accommodationId);
     Optional<AccommodationImage> findByIdAndAccommodation_Id(Long id, Long accommodationId);
+    long countByAccommodation_Id(Long accommodationId);
 
     /** Elimina únicamente si la imagen pertenece al alojamiento indicado. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

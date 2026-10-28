@@ -16,7 +16,8 @@ import java.util.Map;
 @Service
 public class CloudinaryImageService {
 
-    private static final long MAX_IMAGE_SIZE_BYTES = 5L * 1024 * 1024;
+    private static final long MIN_IMAGE_SIZE_BYTES = 500_000L;
+    private static final long MAX_IMAGE_SIZE_BYTES = 2_000_000L;
 
     private final Cloudinary cloudinary;
     private final String folder;
@@ -122,9 +123,15 @@ public class CloudinaryImageService {
             );
         }
 
+        if (file.getSize() < MIN_IMAGE_SIZE_BYTES) {
+            throw new InvalidImageException(
+                    "La imagen debe pesar al menos 500 KB."
+            );
+        }
+
         if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
             throw new InvalidImageException(
-                    "La imagen no puede superar los 5 MB."
+                    "La imagen no puede superar los 2 MB."
             );
         }
 

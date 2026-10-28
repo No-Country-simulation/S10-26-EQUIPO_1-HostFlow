@@ -1,15 +1,15 @@
 # Módulo: Gestión del alojamiento
 
-> Documentación del código del módulo, sus entidades JPA y las migraciones Flyway `V2`–`V5`. 
+> Documentación del código del módulo, sus entidades JPA y las migraciones Flyway `V2`–`V6`. 
 
 ## 1. Alcance
 
 El módulo permite al propietario autenticado:
 
 - Crear, consultar y actualizar parcialmente el perfil de su alojamiento.
-- Registrar imágenes de galería mediante URL HTTPS o subir archivos a Cloudinary.
+- Subir hasta cuatro imágenes de galería a Cloudinary.
 - Subir o reemplazar el logotipo del alojamiento.
-- Eliminar imágenes de galería, distinguiendo entre recursos gestionados por Cloudinary y URLs externas.
+- Eliminar imágenes de galería gestionadas por Cloudinary.
 - Crear, consultar, actualizar y eliminar métodos de pago.
 - Consultar y gestionar la desactivación temporal del alojamiento mediante un controlador separado.
 
@@ -49,7 +49,7 @@ Las columnas que se indican como obligatorias reflejan tanto las restricciones d
 | `id` | `BIGSERIAL` | No | PK. |
 | `accommodation_id` | `BIGINT` | No | FK `fk_accommodation_images_accommodation` a `accommodations(id)`. |
 | `image_url` | `VARCHAR(2048)` | No | URL de la imagen; no almacena el archivo binario. |
-| `cloudinary_public_id` | `VARCHAR(255)` | Sí | ID de Cloudinary para imágenes subidas por HostFlow; `NULL` para URLs externas manuales. |
+| `cloudinary_public_id` | `VARCHAR(255)` | Sí | ID del recurso de Cloudinary; nullable para conservar registros históricos. |
 | `created_at` | `TIMESTAMP` | No | Fecha de registro. |
 
 Índice: `idx_accommodation_images_accommodation` sobre `accommodation_id`. La FK tiene `ON DELETE CASCADE` en la migración.
@@ -63,13 +63,17 @@ Las columnas que se indican como obligatorias reflejan tanto las restricciones d
 | `payment_type` | `VARCHAR(30)` | No | Enum: `BANK_TRANSFER`, `DIGITAL_WALLET`, `CASH`, `CARD`, `OTHER`. |
 | `display_name` | `VARCHAR(120)` | No | Nombre visible del método. |
 | `provider_name` | `VARCHAR(150)` | Sí | Proveedor. |
-| `bank_name` | `VARCHAR(150)` | Sí | Banco o entidad. |
-| `account_holder` | `VARCHAR(200)` | Sí | Titular. |
-| `account_number` | `VARCHAR(100)` | Sí | Número de cuenta. |
-| `cbu_cvu` | `VARCHAR(100)` | Sí | CBU/CVU. |
+| `bank_name` | `VARCHAR(150)` | Sí | Banco o entidad; obligatorio para `BANK_TRANSFER`. |
+| `account_holder` | `VARCHAR(200)` | Sí | Titular; obligatorio para `BANK_TRANSFER` y `DIGITAL_WALLET`. |
+| `account_type` | `VARCHAR(80)` | Sí | Tipo de cuenta bancaria; obligatorio para `BANK_TRANSFER` (migración `V6`). |
+| `account_number` | `VARCHAR(100)` | Sí | Número de cuenta; obligatorio para `BANK_TRANSFER`. |
+| `cbu_cvu` | `VARCHAR(100)` | Sí | CBU/CVU; obligatorio para `BANK_TRANSFER`. |
 | `alias` | `VARCHAR(100)` | Sí | Alias de cuenta. |
-| `tax_id` | `VARCHAR(30)` | Sí | Identificador fiscal. |
-| `instructions` | `TEXT` | Sí | Instrucciones para el pago. |
+| `tax_id` | `VARCHAR(30)` | Sí | Identificador fiscal del titular o proveedor; opcional en la validación actual. |
+| `user_identifier` | `VARCHAR(200)` | Sí | Nombre de usuario o identificador de la billetera digital; obligatorio para `DIGITAL_WALLET` (migración `V6`). |
+| `wallet_phone` | `VARCHAR(50)` | Sí | Teléfono asociado a la billetera digital; obligatorio para `DIGITAL_WALLET` (migración `V6`). |
+| `wallet_email` | `VARCHAR(254)` | Sí | Correo asociado a la billetera digital; obligatorio y validado por formato para `DIGITAL_WALLET` (migración `V6`). |
+| `instructions` | `TEXT` | Sí | Instrucciones para el pago; hasta 5.000 caracteres en el DTO de solicitud. |
 | `is_default` | `BOOLEAN` | No | Indica el método predeterminado; default SQL `FALSE`. |
 | `is_active` | `BOOLEAN` | No | Indica si está activo; default SQL `TRUE`. |
 | `created_at` | `TIMESTAMP` | No | Fecha de creación. |
@@ -83,6 +87,7 @@ Las columnas que se indican como obligatorias reflejan tanto las restricciones d
 - `V3__separate_accommodation_payment_methods.sql`: crea métodos de pago, migra los datos bancarios heredados y elimina las columnas bancarias antiguas del perfil.
 - `V4__add_cloudinary_public_id_to_accommodation_images.sql`: añade el ID de Cloudinary a la galería.
 - `V5__add_cloudinary_public_id_to_accommodations.sql`: añade el ID de Cloudinary del logotipo.
+- `V6__add_payment_method_type_specific_fields.sql`: añade `account_type`, `user_identifier`, `wallet_phone` y `wallet_email` para completar los datos específicos de transferencias bancarias y billeteras digitales. Estos campos permanecen nullable en SQL porque no aplican a todos los tipos de pago; la obligatoriedad condicional se valida en el servicio.
 
 **Nota de entorno:** en los archivos de propiedades revisados, Flyway está deshabilitado en la configuración base y de desarrollo, y Hibernate usa `ddl-auto=update`. La existencia de estas migraciones en el repositorio no significa que se haya verificado su ejecución en una base PostgreSQL real.
 
@@ -98,7 +103,6 @@ La aplicación declara el context path `/api/v1`; por eso las rutas completas si
 | `GET` | `/profile` | `200 OK` | Obtiene el perfil y las imágenes de galería. |
 | `PATCH` | `/profile` | `200 OK` | Actualiza parcialmente el perfil. |
 | `GET` | `/gallery` | `200 OK` | Lista las referencias de imagen. |
-| `POST` | `/gallery` | `201 Created` | Registra una URL HTTPS externa. |
 | `POST` | `/gallery/upload` | `201 Created` | Sube un archivo de imagen a Cloudinary y registra la URL. |
 | `POST` | `/profile/logo` | `200 OK` | Sube o reemplaza el logotipo. |
 | `DELETE` | `/gallery/{imageId}` | `204 No Content` | Elimina una imagen de la galería. |
@@ -130,20 +134,6 @@ Content-Type: application/json
 
 En `PATCH /profile`, los campos omitidos o enviados como `null` permanecen sin cambios; una solicitud sin campos modificables se rechaza. No se acepta un `ownerId` del cliente para decidir a qué propietario pertenece el registro: se obtiene a partir de la autenticación.
 
-Para añadir una URL externa:
-
-```http
-POST /api/v1/owners/accommodation/gallery
-Authorization: Bearer <JWT>
-Content-Type: application/json
-```
-
-```json
-{ "url": "https://example.com/images/cabin-exterior.jpg" }
-```
-
-La URL debe ser HTTPS válida y tener como máximo 2048 caracteres. Esta operación no carga el archivo al backend ni lo administra en Cloudinary.
-
 Para subir una imagen de galería o el logotipo, usar `multipart/form-data` con un único campo de archivo llamado `file`:
 
 ```bash
@@ -152,7 +142,7 @@ curl -X POST 'http://localhost:8080/api/v1/owners/accommodation/gallery/upload' 
   -F 'file=@./imagen.jpg'
 ```
 
-Para el logotipo, cambiar la ruta por `/api/v1/owners/accommodation/profile/logo`. El archivo debe estar presente, no vacío, tener un `Content-Type` que comience por `image/` y no superar 5 MB. Los límites HTTP de multipart también están configurados en 5 MB para archivo y solicitud.
+Para el logotipo, cambiar la ruta por `/api/v1/owners/accommodation/profile/logo`. El archivo debe estar presente, tener entre 500 KB (500.000 bytes) y 2 MB (2.000.000 bytes), inclusive, y tener un `Content-Type` que comience por `image/`. La galería admite como máximo cuatro imágenes por alojamiento; el logotipo se gestiona por separado y no cuenta para ese límite. La comprobación de cantidad se realiza bajo bloqueo de la fila del alojamiento para evitar que cargas simultáneas excedan el límite. Los límites HTTP de multipart están configurados en 2 MB (2.000.000 bytes) por archivo y 3 MB (3.000.000 bytes) por solicitud para permitir el encabezado multipart.
 
 ### Métodos de pago — `/api/v1/owners/accommodation/payment-methods`
 
@@ -165,13 +155,15 @@ Para el logotipo, cambiar la ruta por `/api/v1/owners/accommodation/profile/logo
 
 El cuerpo JSON admite `paymentType`, `displayName`, `providerName`, `bankName`, `accountHolder`, `accountType`, `accountNumber`, `cbuCvu`, `alias`, `taxId`, `userIdentifier`, `walletPhone`, `walletEmail`, `instructions`, `isDefault` e `isActive`. `paymentType` y `displayName` son obligatorios al crear. Los valores de `paymentType` son `BANK_TRANSFER`, `DIGITAL_WALLET`, `CASH`, `CARD` y `OTHER`.
 
-Los campos obligatorios dependen de `paymentType` y se validan en el servicio del backend:
+Los campos obligatorios dependen de `paymentType` y se validan en `AccommodationPaymentMethodService`. En la creación, además de `paymentType` y `displayName`, se exigen los siguientes campos según el tipo:
 
-- `BANK_TRANSFER`: `bankName`, `accountHolder`, `accountType`, `accountNumber`, `cbuCvu` y `alias`.
-- `DIGITAL_WALLET`: `accountHolder`, `userIdentifier`, `walletPhone` y `walletEmail`; el correo debe tener formato válido.
-- `CASH`, `CARD` y `OTHER`: no heredan los requisitos de banco ni de billetera; además de `paymentType` y `displayName`, no tienen campos específicos obligatorios en esta implementación.
+- `BANK_TRANSFER` (transferencia bancaria): `bankName` (banco o entidad), `accountHolder` (titular), `accountType` (tipo de cuenta), `accountNumber` (número de cuenta), `cbuCvu` (CBU/CVU) y `alias`.
+- `DIGITAL_WALLET` (billetera digital): `accountHolder` (titular), `userIdentifier` (nombre de usuario o identificador), `walletPhone` (teléfono) y `walletEmail` (correo electrónico). `walletEmail` también debe cumplir el formato de correo comprobado por el servicio. `providerName` puede utilizarse para indicar el proveedor de la billetera.
+- `CASH`, `CARD` y `OTHER`: no requieren los campos específicos de transferencia bancaria ni de billetera digital; en esta implementación, solo son obligatorios `paymentType` y `displayName`.
 
-En `PATCH`, se combinan los campos enviados con los valores ya guardados y se valida el estado final. Por eso, un cambio que deje incompletos los campos requeridos para el tipo actual será rechazado. Los campos específicos se mantienen nullable en SQL porque no corresponden a todos los tipos de método de pago.
+Los demás campos disponibles son opcionales para la validación del servicio: `providerName`, `taxId` e `instructions`, además de los campos de otros tipos que no correspondan al método seleccionado. Los límites declarados en el DTO incluyen `displayName` 120 caracteres, `providerName` y `bankName` 150, `accountHolder` 200, `accountType` 80, `accountNumber`, `cbuCvu` y `alias` 100, `taxId` 30, `userIdentifier` 200, `walletPhone` 50, `walletEmail` 254 e `instructions` 5.000 caracteres.
+
+En `PATCH`, los campos omitidos o enviados como `null` no cambian los valores guardados. El servicio combina los datos nuevos con el método existente y valida el estado final; por eso, cambiar `paymentType` o modificar datos de forma que falte un campo obligatorio provoca el rechazo de la actualización. Los campos específicos permanecen nullable en SQL porque no corresponden a todos los tipos de método de pago.
 
 Reglas implementadas: el primer método se establece como predeterminado si todavía no existe uno; al marcar otro como predeterminado se desmarca el anterior; si se elimina el predeterminado y quedan métodos, se elige otro. Las consultas, actualizaciones y eliminaciones limitan el método al alojamiento del propietario autenticado.
 
@@ -184,7 +176,7 @@ La configuración usa las propiedades `cloudinary.cloud-name`, `cloudinary.api-k
 - Si la transacción del cambio de logotipo confirma, se intenta borrar el logotipo anterior cuando hay un `logo_public_id` conocido. Si la transacción falla, se intenta borrar el recurso nuevo para evitar dejarlo huérfano.
 - Si el logotipo anterior no tiene `logo_public_id`, se conserva por seguridad: no se intenta inferir el identificador desde una URL.
 - Si la eliminación posterior del logotipo anterior falla, se registra una advertencia para limpieza posterior; el nuevo logotipo permanece guardado.
-- `DELETE /gallery/{imageId}`: para recursos con `cloudinary_public_id`, intenta confirmar primero la eliminación remota y después elimina el registro. Si Cloudinary no confirma, el registro se conserva. Las URLs externas agregadas manualmente solo se quitan de la galería.
+- `DELETE /gallery/{imageId}`: intenta confirmar primero la eliminación remota y después elimina el registro. Si Cloudinary no confirma, el registro se conserva.
 - Una respuesta de Cloudinary con resultado `not found` al eliminar se considera éxito idempotente.
 
 Las operaciones externas de Cloudinary y la transacción SQL no forman una transacción distribuida; la lógica descrita reduce el riesgo de pérdida de referencias, pero un fallo remoto durante la limpieza puede requerir intervención posterior.

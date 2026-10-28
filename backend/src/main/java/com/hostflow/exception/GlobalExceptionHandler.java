@@ -195,7 +195,7 @@ public class GlobalExceptionHandler {
 
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
-                "El archivo supera el tamaño máximo permitido de 5 MB.",
+                "El archivo supera el tamaño máximo permitido de 2 MB.",
                 "FILE_TOO_LARGE"
         );
     }

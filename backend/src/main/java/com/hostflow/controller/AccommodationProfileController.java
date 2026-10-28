@@ -1,6 +1,5 @@
 package com.hostflow.controller;
 
-import com.hostflow.dto.request.AccommodationImageRequest;
 import com.hostflow.dto.request.AccommodationProfileRequest;
 import com.hostflow.dto.response.AccommodationImageResponse;
 import com.hostflow.dto.response.AccommodationProfileResponse;
@@ -134,41 +133,20 @@ public class AccommodationProfileController {
         return ResponseEntity.ok(images);
     }
 
-    @PostMapping("/gallery")
-    @Operation(operationId = "addAccommodationGalleryImage",
-            summary = "Agregar una imagen a mi galería",
-            description = "Registra una referencia de imagen por URL HTTPS; el archivo binario no se carga al backend.",
-            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = true, description = "URL HTTPS de la imagen.",
-                    content = @Content(schema = @Schema(implementation = AccommodationImageRequest.class),
-                            examples = @ExampleObject(name = "URL de imagen", value = "{ \"url\": \"https://example.com/images/cabin-exterior.jpg\" }"))))
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Imagen registrada correctamente", content = @Content(schema = @Schema(implementation = AccommodationImageResponse.class))),
-            @ApiResponse(responseCode = "400", description = "URL vacía, inválida o no HTTPS", content = @Content),
-            @ApiResponse(responseCode = "401", description = "Token ausente o inválido", content = @Content),
-            @ApiResponse(responseCode = "403", description = "El usuario no tiene el rol OWNER", content = @Content),
-            @ApiResponse(responseCode = "404", description = "No existe un perfil para el propietario autenticado", content = @Content)
-    })
-    public ResponseEntity<AccommodationImageResponse> addImage(
-            @Valid @RequestBody AccommodationImageRequest request, Authentication authentication) {
-        AccommodationImage image = profileService.addImage(getCurrentOwnerId(authentication), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(AccommodationImageResponse.from(image));
-    }
-
     @PostMapping(value = "/gallery/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(operationId = "uploadAccommodationGalleryImage",
             summary = "Subir una imagen a mi galería",
             description = "Recibe un archivo de imagen, lo sube a Cloudinary y registra su URL segura en la galería del alojamiento del propietario autenticado.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Imagen subida y registrada correctamente", content = @Content(schema = @Schema(implementation = AccommodationImageResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Archivo ausente, vacío, no válido o superior a 5 MB", content = @Content),
+            @ApiResponse(responseCode = "400", description = "Archivo ausente, vacío, inválido o fuera del rango de 500 KB a 2 MB, o galería completa", content = @Content),
             @ApiResponse(responseCode = "401", description = "Token ausente o inválido", content = @Content),
             @ApiResponse(responseCode = "403", description = "El usuario no tiene el rol OWNER", content = @Content),
             @ApiResponse(responseCode = "404", description = "No existe un perfil para el propietario autenticado", content = @Content),
             @ApiResponse(responseCode = "502", description = "No fue posible subir la imagen a Cloudinary", content = @Content)
     })
     public ResponseEntity<AccommodationImageResponse> uploadGalleryImage(
-            @Parameter(description = "Archivo de imagen (máximo 5 MB).", required = true)
+            @Parameter(description = "Archivo de imagen (entre 500 KB y 2 MB).", required = true)
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
         AccommodationImage image = profileService.uploadGalleryImage(getCurrentOwnerId(authentication), file);
@@ -181,14 +159,14 @@ public class AccommodationProfileController {
             description = "Recibe un archivo de imagen, lo sube a Cloudinary y actualiza logoUrl del alojamiento del propietario autenticado.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Logotipo actualizado correctamente", content = @Content(schema = @Schema(implementation = AccommodationProfileResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Archivo ausente, vacío, no válido o superior a 5 MB", content = @Content),
+            @ApiResponse(responseCode = "400", description = "Archivo ausente, vacío, inválido o fuera del rango de 500 KB a 2 MB", content = @Content),
             @ApiResponse(responseCode = "401", description = "Token ausente o inválido", content = @Content),
             @ApiResponse(responseCode = "403", description = "El usuario no tiene el rol OWNER", content = @Content),
             @ApiResponse(responseCode = "404", description = "No existe un perfil para el propietario autenticado", content = @Content),
             @ApiResponse(responseCode = "502", description = "No fue posible subir el logotipo a Cloudinary", content = @Content)
     })
     public ResponseEntity<AccommodationProfileResponse> uploadLogo(
-            @Parameter(description = "Archivo del logotipo (máximo 5 MB).", required = true)
+            @Parameter(description = "Archivo del logotipo (entre 500 KB y 2 MB).", required = true)
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
         Accommodation accommodation = profileService.uploadLogo(getCurrentOwnerId(authentication), file);
@@ -198,7 +176,7 @@ public class AccommodationProfileController {
     @DeleteMapping("/gallery/{imageId}")
     @Operation(operationId = "deleteAccommodationGalleryImage",
             summary = "Eliminar una imagen de mi galería",
-            description = "Si la imagen fue subida a Cloudinary por HostFlow, elimina primero el recurso remoto y luego el registro. Las URLs externas agregadas manualmente solo se eliminan de la galería.")
+            description = "Elimina de Cloudinary el recurso administrado por HostFlow y después elimina el registro de la galería.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Imagen eliminada correctamente"),
             @ApiResponse(responseCode = "401", description = "Token ausente o inválido", content = @Content),
