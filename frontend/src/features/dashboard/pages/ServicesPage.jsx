@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConciergeBell, Pencil, Plus, Trash2 } from "lucide-react";
 import { Alert, Badge, Button, Card, EmptyState, Field, Switch } from "@components/ui";
 import Modal from "@components/ui/Modal";
@@ -50,37 +50,60 @@ export default function ServicesPage() {
     setTimeout(() => setSaved(false), 2200);
   };
 
+  // Sincroniza el listado con el backend. En modo demo el store local ya es la
+  // fuente de verdad, así que no hace falta pedir nada.
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let alive = true;
+    Promise.resolve()
+      .then(() => actions.getServices?.())
+      .catch((err) => {
+        if (alive) setError(err?.message || "No se pudieron cargar los servicios desde el backend.");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [actions]);
+
   const setField = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
 
-  const addService = (event) => {
+  const addService = async (event) => {
     event.preventDefault();
     if (!form.name.trim()) return setError("Ingresá el nombre del servicio.");
     if (Number(form.price) < 0) return setError("Ingresá un precio válido (0 si es gratuito).");
     setError("");
-    actions.addService({
-      name: form.name,
-      price: form.price,
-      description: form.description,
-      pricing: form.pricing,
-      perGuest: form.perGuest,
-    });
+    try {
+      await actions.addService({
+        name: form.name,
+        price: form.price,
+        description: form.description,
+        pricing: form.pricing,
+        perGuest: form.perGuest,
+      });
+    } catch (err) {
+      return setError(err?.message || "No se pudo guardar el servicio.");
+    }
     setForm(EMPTY_FORM);
     flashSaved();
   };
 
-  const saveEdit = (event) => {
+  const saveEdit = async (event) => {
     event.preventDefault();
     if (!editing) return;
     if (!form.name.trim()) return setError("Ingresá el nombre del servicio.");
     if (Number(form.price) < 0) return setError("Ingresá un precio válido.");
     setError("");
-    actions.updateService(editing.id, {
-      name: form.name.trim(),
-      price: Number(form.price) || 0,
-      pricing: form.pricing,
-      perGuest: Boolean(form.perGuest),
-      description: form.description.trim(),
-    });
+    try {
+      await actions.updateService(editing.id, {
+        name: form.name.trim(),
+        price: Number(form.price) || 0,
+        pricing: form.pricing,
+        perGuest: Boolean(form.perGuest),
+        description: form.description.trim(),
+      });
+    } catch (err) {
+      return setError(err?.message || "No se pudo guardar el servicio.");
+    }
     closeEdit();
     flashSaved();
   };
@@ -103,11 +126,23 @@ export default function ServicesPage() {
     setError("");
   };
 
-  const remove = (service) => {
+  const remove = async (service) => {
     // window.confirm evita borrados accidentales; es el patrón nativo del proyecto.
     if (!window.confirm(`¿Eliminar el servicio "${service.name}"?`)) return;
-    actions.removeService(service.id);
+    try {
+      await actions.removeService(service.id);
+    } catch (err) {
+      return setError(err?.message || "No se pudo eliminar el servicio.");
+    }
     flashSaved();
+  };
+
+  const toggle = async (service) => {
+    try {
+      await actions.toggleService(service.id);
+    } catch (err) {
+      setError(err?.message || "No se pudo cambiar el estado del servicio.");
+    }
   };
 
   return (
@@ -167,7 +202,7 @@ export default function ServicesPage() {
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3.5">
                   <Switch
                     checked={service.enabled}
-                    onChange={() => actions.toggleService(service.id)}
+                    onChange={() => toggle(service)}
                     label={service.enabled ? "Visible para huéspedes" : "Oculto"}
                   />
                   <div className="flex gap-2">

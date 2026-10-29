@@ -38,8 +38,8 @@ después de cambiar una clave).
 | `/panel` | **Panel** del anfitrión (próximas reservas, métricas, accesos rápidos) | sesión |
 | `/panel/reservas` | Listado de reservas con filtros y búsqueda | sesión |
 | `/panel/alojamiento` | Datos del alojamiento (nombre, habitaciones, baños, precio, imágenes) | sesión |
-| `/panel/disponibilidad` | Calendario para **deshabilitar días** | sesión |
-| `/panel/pagos` | Métodos de pago (ARS principal, USD/EUR secundarias, billeteras digitales) + **datos para transferencia** | sesión |
+| `/panel/disponibilidad` | Calendario: **días bloqueados** a mano + días **ocupados por reservas** | sesión |
+| `/panel/pagos` | Métodos de pago (**hasta 4**, con sus llaves/credenciales y opción de copiar) + **datos para transferencia** | sesión |
 | `/panel/servicios` | **Servicios adicionales**: alta, edición, activación y precios | sesión |
 | `/panel/perfil` | Perfil: **subir logo** + personalización de la empresa (3 colores, formas) | sesión |
 | `/llegada/:lodgingId/:bookingId` | **Onboarding del huésped** (B2C, sin cuenta): ficha de llegada, alérgenos, servicios y **cotización opcional de lancha** | público (enlace único) |
@@ -60,6 +60,9 @@ después de cambiar una clave).
 - `src/lib/api/httpApi.js` implementa las llamadas reales; `src/lib/api/demoApi.js` implementa el
   **mismo contrato** con datos en memoria.
 - `src/lib/api/index.js` elige el adaptador según `VITE_API_URL`. Las pantallas nunca llaman a `fetch`.
+- El backend hoy solo expone **auth y dueños**. Para el resto de los módulos, `httpApi` detecta que
+  el endpoint aún no responde (404 / 405 / 501 o sin conexión) y opera sobre el store local: así
+  ninguna pantalla se rompe y, cuando el backend los publique, pasan a usarse sin tocar la UI.
 - El backend expone el context-path `/api/v1`, así que `VITE_API_URL` debe incluirlo:
   `VITE_API_URL=http://localhost:8080/api/v1`.
 - Documentación interactiva del backend: `GET /api/v1/swagger-ui.html` (OpenAPI en `/api/v1/api-docs`).

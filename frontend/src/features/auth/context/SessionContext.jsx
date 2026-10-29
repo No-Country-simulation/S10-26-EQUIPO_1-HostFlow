@@ -1,11 +1,21 @@
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
 import { api } from "@lib/api";
 import { useStore } from "@lib/state/useStore";
+import { DEMO_MODE } from "@lib/config/env";
 
 const SessionContext = createContext(null);
 
 export function SessionProvider({ children }) {
   const user = useStore((s) => s.user);
+
+  useEffect(() => {
+    if (user && !DEMO_MODE) {
+      // Sincroniza datos del alojamiento con el backend solo si hay backend configurado
+      try {
+        api.getLodging?.();
+      } catch {}
+    }
+  }, [user]);
 
   const value = useMemo(
     () => ({

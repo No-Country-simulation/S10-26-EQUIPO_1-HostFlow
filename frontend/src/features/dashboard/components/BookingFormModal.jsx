@@ -112,7 +112,7 @@ export function BookingFormModal({ open, onClose, onCreated }) {
     setError("");
     setSaving(true);
     try {
-      const booking = actions.createBooking({
+      const booking = await actions.createBooking({
         ...data,
         // Calculados, no escritos: noches × precio por noche y la moneda del
         // alojamiento. Los adicionales se suman cuando el huésped los elige.
@@ -121,6 +121,10 @@ export function BookingFormModal({ open, onClose, onCreated }) {
       });
       onCreated?.(booking);
       close();
+    } catch (err) {
+      // Error real del backend (el módulo todavía no implementado cae solo al
+      // store local y no llega acá).
+      setError(err?.message || "No se pudo crear la reserva. Intentá nuevamente.");
     } finally {
       setSaving(false);
     }

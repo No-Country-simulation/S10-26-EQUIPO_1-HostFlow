@@ -127,23 +127,46 @@ pero conserva los datos.
 
 ---
 
-## Pendiente de definir en el backend
+## Módulos reservados (contrato definido, backend pendiente)
 
-Estos módulos todavía **no existen** en `backend/`. Mientras tanto la capa de servicios
-(`src/lib/api/index.js`) cae al **store local** (`src/lib/state/store.js`), de modo que las
-pantallas siguen siendo usables; cuando el backend los implemente, alcanza con agregar las
-rutas en `src/lib/api/endpoints.js` y los métodos en `src/lib/api/httpApi.js`: las
-pantallas ya consumen la capa de servicios y no cambian.
+Estos módulos **todavía no existen** en `backend/`, pero su contrato ya está
+definido en `src/lib/api/endpoints.js`. Mientras tanto, `src/lib/api/httpApi.js`
+detecta que el endpoint aún no responde (404 / 405 / 501, o falta de conexión)
+y opera sobre el store local (`src/lib/state/store.js`), de modo que ninguna
+pantalla se rompe. Cuando el backend los publique, la app pasa a usarlos sin
+tocar las pantallas.
 
-| Módulo | Rutas reservadas en `endpoints.js` |
+| Módulo | Rutas reservadas |
 |---|---|
-| Alojamiento (datos, imágenes, precio) | `/lodgings/mine` |
-| Disponibilidad (días bloqueados) | `/lodgings/mine/blocked-days` |
-| Reservas | `/lodgings/mine/bookings`, `/bookings/{id}` |
-| Estado del pago de una reserva | `/bookings/{id}/payment-status` |
-| Datos bancarios del alojamiento | `/lodgings/mine/bank-details` |
-| Servicios adicionales | `/lodgings/mine/services` |
-| Onboarding del huésped (B2C, público) | `/onboarding/{lodgingId}/{bookingId}` |
-| Cotización de transporte en lancha | `/bookings/{id}/boat-quote` (ver [boat-quote-contract.md](boat-quote-contract.md)) |
-| Métodos de pago | `/lodgings/mine/payment-methods` |
-| Estadísticas de administración | `/admin/stats` |
+| Alojamiento (datos, imágenes, precio) | `GET`/`PUT /lodgings/mine` · `PUT /lodgings/mine/logo` · `POST`/`DELETE /lodgings/mine/images` · `PUT /lodgings/mine/brand` |
+| Disponibilidad (días bloqueados) | `GET`/`PUT /lodgings/mine/blocked-days` · `PATCH /lodgings/mine/blocked-days/{date}` |
+| Reservas | `GET`/`POST /lodgings/mine/bookings` · `PATCH /bookings/{id}` · `PATCH /bookings/{id}/status` · `PATCH /bookings/{id}/payment-status` · `POST /bookings/{id}/onboarding-link` |
+| Onboarding del huésped (B2C, **público**, sin token) | `GET`/`POST /onboarding/{lodgingId}/{bookingId}` |
+| Cotización de transporte en lancha | `POST`/`DELETE /bookings/{id}/boat-quote` (ver [boat-quote-contract.md](boat-quote-contract.md)) |
+| Servicios adicionales | `GET`/`POST /lodgings/mine/services` · `PATCH`/`DELETE /lodgings/mine/services/{id}` · `PATCH /lodgings/mine/services/{id}/status` |
+| Métodos de pago (máximo 4 por alojamiento) | `GET`/`POST /lodgings/mine/payment-methods` · `PATCH`/`DELETE /lodgings/mine/payment-methods/{id}` · `PATCH /lodgings/mine/payment-methods/{id}/status` · `PUT /lodgings/mine/payment-methods/currency` · `PUT /lodgings/mine/payment-methods/wallets` · `PUT /lodgings/mine/bank-details` |
+| Estadísticas de administración (solo `ROLE_ADMIN`) | `GET /admin/stats` |
+
+### Notas de integración
+
+- **Alojamiento**: `GET /lodgings/mine` devuelve el alojamiento del dueño
+  autenticado. Si el endpoint todavía no existe, el front completa lo único que
+  el backend sí sabe (nombre del alojamiento y titularidad) desde
+  `GET /owners/email/{email}`.
+- **Métodos de pago**: el límite de **4 métodos** se respeta tanto en la
+  interfaz como en `httpApi` y en el store, por si el backend lo mandara mal.
+  Cada método lleva `label`, `type` (`WALLET` · `BANK` · `CARD`), `enabled`,
+  `keys` (credenciales/librerías) y `notes`. El onboarding del huésped lista los
+  métodos **habilitados** y permite copiar sus credenciales.
+- **Disponibilidad**: las fechas usan el formato ISO `YYYY-MM-DD`. El calendario
+  del panel marca como **ocupados** los días cubiertos por una reserva activa
+  (además de los bloqueos manuales) y el alta de reservas valida el solape.
+- **Administración**: `GET /owners` es la fuente del listado; el estado de un
+  alojamiento se alterna habilitando o deshabilitando su dueño
+  (`PATCH /owners/{id}/status?enabled=`). `GET /admin/stats` devuelve
+  `{ lodgings, active, paused, hosts, bookings }`; sin él, el front calcula las
+  métricas con el listado de dueños y muestra "—" en las que no puede derivar.
+- **Onboarding B2C**: el `GET` público es el que permite que el huésped vea, en
+  su propio dispositivo, el alojamiento, la reserva, los servicios y las
+  formas de pago con sus credenciales (el POST registra la ficha completada).
+

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import {
   ArrowLeft,
@@ -7,8 +7,10 @@ import {
   ClipboardList,
   Clock,
   Copy,
+  CreditCard,
   HeartPulse,
   IdCard,
+  Landmark,
   Mail,
   MessageSquare,
   Phone,
@@ -16,6 +18,7 @@ import {
   Ship,
   Sparkles,
   UserRound,
+  Wallet,
 } from "lucide-react";
 import { Alert, Badge, Button, EmptyState, Field, WhatsAppIcon } from "@components/ui";
 import OnboardingShell from "../components/OnboardingShell";
@@ -26,7 +29,7 @@ import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { isOnboardingLinkExpired } from "@lib/state/store";
 import { DEMO_MODE } from "@lib/config/env";
-import { bookingGrandTotal, cn, daysBetween, formatDate, formatMoney, isEmail, plural, serviceLineDetail, serviceLineTotal } from "@utils/format";
+import { bookingGrandTotal, cn, copyText, daysBetween, formatDate, formatMoney, isEmail, plural, serviceLineDetail, serviceLineTotal } from "@utils/format";
 
 const STEPS = [
   { id: 0, label: "Tus datos", icon: UserRound },
@@ -130,7 +133,9 @@ export default function OnboardingPage() {
   const lodging = useStore((s) => s.lodging);
   const booking = useStore((s) => s.bookings.find((b) => b.id === bookingId));
   const services = useStore((s) => s.services);
-  const bankDetails = useStore((s) => s.payments.bankDetails);
+  const payments = useStore((s) => s.payments);
+  const bankDetails = payments?.bankDetails || {};
+  const paymentMethods = payments?.methods || [];
 
   const [step, setStep] = useState(0);
   const [started, setStarted] = useState(false);
@@ -139,6 +144,7 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedMethodId, setCopiedMethodId] = useState(null);
 
   const [guest, setGuest] = useState({
     guestName: booking?.guestName || "",
@@ -149,6 +155,23 @@ export default function OnboardingPage() {
   const [health, setHealth] = useState({ allergies: "", preferences: "", notes: "" });
   const [selected, setSelected] = useState([]); // [{ serviceId, name, price }]
   const [quote, setQuote] = useState(EMPTY_QUOTE);
+
+  // El huésped abre el enlace desde su propio dispositivo, donde no hay datos
+  // locales: se piden al backend (endpoint público, sin token) el alojamiento,
+  // la reserva, los servicios y las formas de pago con sus credenciales.
+  // En modo demo todo ya vive en el store del navegador.
+  useEffect(() => {
+    if (DEMO_MODE || !lodgingId || !bookingId) return;
+    let alive = true;
+    Promise.resolve()
+      .then(() => actions.getOnboarding?.(lodgingId, bookingId))
+      .catch((err) => {
+        if (alive) console.warn("Onboarding:", err);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [actions, lodgingId, bookingId]);
 
   const linkValid = lodgingId === lodging.id;
   const availableServices = useMemo(() => services.filter((sv) => sv.enabled), [services]);
@@ -162,6 +185,28 @@ export default function OnboardingPage() {
   const orderTotal = (Number(booking?.total) || 0) + servicesTotal;
   const savedTotal = booking ? bookingGrandTotal(booking) : orderTotal;
   const hasBankDetails = Boolean(bankDetails.holder || bankDetails.alias || bankDetails.cbu);
+  const activePaymentMethods = useMemo(
+    () => (Array.isArray(paymentMethods) ? paymentMethods.filter((m) => m.enabled) : []),
+    [paymentMethods],
+  );
+
+  const copyMethodCredentials = async (method) => {
+    const keys = method.keys || {};
+    const lines = [`Método de pago: ${method.label}`];
+    if (keys.holder) lines.push(`Titular: ${keys.holder}`);
+    if (keys.alias) lines.push(`Alias: ${keys.alias}`);
+    if (keys.cbu) lines.push(`CBU: ${keys.cbu}`);
+    if (keys.cvu) lines.push(`CVU: ${keys.cvu}`);
+    if (keys.bank) lines.push(`Banco: ${keys.bank}`);
+    if (keys.email) lines.push(`Correo: ${keys.email}`);
+    if (keys.paypalMe) lines.push(`PayPal.Me: ${keys.paypalMe}`);
+    if (keys.publicKey) lines.push(`Llave pública: ${keys.publicKey}`);
+    if (method.notes) lines.push(`Instrucciones: ${method.notes}`);
+
+    if (!(await copyText(lines.join("\n")))) return;
+    setCopiedMethodId(method.id);
+    setTimeout(() => setCopiedMethodId(null), 2500);
+  };
 
   const completed = Boolean(booking?.onboarding?.completedAt) || done;
 
@@ -286,6 +331,10 @@ export default function OnboardingPage() {
         boatQuoteRequested: Boolean(quote.decided && quote.wanted),
       });
       setDone(true);
+    } catch (err) {
+      // Error real del backend: el huésped puede reintentar. Los módulos aún
+      // no implementados caen solos al store local y no llegan acá.
+      setError(err?.message || "No pudimos registrar tu llegada. Intentá nuevamente.");
     } finally {
       setSubmitting(false);
     }
@@ -907,23 +956,111 @@ export default function OnboardingPage() {
                 <span className="shrink-0 text-base font-extrabold text-ink">{formatMoney(orderTotal, booking.currency)}</span>
               </div>
 
-              {selected.length > 0 && (
-                <div className="mt-1 rounded-xl bg-cloud p-3.5">
-                  <p className="font-semibold text-ink">Para pagar por transferencia</p>
-                  {hasBankDetails ? (
-                    <div className="mt-1.5 grid gap-1 text-xs text-muted">
-                      {bankDetails.holder && <p><span className="font-semibold text-ink">Titular:</span> {bankDetails.holder}</p>}
-                      {bankDetails.alias && <p><span className="font-semibold text-ink">Alias:</span> {bankDetails.alias}</p>}
-                      {bankDetails.cbu && <p><span className="font-semibold text-ink">CBU:</span> {bankDetails.cbu}</p>}
-                      {bankDetails.notes && <p>{bankDetails.notes}</p>}
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-xs text-muted">
-                      {lodging.name} te compartirá los datos de la transferencia para confirmar el pedido.
-                    </p>
-                  )}
+              {/* Métodos de pago disponibles con opción de copiar credenciales */}
+              <div className="mt-3 grid gap-3 rounded-2xl bg-cloud/70 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <p className="font-bold text-ink">Métodos de pago habilitados</p>
+                  <span className="text-[11px] font-semibold text-muted">Copiá los datos para abonar</span>
                 </div>
-              )}
+
+                {activePaymentMethods.length > 0 ? (
+                  <div className="grid gap-2.5">
+                    {activePaymentMethods.map((method) => {
+                      const keys = method.keys || {};
+                      const isCopied = copiedMethodId === method.id;
+                      return (
+                        <div
+                          key={method.id}
+                          className="flex flex-col justify-between gap-3 rounded-xl border border-line bg-paper p-3.5 shadow-sm sm:flex-row sm:items-center"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="grid size-7 place-items-center rounded-lg bg-teal-soft text-teal-strong">
+                                {method.type === "BANK" ? <Landmark size={14} /> : <CreditCard size={14} />}
+                              </span>
+                              <span className="text-sm font-bold text-ink">{method.label}</span>
+                            </div>
+
+                            <div className="mt-1.5 grid gap-0.5 text-xs text-muted">
+                              {keys.holder && (
+                                <p>
+                                  <span className="font-semibold text-ink">Titular:</span> {keys.holder}
+                                </p>
+                              )}
+                              {keys.alias && (
+                                <p>
+                                  <span className="font-semibold text-ink">Alias:</span>{" "}
+                                  <code className="font-mono text-teal-strong">{keys.alias}</code>
+                                </p>
+                              )}
+                              {keys.cbu && (
+                                <p>
+                                  <span className="font-semibold text-ink">CBU:</span>{" "}
+                                  <code className="font-mono text-teal-strong">{keys.cbu}</code>
+                                </p>
+                              )}
+                              {keys.cvu && (
+                                <p>
+                                  <span className="font-semibold text-ink">CVU:</span>{" "}
+                                  <code className="font-mono text-teal-strong">{keys.cvu}</code>
+                                </p>
+                              )}
+                              {keys.email && (
+                                <p>
+                                  <span className="font-semibold text-ink">Correo:</span> {keys.email}
+                                </p>
+                              )}
+                              {keys.paypalMe && (
+                                <p>
+                                  <span className="font-semibold text-ink">PayPal.Me:</span> {keys.paypalMe}
+                                </p>
+                              )}
+                              {keys.publicKey && (
+                                <p>
+                                  <span className="font-semibold text-ink">Llave pública:</span> {keys.publicKey}
+                                </p>
+                              )}
+                              {method.notes && <p className="italic text-muted">{method.notes}</p>}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => copyMethodCredentials(method)}
+                            className={cn(
+                              "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition-all sm:self-center",
+                              isCopied
+                                ? "border-success bg-success-soft text-success"
+                                : "border-line-strong bg-cloud text-ink hover:border-teal hover:text-teal-strong",
+                            )}
+                          >
+                            {isCopied ? (
+                              <>
+                                <Check size={14} /> ¡Copiado!
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={14} /> Copiar credenciales
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : hasBankDetails ? (
+                  <div className="rounded-xl border border-line bg-paper p-3 text-xs text-muted">
+                    {bankDetails.holder && <p><span className="font-semibold text-ink">Titular:</span> {bankDetails.holder}</p>}
+                    {bankDetails.alias && <p><span className="font-semibold text-ink">Alias:</span> {bankDetails.alias}</p>}
+                    {bankDetails.cbu && <p><span className="font-semibold text-ink">CBU:</span> {bankDetails.cbu}</p>}
+                    {bankDetails.notes && <p>{bankDetails.notes}</p>}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted">
+                    {lodging.name} te compartirá los datos para realizar el pago al confirmar.
+                  </p>
+                )}
+              </div>
             </div>
 
             {error && <Alert>{error}</Alert>}

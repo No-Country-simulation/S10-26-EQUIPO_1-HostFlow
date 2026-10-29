@@ -111,6 +111,35 @@ export function maskEmail(email = "") {
   return `${head}${"•".repeat(Math.max(1, user.length - 2))}@${domain}`;
 }
 
+// Copia texto al portapapeles de forma segura.
+// `navigator.clipboard` solo existe en contextos seguros (https o localhost):
+// si no está disponible se recurre al método clásico y, si tampoco funciona,
+// se devuelve false para que la pantalla avise en lugar de fallar en silencio.
+export async function copyText(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* cae al método clásico de abajo */
+  }
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(area);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 // ── Servicios adicionales y totales ──────────────────────────────────────
 // El campo `total` de la reserva es SOLO el alojamiento. El total real (lo que
 // el huésped paga) incluye los servicios que registró en el onboarding.

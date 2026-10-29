@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
-import { BedDouble, ImagePlus, MapPin, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { BedDouble, ImagePlus, MapPin, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Alert, Badge, Button, Card, Field } from "@components/ui";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { MAX_IMAGES } from "@lib/state/store";
+import { DEMO_MODE } from "@lib/config/env";
 import { readableOn } from "@utils/color";
 import { CURRENCIES, formatMoney, plural } from "@utils/format";
 
@@ -20,12 +21,22 @@ export default function LodgingPage() {
   const lodging = useStore((s) => s.lodging);
   const images = Array.isArray(lodging.images) ? lodging.images : [];
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [imageErrors, setImageErrors] = useState([]);
   const [imageNotice, setImageNotice] = useState("");
   const fileRef = useRef(null);
 
-  const submit = (event) => {
+  useEffect(() => {
+    if (!DEMO_MODE && actions.getLodging) {
+      setLoading(true);
+      Promise.resolve(actions.getLodging())
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, [actions]);
+
+  const submit = async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") || "").trim();
@@ -42,9 +53,13 @@ export default function LodgingPage() {
     if (!pricePerNight || pricePerNight <= 0) return setError("Ingresá un precio por noche válido.");
 
     setError("");
-    actions.updateLodging({ name, rooms, bathrooms, capacity, pricePerNight, currency });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2600);
+    try {
+      await actions.updateLodging({ name, rooms, bathrooms, capacity, pricePerNight, currency });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2600);
+    } catch (err) {
+      setError(err?.message || "Error al actualizar los datos en el backend.");
+    }
   };
 
   // Subida de 0 a 4 fotos con validación de peso (hasta 2 MB cada una).
@@ -100,11 +115,18 @@ export default function LodgingPage() {
           <h1 className="text-[clamp(24px,4vw,32px)] font-extrabold">Datos del alojamiento</h1>
           <p className="mt-1 text-sm text-muted">Nombre, capacidad, precio y fotos de tu propiedad.</p>
         </div>
-        {saved ? (
-          <Alert tone="success">Cambios guardados correctamente.</Alert>
-        ) : (
-          <Badge tone="lime">{formatMoney(lodging.pricePerNight, lodging.currency)} / noche</Badge>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {saved ? (
+            <Alert tone="success">Cambios guardados correctamente.</Alert>
+          ) : (
+            <>
+              <Badge tone={DEMO_MODE ? "neutral" : "teal"}>
+                {DEMO_MODE ? "Modo demo" : "Sincronizado con Backend"}
+              </Badge>
+              <Badge tone="lime">{formatMoney(lodging.pricePerNight, lodging.currency)} / noche</Badge>
+            </>
+          )}
+        </div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">

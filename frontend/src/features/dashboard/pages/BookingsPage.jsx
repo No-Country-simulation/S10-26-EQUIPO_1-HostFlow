@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Plus, Search } from "lucide-react";
-import { Badge, Button, EmptyState } from "@components/ui";
+import { Alert, Badge, Button, EmptyState } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
 import { BookingDetailModal } from "../components/BookingDetailModal";
 import { BookingFormModal } from "../components/BookingFormModal";
 import { BookingRequirementsAlert } from "../components/BookingRequirementsAlert";
 import { getBookingRequirements } from "../lib/bookingRequirements";
+import { guardAction } from "../lib/guardAction";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
+import { DEMO_MODE } from "@lib/config/env";
 import { cn, toISODate } from "@utils/format";
 
 const FILTERS = [
@@ -26,8 +28,24 @@ export default function BookingsPage() {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [detailId, setDetailId] = useState(null);
+  const [syncError, setSyncError] = useState("");
 
   const today = toISODate();
+
+  // Sincroniza el listado con el backend. En modo demo el store local ya es la
+  // fuente de verdad, así que no hace falta pedir nada.
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let alive = true;
+    Promise.resolve()
+      .then(() => actions.getBookings?.())
+      .catch((err) => {
+        if (alive) setSyncError(err?.message || "No se pudieron cargar las reservas desde el backend.");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [actions]);
 
   // Aviso previo: si al alojamiento le falta configuración, no se puede crear
   // una reserva. La alerta lleva a cada pantalla para completarla.
@@ -64,6 +82,8 @@ export default function BookingsPage() {
           </Button>
         </div>
       </header>
+
+      {syncError && <Alert tone="danger">{syncError}</Alert>}
 
       <BookingRequirementsAlert
         requirements={requirements}
@@ -110,8 +130,8 @@ export default function BookingsPage() {
             <BookingSummaryCard
               key={booking.id}
               booking={booking}
-              onConfirm={(id) => actions.setBookingStatus(id, "CONFIRMED")}
-              onCancel={(id) => actions.setBookingStatus(id, "CANCELLED")}
+              onConfirm={(id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CONFIRMED"))}
+              onCancel={(id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CANCELLED"))}
               onView={(id) => setDetailId(id)}
             />
           ))}

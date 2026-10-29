@@ -6,6 +6,7 @@ import { PaymentStatusBadge, StatusBadge } from "./BookingSummaryCard";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { ONBOARDING_LINK_TTL_MS, isOnboardingLinkExpired } from "@lib/state/store";
+import { guardAction } from "../lib/guardAction";
 import { DEMO_MODE } from "@lib/config/env";
 import { bookingGrandTotal, bookingServices, bookingServicesTotal, daysBetween, formatDate, formatMoney, plural, serviceLineDetail, serviceLineTotal } from "@utils/format";
 
@@ -91,9 +92,7 @@ export function BookingDetailModal({ booking, open, onClose }) {
             </div>
             <Switch
               checked={booking.paymentStatus === "PAID"}
-              onChange={(next) =>
-                actions.setPaymentStatus(booking.id, next ? "PAID" : "PENDING")
-              }
+              onChange={(next) => guardAction("setPaymentStatus", actions.setPaymentStatus(booking.id, next ? "PAID" : "PENDING"))}
               label={booking.paymentStatus === "PAID" ? "Pagado" : "Pendiente"}
             />
           </div>
@@ -201,7 +200,7 @@ export function BookingDetailModal({ booking, open, onClose }) {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => actions.regenerateOnboardingLink(booking.id)}
+              onClick={() => guardAction("regenerateOnboardingLink", actions.regenerateOnboardingLink(booking.id))}
               className="min-h-[34px] px-3 text-xs"
             >
               Renovar 24 h
@@ -232,7 +231,7 @@ export function BookingDetailModal({ booking, open, onClose }) {
             <Button
               type="button"
               icon={Check}
-              onClick={() => actions.setBookingStatus(booking.id, "CONFIRMED")}
+              onClick={() => guardAction("setBookingStatus", actions.setBookingStatus(booking.id, "CONFIRMED"))}
             >
               Confirmar reserva
             </Button>
@@ -241,7 +240,7 @@ export function BookingDetailModal({ booking, open, onClose }) {
             <Button
               type="button"
               variant="secondary"
-              onClick={() => actions.setBookingStatus(booking.id, "CANCELLED")}
+              onClick={() => guardAction("setBookingStatus", actions.setBookingStatus(booking.id, "CANCELLED"))}
             >
               Cancelar reserva
             </Button>

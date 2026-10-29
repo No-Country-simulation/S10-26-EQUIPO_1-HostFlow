@@ -5,6 +5,7 @@
 //   Con    VITE_API_URL → httpApi (backend real Java Spring Boot, src/lib/api/httpApi.js).
 import { DEMO_MODE } from "../config/env"
 import { demoApi } from "./demoApi"
+import { ApiNotConfiguredError } from "./errors"
 import { httpApi } from "./httpApi"
 import { actions, store } from "../state/store"
 import { tokenStorage } from "./tokenStorage"
@@ -21,17 +22,43 @@ const keepToken = (result) => {
 }
 
 // Operation helper.
-// El backend todavía no expone los módulos de alojamiento, reservas, disponibilidad
-// ni pagos. Para esos casos se cae al store local: las pantallas siguen siendo
-// usables y, sobre todo, NO fallan en silencio (que era el bug anterior).
+// El backend todavía no expone todos los módulos. Si la operación no está
+// declarada en endpoints.js (`ApiNotConfiguredError`), se cae con seguridad al
+// adaptador demo o al store local sin romper la aplicación. Cualquier otro
+// error es REAL y se propaga: así la pantalla puede mostrarlo al usuario.
 const op =
   (name) =>
-  (...args) => {
+  async (...args) => {
     const fn = impl[name] || demoApi[name]
-    if (typeof fn !== "function") {
-      throw new Error(`La operación "${name}" no está implementada en ningún adaptador.`)
+    if (typeof fn === "function") {
+      try {
+        return await fn(...args)
+      } catch (err) {
+        if (!(err instanceof ApiNotConfiguredError)) throw err
+        console.warn(`Operación "${name}":`, err)
+      }
     }
-    return fn(...args)
+    if (typeof actions[name] === "function") {
+      return actions[name](...args)
+    }
+    const s = store.get()
+    if (name === "getLodging") return s.lodging
+    if (name === "getAdminLodgings") return s.admin?.lodgings || []
+    if (name === "getAdminStats") {
+      const lodgings = s.admin?.lodgings || []
+      return {
+        lodgings: lodgings.length,
+        active: lodgings.filter((l) => l.status === "ACTIVE").length,
+        paused: lodgings.filter((l) => l.status === "PAUSED").length,
+        hosts: new Set(lodgings.map((l) => l.ownerEmail)).size,
+        bookings: 0,
+      }
+    }
+    if (name === "getBlockedDays") return s.blockedDays || []
+    if (name === "getBookings") return s.bookings || []
+    if (name === "getPayments") return s.payments || {}
+    if (name === "getServices") return s.services || []
+    return undefined
   }
 
 export const api = {
@@ -82,12 +109,15 @@ export const api = {
   regenerateOnboardingLink: op("regenerateOnboardingLink"),
 
   // ── Onboarding del huésped (B2C) ────────────────────────────────────────
+  // Lectura pública del enlace de llegada (sin token).
+  getOnboarding: op("getOnboarding"),
   submitOnboarding: op("submitOnboarding"),
   // Solicitud de cotización de lancha: genera el JSON; NO lo envía a otra API.
   createBoatQuoteRequest: op("createBoatQuoteRequest"),
   declineBoatQuote: op("declineBoatQuote"),
 
   // ── Servicios adicionales ───────────────────────────────────────────────
+  getServices: op("getServices"),
   addService: op("addService"),
   updateService: op("updateService"),
   removeService: op("removeService"),
@@ -99,11 +129,14 @@ export const api = {
   toggleWallet: op("toggleWallet"),
   togglePaymentMethod: op("togglePaymentMethod"),
   addPaymentMethod: op("addPaymentMethod"),
+  updatePaymentMethod: op("updatePaymentMethod"),
+  removePaymentMethod: op("removePaymentMethod"),
   // Datos bancarios del alojamiento (transferencia externa).
   updateBankDetails: op("updateBankDetails"),
 
   // ── Admin ───────────────────────────────────────────────────────────────
   getAdminLodgings: op("getAdminLodgings"),
+  getAdminStats: op("getAdminStats"),
   setAdminLodgingStatus: op("setAdminLodgingStatus"),
 
   // En demo siempre hay acceso si existe un usuario en el store.

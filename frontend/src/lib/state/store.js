@@ -172,19 +172,72 @@ const seedBookings = [
 
 const seedBlockedDays = [addDays(today, 4), addDays(today, 15)];
 
+// Límite estricto de métodos de pago configurables (3 a 4 métodos)
+export const MAX_PAYMENT_METHODS = 4;
+
 const seedPayments = {
   primary: "ARS",
   wallets: ["USD", "EUR"],
   methods: [
-    { id: "pm_1", type: "WALLET", label: "Mercado Pago", enabled: true },
-    { id: "pm_2", type: "WALLET", label: "PayPal", enabled: true },
-    { id: "pm_3", type: "CARD", label: "Tarjeta de crédito", enabled: true },
-    { id: "pm_4", type: "WALLET", label: "Ualá", enabled: false },
+    {
+      id: "pm_1",
+      type: "WALLET",
+      label: "Mercado Pago",
+      enabled: true,
+      keys: {
+        alias: "hostflow.mp",
+        cvu: "0000003100012345678901",
+        publicKey: "APP_USR-839210-9182",
+        accessToken: "TEST-48291048291-039120",
+      },
+      notes: "Transferir al CVU o Alias y enviar comprobante por WhatsApp.",
+    },
+    {
+      id: "pm_2",
+      type: "BANK",
+      label: "Transferencia Bancaria",
+      enabled: true,
+      keys: {
+        holder: "Cabañas del Arroyo SRL",
+        cbu: "0720000188000038291024",
+        alias: "cabanas.arroyo",
+        bank: "Banco Santander",
+      },
+      notes: "Enviar comprobante indicando el número de reserva.",
+    },
+    {
+      id: "pm_3",
+      type: "WALLET",
+      label: "PayPal",
+      enabled: true,
+      keys: {
+        email: "pagos@hostflow.app",
+        clientId: "AYz_demo_clientId_9910",
+        paypalMe: "paypal.me/hostflowdemo",
+      },
+      notes: "Aceptamos pagos internacionales en USD o EUR.",
+    },
+    {
+      id: "pm_4",
+      type: "CARD",
+      label: "Tarjeta de crédito",
+      enabled: false,
+      keys: {
+        publishableKey: "pk_test_51Oz...demo92",
+        secretKey: "sk_test_...demo41",
+      },
+      notes: "Procesamiento de pagos con tarjeta de crédito o débito.",
+    },
   ],
   // Datos bancarios que el alojamiento muestra al huésped para pagar por
   // transferencia externa (la plataforma no procesa pagos electrónicos).
   // El dueño los completa desde /panel/pagos; vacíos hasta que se carguen.
-  bankDetails: { holder: "", alias: "", cbu: "", notes: "" },
+  bankDetails: {
+    holder: "Cabañas del Arroyo SRL",
+    alias: "cabanas.arroyo",
+    cbu: "0720000188000038291024",
+    notes: "Envíanos el comprobante por WhatsApp.",
+  },
 };
 
 // Servicios adicionales que el alojamiento ofrece a sus huéspedes.
@@ -250,7 +303,20 @@ function normalizeStored(stored, fallback) {
     // El límite bajó a 4 fotos: los estados viejos con más se recortan.
     images: Array.isArray(merged.lodging?.images) ? merged.lodging.images.slice(0, MAX_IMAGES) : [],
   }
-  merged.payments = { ...merged.payments, bankDetails: { ...seedPayments.bankDetails, ...merged.payments?.bankDetails } }
+  merged.payments = {
+    ...merged.payments,
+    bankDetails: { ...seedPayments.bankDetails, ...merged.payments?.bankDetails },
+    methods: Array.isArray(merged.payments?.methods)
+      ? merged.payments.methods.slice(0, MAX_PAYMENT_METHODS).map((m) => {
+          const seed = seedPayments.methods.find((s) => s.id === m.id);
+          return {
+            ...m,
+            keys: { ...(seed?.keys || {}), ...(m.keys || {}) },
+            notes: m.notes ?? seed?.notes ?? "",
+          };
+        })
+      : seedPayments.methods.map((m) => ({ ...m })),
+  }
   if (!Array.isArray(merged.services)) merged.services = seedServices.map((s) => ({ ...s }))
   // Servicios guardados por versiones anteriores: sin forma de cobro → precio fijo.
   // `perGuest` no existía antes: los servicios de ejemplo toman su valor del seed.
@@ -492,6 +558,10 @@ export const actions = {
   },
 
   // ── Alojamiento ──────────────────────────────────────────────────────────
+  getLodging() {
+    return state.lodging;
+  },
+
   updateLodging(patch) {
     setState((s) => ({ ...s, lodging: { ...s.lodging, ...patch } }));
   },
@@ -520,6 +590,12 @@ export const actions = {
       ...s,
       lodging: { ...s.lodging, brand: { ...s.lodging.brand, ...patch } },
     }));
+  },
+
+  // Reemplaza la colección completa de reservas. Lo usa el adaptador real
+  // (httpApi) para adoptar lo que devuelve el backend; en modo demo no se usa.
+  setBookings(bookings) {
+    setState((s) => ({ ...s, bookings: bookings.map((b) => ({ ...b })) }));
   },
 
   // ── Disponibilidad ───────────────────────────────────────────────────────
@@ -649,6 +725,27 @@ export const actions = {
   },
 
   // ── Pagos ────────────────────────────────────────────────────────────────
+  // Sincronización con el backend: reemplaza SOLO las claves que vengan
+  // definidas (primary / wallets / methods / bankDetails), sin tocar el resto.
+  // El tope de métodos se respeta también acá por si el backend lo manda mal.
+  setPayments(patch) {
+    setState((s) => {
+      const current = s.payments;
+      const methods = Array.isArray(patch?.methods)
+        ? patch.methods.slice(0, MAX_PAYMENT_METHODS).map((m) => ({ ...m, keys: { ...(m.keys || {}) } }))
+        : current.methods;
+      return {
+        ...s,
+        payments: {
+          primary: patch?.primary ?? current.primary,
+          wallets: Array.isArray(patch?.wallets) ? [...patch.wallets] : current.wallets,
+          methods,
+          bankDetails: patch?.bankDetails ? { ...current.bankDetails, ...patch.bankDetails } : current.bankDetails,
+        },
+      };
+    });
+  },
+
   setPrimaryCurrency(code) {
     setState((s) => ({ ...s, payments: { ...s.payments, primary: code } }));
   },
@@ -676,12 +773,61 @@ export const actions = {
     }));
   },
 
-  addPaymentMethod(label, type = "WALLET") {
+  addPaymentMethod(payload, maybeType = "WALLET") {
+    const isObj = typeof payload === "object" && payload !== null;
+    const label = isObj ? payload.label : payload;
+    const type = isObj ? payload.type || "WALLET" : maybeType;
+    const keys = isObj && payload.keys ? payload.keys : {};
+    const notes = isObj ? payload.notes || "" : "";
+
+    setState((s) => {
+      if (s.payments.methods.length >= MAX_PAYMENT_METHODS) {
+        return s; // Límite de 4 métodos
+      }
+      return {
+        ...s,
+        payments: {
+          ...s.payments,
+          methods: [
+            ...s.payments.methods,
+            {
+              id: `pm_${Date.now().toString(36)}`,
+              type,
+              label: String(label || "Nuevo método").trim(),
+              enabled: true,
+              keys,
+              notes,
+            },
+          ],
+        },
+      };
+    });
+  },
+
+  updatePaymentMethod(id, patch) {
     setState((s) => ({
       ...s,
       payments: {
         ...s.payments,
-        methods: [...s.payments.methods, { id: `pm_${Date.now().toString(36)}`, type, label, enabled: true }],
+        methods: s.payments.methods.map((m) =>
+          m.id === id
+            ? {
+                ...m,
+                ...patch,
+                keys: patch.keys ? { ...m.keys, ...patch.keys } : m.keys,
+              }
+            : m,
+        ),
+      },
+    }));
+  },
+
+  removePaymentMethod(id) {
+    setState((s) => ({
+      ...s,
+      payments: {
+        ...s.payments,
+        methods: s.payments.methods.filter((m) => m.id !== id),
       },
     }));
   },
@@ -695,6 +841,11 @@ export const actions = {
   },
 
   // ── Servicios adicionales ────────────────────────────────────────────────
+  // Reemplaza el listado completo (sincronización con el backend).
+  setServices(services) {
+    setState((s) => ({ ...s, services: services.map((sv) => ({ ...sv })) }));
+  },
+
   addService({ name, price, description, pricing, perGuest }) {
     const service = {
       id: `sv_${Date.now().toString(36)}`,
@@ -730,11 +881,25 @@ export const actions = {
   },
 
   // ── Admin ────────────────────────────────────────────────────────────────
+  getAdminLodgings() {
+    return state.admin?.lodgings || [];
+  },
+
+  // Reemplaza el listado completo (sincronización con GET /owners).
+  setAdminLodgings(lodgings) {
+    setState((s) => ({
+      ...s,
+      admin: { lodgings: lodgings.map((l) => ({ ...l })) },
+    }));
+  },
+
   setAdminLodgingStatus(id, status) {
     setState((s) => ({
       ...s,
       admin: {
-        lodgings: s.admin.lodgings.map((l) => (l.id === id ? { ...l, status } : l)),
+        lodgings: (s.admin?.lodgings || []).map((l) =>
+          String(l.id) === String(id) ? { ...l, status, enabled: status === "ACTIVE" } : l,
+        ),
       },
     }));
   },

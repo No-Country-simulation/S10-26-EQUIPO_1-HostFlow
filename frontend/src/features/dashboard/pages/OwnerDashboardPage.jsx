@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   ArrowRight,
@@ -13,8 +13,10 @@ import {
 import { Badge, Card, Stat } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
 import { BookingDetailModal } from "../components/BookingDetailModal";
+import { guardAction } from "../lib/guardAction";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
+import { DEMO_MODE } from "@lib/config/env";
 import { addDays, bookingGrandTotal, formatMoney, toISODate } from "@utils/format";
 
 export default function OwnerDashboardPage() {
@@ -23,6 +25,27 @@ export default function OwnerDashboardPage() {
   const lodging = useStore((s) => s.lodging);
   const blockedDays = useStore((s) => s.blockedDays);
   const [detailId, setDetailId] = useState(null);
+
+  // Métricas y próximas reservas: se cargan desde el backend. En modo demo el
+  // store local ya es la fuente de verdad.
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let alive = true;
+    Promise.allSettled([
+      actions.getBookings?.(),
+      actions.getBlockedDays?.(),
+      actions.getPayments?.(),
+      actions.getServices?.(),
+    ]).then((results) => {
+      if (!alive) return;
+      results
+        .filter((r) => r.status === "rejected")
+        .forEach((r) => console.warn("Panel:", r.reason));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [actions]);
 
   const detail = bookings.find((b) => b.id === detailId) || null;
 
@@ -132,8 +155,8 @@ export default function OwnerDashboardPage() {
               <BookingSummaryCard
                 key={booking.id}
                 booking={booking}
-                onConfirm={(id) => actions.setBookingStatus(id, "CONFIRMED")}
-                onCancel={(id) => actions.setBookingStatus(id, "CANCELLED")}
+                onConfirm={(id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CONFIRMED"))}
+                onCancel={(id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CANCELLED"))}
                 onView={(id) => setDetailId(id)}
               />
             ))}
