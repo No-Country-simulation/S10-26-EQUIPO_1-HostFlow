@@ -22,4 +22,5 @@ HostFlow propone una aplicación web **B2B2C** que digitaliza el proceso de inco
 
 ---
 
-> **Nota del Desarrollo:** El producto se desarrollará como un **MVP** con prioridad en la experiencia móvil, la facilidad de uso y la centralización de información, limitando la complejidad técnica para cumplir con un plazo máximo de tres semanas y media.
+> **Nota del Desarrollo:** El producto se desarrollará en este momento como un **MVP** con prioridad en la experiencia móvil, la facilidad de uso y la centralización de información, limitando la complejidad técnica para cumplir con un plazo máximo de tres semanas y media.
+
