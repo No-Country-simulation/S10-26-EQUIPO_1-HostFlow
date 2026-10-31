@@ -35,7 +35,10 @@ build/
 ### VS Code ###
 .vscode/
 
+# IDE
+.idea/
+*.iml
 
-#.env
-
+# Environment
 .env
+backend/.env

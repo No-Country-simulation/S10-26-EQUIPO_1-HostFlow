@@ -40,6 +40,14 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
+		<!-- Cloudinary SDK: subida de imágenes en la nube -->
+		<dependency>
+			<groupId>com.cloudinary</groupId>
+			<artifactId>cloudinary-http5</artifactId>
+			<version>2.4.0</version>
+		</dependency>
+
+
 		<!-- ============================================ -->
 		<!-- Spring Data JPA: Persistencia con Hibernate  -->
 		<!-- ============================================ -->
@@ -133,6 +141,11 @@
 		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
 
