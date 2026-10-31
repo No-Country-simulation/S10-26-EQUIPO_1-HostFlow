@@ -1,4 +1,6 @@
 describe('Módulo de Autenticación - HostFlow', () => {
+
+  
   it('Debería permitir iniciar sesión con credenciales válidas', () => {
     // 1. Visitar la página de login
     cy.visit('http://localhost:5173/auth/login');
