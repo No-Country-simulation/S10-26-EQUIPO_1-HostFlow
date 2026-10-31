@@ -311,6 +311,10 @@ function normalizeStored(stored, fallback) {
           const seed = seedPayments.methods.find((s) => s.id === m.id);
           return {
             ...m,
+            // Estados viejos no guardaban `enabled`: sin este valor la alerta
+            // de "falta método de pago" aparecía aunque hubiera métodos.
+            enabled: m.enabled ?? seed?.enabled ?? true,
+            type: m.type || seed?.type || "WALLET",
             keys: { ...(seed?.keys || {}), ...(m.keys || {}) },
             notes: m.notes ?? seed?.notes ?? "",
           };
@@ -335,6 +339,19 @@ function normalizeStored(stored, fallback) {
         ...b,
         guestPhone: b.guestPhone || seed?.guestPhone || "",
         onboardingLinkIssuedAt: b.onboardingLinkIssuedAt || onboardingLinkIssuedAt(),
+        // Alergias: antes se guardaban como texto; ahora la respuesta es un
+        // array (multiselección + "Otro"). Se migra sin perder el contenido.
+        onboarding: b.onboarding
+          ? {
+              ...b.onboarding,
+              allergies: Array.isArray(b.onboarding.allergies)
+                ? b.onboarding.allergies.filter(Boolean)
+                : String(b.onboarding.allergies || "")
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter(Boolean),
+            }
+          : b.onboarding,
       };
     })
   }

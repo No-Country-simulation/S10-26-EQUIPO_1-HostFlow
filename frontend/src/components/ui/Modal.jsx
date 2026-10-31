@@ -95,7 +95,7 @@ export default function Modal({ open, onClose, title, subtitle, className, child
           className,
         )}
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="sticky -top-5 z-20 -mx-5 -mt-5 mb-4 flex items-start justify-between gap-4 border-b border-line bg-paper/95 px-5 pb-3 pt-5 backdrop-blur sm:-top-6 sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6">
           <div>
             {title && (
               <h2 id={titleId} className="break-words text-lg font-extrabold text-ink">

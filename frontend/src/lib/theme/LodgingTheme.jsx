@@ -35,7 +35,7 @@ const RADIUS_CARD = "18px";
 
 // Fondos reales de cada tema (styles/globals.css: --color-paper).
 const PAPER_LIGHT = "#ffffff";
-const PAPER_DARK = "#111111";
+const PAPER_DARK = "#101518";
 
 export function LodgingTheme({ brand, className, as: Element = "div", children, style: outerStyle, ...props }) {
   const rawId = useId();
@@ -52,38 +52,43 @@ export function LodgingTheme({ brand, className, as: Element = "div", children, 
 
     // Variantes para fondo OSCURO: si la marca elegida es muy oscura (azul
     // marino, bordo, negro), la banda y el patrón se aclaran hasta distinguirse
-    // del fondo #111. En claro se usan tal cual.
-    const primaryDark = visibleOn(primary, PAPER_DARK, 2.4);
-    const tertiaryDark = visibleOn(tertiary, PAPER_DARK, 1.55);
+    // del fondo. En claro se usan tal cual.
+    const primaryDark = visibleOn(primary, PAPER_DARK, 2.9);
+    const tertiaryDark = visibleOn(tertiary, PAPER_DARK, 1.9);
 
-    // Variables por tema: en oscuro, las variantes `*-strong` se ACLARAN hasta
-    // ser legibles sobre #111 (en claro se oscurecen sobre #fff).
+    // Variables por tema. La OPACIDAD de los tintes cambia según el fondo: sobre
+    // blanco alcanza con 14-22 % para que se note, pero sobre un casi negro el
+    // mismo porcentaje "desaparece"; en oscuro se sube a 26-36 % para que el
+    // color se lea sin lavar el contenido.
     const vars = (dark) => {
       const bg = dark ? PAPER_DARK : PAPER_LIGHT;
       const hero = dark ? primaryDark : primary;
       const surfaceBase = dark ? tertiaryDark : tertiary;
       return [
         // Marca → cabecera/portada del enlace, datos, íconos y bordes.
-        `--color-teal: ${primary};`,
+        // En oscuro se usa la variante visible: el color tal cual se perdería.
+        `--color-teal: ${dark ? primaryDark : primary};`,
         `--color-teal-strong: ${strongOn(primary, bg, { dark })};`,
-        `--color-teal-soft: color-mix(in srgb, ${primary} ${dark ? 22 : 14}%, transparent);`,
+        `--color-teal-soft: color-mix(in srgb, ${primary} ${dark ? 30 : 14}%, transparent);`,
         // Acción → botones, precio y selección de servicios.
         `--color-lime: ${accent};`,
         `--color-lime-strong: ${strongOn(accent, bg, { dark })};`,
-        `--color-lime-soft: color-mix(in srgb, ${accent} ${dark ? 26 : 22}%, transparent);`,
+        `--color-lime-soft: color-mix(in srgb, ${accent} ${dark ? 34 : 22}%, transparent);`,
         `--color-lime-ink: ${readableOn(accent)};`,
         // Fondo → superficie del enlace y acentos suaves.
         `--color-pink: ${tertiary};`,
         `--color-pink-strong: ${strongOn(tertiary, bg, { dark })};`,
-        `--color-pink-soft: color-mix(in srgb, ${tertiary} ${dark ? 30 : 25}%, transparent);`,
+        `--color-pink-soft: color-mix(in srgb, ${tertiary} ${dark ? 36 : 25}%, transparent);`,
         // Banda de marca de la cabecera (color plano, sin degradé).
         `--hf-hero: ${hero};`,
         `--hf-hero-ink: ${readableOn(hero)};`,
         // Superficie de la página: el color de fondo mezclado con el papel.
-        `--hf-surface: color-mix(in srgb, ${surfaceBase} ${dark ? 14 : 9}%, ${bg});`,
+        // En oscuro el tinte baja: mucha mezcla sobre el carbón da un barro.
+        `--hf-surface: color-mix(in srgb, ${surfaceBase} ${dark ? 10 : 9}%, ${bg});`,
         // Patrón de fondo: máscara con formas (hojas, olas, montañas…) pintada
-        // con el color de marca a baja opacidad: se intuye, no compite.
-        `--hf-pattern-color: color-mix(in srgb, ${hero} ${dark ? 18 : 13}%, transparent);`,
+        // con el color de marca. Más visible en oscuro, donde el contraste es
+        // menor, pero siempre por detrás del contenido.
+        `--hf-pattern-color: color-mix(in srgb, ${hero} ${dark ? 24 : 13}%, transparent);`,
         `--hf-pattern-mask: ${patternMask};`,
         `--hf-pattern-size: ${patternSize};`,
         // Forma de los elementos (fija).

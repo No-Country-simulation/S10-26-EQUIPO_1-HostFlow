@@ -31,19 +31,9 @@ const waves = svgMask(
   24,
 );
 
-// Pétalos: flor de cinco pétalos dibujada con línea fina y centro lleno.
-const petals = svgMask(
-  `<g transform='translate(20 20)' fill='none' stroke='#000' stroke-width='1.5'><ellipse cx='0' cy='-8' rx='4.4' ry='7'/><ellipse cx='0' cy='-8' rx='4.4' ry='7' transform='rotate(72)'/><ellipse cx='0' cy='-8' rx='4.4' ry='7' transform='rotate(144)'/><ellipse cx='0' cy='-8' rx='4.4' ry='7' transform='rotate(216)'/><ellipse cx='0' cy='-8' rx='4.4' ry='7' transform='rotate(288)'/><circle r='2.2' fill='#000' stroke='none'/></g>`,
-  40,
-  40,
-);
-
-// Arcos: dos semicírculos concéntricos (aire boho/mediterráneo).
-const arches = svgMask(
-  `<g fill='none' stroke='#000' stroke-linecap='round'><path d='M4 27a18 18 0 0 1 36 0' stroke-width='2'/><path d='M11 27a11 11 0 0 1 22 0' stroke-width='1.5' stroke-opacity='.55'/></g>`,
-  44,
-  30,
-);
+// Pétalos, arcos, escamas y sol quedaron fuera: tres patrones alcanzan para
+// dar identidad y elegir es más rápido. Todos comparten el mismo carácter
+// natural (hojas, agua y montañas).
 
 // Montañas: cordón de línea con sol (paisaje de cabaña).
 const mountains = svgMask(
@@ -52,40 +42,18 @@ const mountains = svgMask(
   32,
 );
 
-// Escamas: arcos superpuestos tipo teja/escama de pez.
-const scales = svgMask(
-  `<g fill='none' stroke='#000' stroke-width='1.4'><path d='M0 23a16 16 0 0 1 32 0'/><path d='M-16 -1a16 16 0 0 1 32 0' stroke-opacity='.55'/><path d='M16 -1a16 16 0 0 1 32 0' stroke-opacity='.55'/></g>`,
-  32,
-  24,
-);
-
-// Sol: círculo con rayos, para estadías de día.
-const sun = svgMask(
-  `<g fill='none' stroke='#000' stroke-linecap='round'><circle cx='24' cy='24' r='6.5' stroke-width='1.8'/><g stroke-width='1.6'><path d='M24 5v4.5M24 38.5V43M5 24h4.5M38.5 24H43M10.6 10.6l3.2 3.2M34.2 34.2l3.2 3.2M37.4 10.6l-3.2 3.2M13.8 34.2l-3.2 3.2'/></g></g>`,
-  48,
-  48,
-);
-
 // [mask, size] de cada patrón. `size` escala la repetición.
 const DEFS = {
   leaves: [leaves, "52px 52px"],
   waves: [waves, "48px 24px"],
-  petals: [petals, "52px 52px"],
-  arches: [arches, "44px 30px"],
   mountains: [mountains, "56px 32px"],
-  scales: [scales, "34px 26px"],
-  sun: [sun, "64px 64px"],
 };
 
 export const PATTERNS = [
   { id: "none", label: "Liso" },
   { id: "leaves", label: "Hojas" },
   { id: "waves", label: "Olas" },
-  { id: "petals", label: "Pétalos" },
-  { id: "arches", label: "Arcos" },
   { id: "mountains", label: "Montañas" },
-  { id: "scales", label: "Escamas" },
-  { id: "sun", label: "Sol" },
 ];
 
 export const PATTERN_IDS = PATTERNS.map((pattern) => pattern.id);

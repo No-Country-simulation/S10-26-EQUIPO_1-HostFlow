@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, Check, Copy, Landmark, Ship, Users } from "lucide-react";
+import { ArrowRight, Check, Copy, HeartPulse, Landmark, Ship, Users } from "lucide-react";
 import { Alert, Badge, Button, Switch } from "@components/ui";
 import Modal from "@components/ui/Modal";
 import { PaymentStatusBadge, StatusBadge } from "./BookingSummaryCard";
@@ -26,6 +26,17 @@ export function BookingDetailModal({ booking, open, onClose }) {
   const servicesTotal = bookingServicesTotal(booking);
   const orderTotal = bookingGrandTotal(booking);
   const hasBankDetails = Boolean(bankDetails.holder || bankDetails.alias || bankDetails.cbu);
+
+  // Alergias del huésped: se guardan como array; los estados viejos tenían un
+  // string, así que se normaliza también acá para no perder información.
+  const rawAllergies = booking.onboarding?.allergies;
+  const allergyList = Array.isArray(rawAllergies)
+    ? rawAllergies.filter(Boolean)
+    : String(rawAllergies || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+  const preferences = booking.onboarding?.preferences;
 
   // Enlace de llegada del huésped (onboarding B2C): identifica alojamiento + reserva.
   const onboardingUrl = `${window.location.origin}${lodging.onboardingPath || "/llegada"}/${lodging.id}/${booking.id}`;
@@ -82,6 +93,24 @@ export function BookingDetailModal({ booking, open, onClose }) {
             )}
           </div>
         </div>
+
+        {/* Ficha de salud del huésped: alergias y preferencias del onboarding */}
+        {(allergyList.length > 0 || preferences) && (
+          <div className="grid min-w-0 gap-2 rounded-2xl border border-line bg-cloud p-4 text-sm">
+            <p className="flex items-center gap-2 font-bold text-ink">
+              <HeartPulse size={16} className="text-teal-strong" /> Ficha de salud y preferencias
+            </p>
+            <p className="text-muted">
+              <span className="font-semibold text-ink">Alergias:</span>{" "}
+              {allergyList.length ? allergyList.join(", ") : "Sin alergias declaradas"}
+            </p>
+            {preferences && (
+              <p className="text-muted">
+                <span className="font-semibold text-ink">Preferencias:</span> {preferences}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Estado del pago (entregable D) */}
         <div className="min-w-0 rounded-2xl border border-line p-4">

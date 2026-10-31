@@ -560,7 +560,7 @@ export default function PaymentMethodsPage() {
 
       {/* Datos para transferencia estándar */}
       <Card className="p-6">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="sticky top-[65px] z-20 -mx-6 -mt-6 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-paper/95 px-6 pb-3 pt-2 backdrop-blur">
           <div className="flex items-center gap-2">
             <span className="grid size-10 place-items-center rounded-xl bg-teal-soft text-teal-strong">
               <Landmark size={20} />
@@ -588,7 +588,7 @@ export default function PaymentMethodsPage() {
             defaultValue={bankDetails.notes}
             placeholder="Ej. Envíanos el comprobante por WhatsApp al +54 9 11 5555 0101."
           />
-          <Button type="submit" className="mt-1 w-full sm:w-auto">
+          <Button type="submit" className="mt-1 w-full sm:w-auto sm:justify-self-end">
             Guardar datos bancarios
           </Button>
         </form>

@@ -6,7 +6,7 @@
      · Lima        #D4F53C  → acción primaria (botones, acentos)
      · Teal        #0FA3A3  → acción secundaria / datos
      · Rosa        #F4B8C4  → acentos suaves (precios, estados)
-     · Carbón      #111111  → fondo oscuro / texto
+     · Carbón      #101518  → fondo oscuro (casi negro, con un leve azul) / texto
      · Papel       #FFFFFF  → fondo claro (preseleccionado)
    Tipografía: DM Sans (interfaz y titulares) + Fraunces (wordmark).
 
@@ -59,7 +59,10 @@
   --shadow-lime: 0 8px 24px -8px rgba(185, 224, 44, 0.55);
 
   /* ── Animaciones ── */
-  --animate-rise: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  /* `backwards` (no `both`): al terminar, la animación no conserva el
+     `transform`; un transform retenido crea un stacking context y deja debajo
+     a los elementos sticky (título del formulario, barra de progreso). */
+  --animate-rise: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   --animate-fade: fade 0.4s ease both;
   --animate-pop: pop 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-float: float 7s ease-in-out infinite;
@@ -135,14 +138,16 @@
 /* ── Modo oscuro: sobreescribe los tokens del tema ──────────────────────── */
 
 .dark {
-  --color-paper: #111111;
-  --color-cloud: #1a1a1a;
-  --color-ink: #f4f4f1;
-  --color-ink-soft: rgba(244, 244, 241, 0.72);
-  --color-muted: rgba(244, 244, 241, 0.52);
-  --color-line: rgba(244, 244, 241, 0.1);
-  --color-line-strong: rgba(244, 244, 241, 0.22);
-  --color-overlay: rgba(244, 244, 241, 0.05);
+  /* Fondo casi negro, nunca #000: un carbón con un leve tinte azul evita el
+     "halo" del negro puro y separa mejor las superficies. */
+  --color-paper: #101518;
+  --color-cloud: #171d21;
+  --color-ink: #f2f5f4;
+  --color-ink-soft: rgba(242, 245, 244, 0.74);
+  --color-muted: rgba(242, 245, 244, 0.56);
+  --color-line: rgba(242, 245, 244, 0.1);
+  --color-line-strong: rgba(242, 245, 244, 0.22);
+  --color-overlay: rgba(242, 245, 244, 0.06);
   --color-shadow: rgba(0, 0, 0, 0.55);
 }
 

@@ -1,4 +1,4 @@
-import { ArrowRight, ClipboardList, Clock, HeartPulse, Ship, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowRight, ClipboardList, Clock, HeartPulse, Ship, UserRound } from "lucide-react";
 import { Badge, BrandLogo, Button, WhatsAppIcon } from "@components/ui";
 import PhotoCarousel from "./PhotoCarousel";
 import StayCard from "./StayCard";
@@ -48,8 +48,8 @@ export default function OnboardingIntro({ lodging, booking, nights, photos = [],
               {firstName ? `¡Hola, ${firstName}!` : "¡Te damos la bienvenida!"}
             </h1>
             <p className="mt-2 text-sm text-muted">
-              Completá tu ficha de llegada en {stepsCount} pasos cortos. Así {lodging.name} sabe cuándo llegás y qué
-              necesitás.
+              Completá tu ficha de llegada en {stepsCount} pasos cortos, <span className="font-semibold text-ink">sin
+              crear cuenta</span>. Así {lodging.name} sabe cuándo llegás y qué necesitás.
             </p>
           </div>
 
@@ -87,13 +87,10 @@ export default function OnboardingIntro({ lodging, booking, nights, photos = [],
               <Badge tone="teal">
                 <Clock size={11} /> 1 minuto
               </Badge>
-              <Badge tone="lime">
-                <ShieldCheck size={11} /> Sin cuenta
-              </Badge>
             </div>
 
             <p className="text-[11px] leading-snug text-muted">
-              Podés volver atrás en cualquier momento. No necesitás crear una cuenta.
+              Podés volver atrás en cualquier momento.
             </p>
 
             {waDigits > 0 && (

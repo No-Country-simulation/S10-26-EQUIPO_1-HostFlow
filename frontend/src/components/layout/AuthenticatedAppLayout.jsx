@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Avatar, Brand, ThemeToggle } from "@components/ui";
 import { useSession } from "@features/auth/context/SessionContext";
+import { useStore } from "@lib/state/useStore";
+import { LodgingTheme } from "@lib/theme/LodgingTheme";
 import { cn } from "@utils/format";
 
 const hostNav = [
@@ -79,6 +81,7 @@ function UserCard({ user, isAdmin, onLogout }) {
 
 export default function AuthenticatedAppLayout() {
   const { user, logout, isAdmin } = useSession();
+  const lodging = useStore((s) => s.lodging);
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -107,7 +110,8 @@ export default function AuthenticatedAppLayout() {
   };
 
   return (
-    <div className="min-h-dvh bg-cloud text-ink">
+    <LodgingTheme brand={isAdmin ? null : lodging?.brand} className="min-h-dvh text-ink">
+      <div className="hf-surface min-h-dvh">
       {/* Sidebar escritorio */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] flex-col gap-6 border-r border-line bg-paper p-5 lg:flex">
         <Brand />
@@ -158,11 +162,12 @@ export default function AuthenticatedAppLayout() {
         </div>
       )}
 
-      <main className="px-4 py-6 pb-16 sm:px-6 lg:pl-[288px] lg:pr-8 lg:py-8">
+      <main className="min-w-0 px-4 py-6 pb-16 sm:px-6 lg:pl-[288px] lg:pr-8 lg:py-8">
         <div className="mx-auto max-w-6xl animate-rise" key={location.pathname}>
           <Outlet />
         </div>
       </main>
-    </div>
+      </div>
+    </LodgingTheme>
   );
 }

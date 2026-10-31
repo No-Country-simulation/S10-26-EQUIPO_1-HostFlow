@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BedDouble, ImagePlus, MapPin, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { Alert, Badge, Button, Card, Field } from "@components/ui";
+import { Alert, Badge, Button, Card, Field, StickyFormTitle } from "@components/ui";
 import { useStore } from "@lib/state/useStore";
 import { useSession } from "@features/auth/context/SessionContext";
 import { MAX_IMAGES } from "@lib/state/store";
@@ -133,6 +133,11 @@ export default function LodgingPage() {
         {/* Formulario */}
         <Card className="p-6">
           <form onSubmit={submit} className="grid gap-4" noValidate>
+            <StickyFormTitle
+              title="Datos del alojamiento"
+              hint="Estos datos se muestran en el enlace del huésped."
+              className="-mt-6"
+            />
             <Field label="Nombre del alojamiento" name="name" defaultValue={lodging.name} placeholder="Ej. Cabañas del Arroyo" />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Número de habitaciones" name="rooms" type="number" min="1" defaultValue={lodging.rooms} />
@@ -159,7 +164,7 @@ export default function LodgingPage() {
 
             {error && <Alert>{error}</Alert>}
 
-            <Button type="submit" className="mt-1 w-full sm:w-auto">
+            <Button type="submit" className="mt-1 w-full sm:w-auto sm:justify-self-end">
               Guardar cambios
             </Button>
           </form>

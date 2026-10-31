@@ -11,7 +11,6 @@ import {
   Menu,
   Palette,
   ShieldCheck,
-  Sparkles,
   Star,
   X,
 } from "lucide-react";
@@ -249,18 +248,6 @@ function Hero() {
           {/* Visual */}
           <div className="relative animate-rise">
             <HeroCard />
-            {/* En móvil va en flujo (sin superponerse a las stats); ≥sm flota sobre la card */}
-            <div className="mt-4 w-fit animate-float rounded-2xl border border-line bg-paper px-4 py-3 shadow-pop sm:absolute sm:-bottom-5 sm:-left-6 sm:mt-0">
-              <div className="flex items-center gap-3">
-                <span className="grid size-9 place-items-center rounded-xl bg-lime text-lime-ink">
-                  <Sparkles size={17} />
-                </span>
-                <div>
-                  <p className="text-xs font-extrabold text-ink">Respuesta inmediata</p>
-                  <p className="text-[11px] text-muted">Confirmación en tiempo real</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -550,24 +537,24 @@ function FAQ() {
 function FinalCTA() {
   return (
     <section className="mx-auto max-w-6xl px-5 pb-20 sm:px-6">
-      {/* Card "inversa" de firma: usa neutros FIJOS (#111 / #f4f4f1) en vez de los
-          tokens del tema, porque `ink`/`paper` se invierten en modo oscuro y la
-          card quedaba clara sobre fondo oscuro (al revés del tema). */}
-      <div className="relative overflow-hidden rounded-[28px] bg-[#111111] px-6 py-16 text-center text-[#f4f4f1] sm:px-12">
-        <div className="absolute inset-0 [background-image:radial-gradient(rgba(244,244,241,0.14)_1px,transparent_1px)] opacity-100 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
+      {/* Card "inversa" de firma: usa neutros FIJOS (#101518 / #f2f5f4) en vez
+          de los tokens del tema, porque `ink`/`paper` se invierten en modo oscuro
+          y la card quedaba clara sobre fondo oscuro (al revés del tema). */}
+      <div className="relative overflow-hidden rounded-[28px] bg-[#101518] px-6 py-16 text-center text-[#f2f5f4] sm:px-12">
+        <div className="absolute inset-0 [background-image:radial-gradient(rgba(242,245,244,0.14)_1px,transparent_1px)] opacity-100 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
         <div className="relative mx-auto max-w-2xl">
           <Palette size={32} className="mx-auto mb-5 text-lime" aria-hidden="true" />
           <h2 className="text-[clamp(26px,4vw,42px)] font-extrabold leading-tight">
             Empezá a recibir huéspedes hoy
           </h2>
-          <p className="mx-auto mt-4 max-w-md text-[#f4f4f1]/70">
+          <p className="mx-auto mt-4 max-w-md text-[#f2f5f4]/70">
             Creá tu cuenta, personalizá tu alojamiento y compartí el enlace. Sin tarjeta.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link to="/auth/registro" className={buttonClass("primary", "min-h-[52px] px-7")}>
               Crear cuenta gratis <ArrowRight size={18} />
             </Link>
-            <Link to="/auth/login" className="inline-flex min-h-[52px] items-center rounded-xl border border-[#f4f4f1]/25 px-6 text-sm font-bold text-[#f4f4f1] transition hover:bg-[#f4f4f1]/10">
+            <Link to="/auth/login" className="inline-flex min-h-[52px] items-center rounded-xl border border-[#f2f5f4]/25 px-6 text-sm font-bold text-[#f2f5f4] transition hover:bg-[#f2f5f4]/10">
               Ya tengo cuenta
             </Link>
           </div>

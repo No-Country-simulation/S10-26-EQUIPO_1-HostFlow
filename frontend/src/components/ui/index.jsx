@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
 import { CircleAlert, Eye, EyeOff, Moon, Sun } from "lucide-react";
 import { DEMO_MODE } from "@lib/config/env";
@@ -236,6 +236,34 @@ export function Card({ className, children, as: Element = "div", ...props }) {
   );
 }
 
+// Título de un formulario dentro de una Card. Queda pegado arriba (debajo de
+// la barra del panel) mientras se completa el formulario, así sigue visible
+// aun cuando el usuario llega al final y tiene que confirmar.
+// Los márgenes negativos lo estiran hasta los bordes de la card.
+export function StickyFormTitle({ icon: Icon, title, hint, aside, className, children }) {
+  return (
+    <div
+      className={cn(
+        "sticky top-[65px] z-20 -mx-6 flex flex-wrap items-center justify-between gap-2 border-b border-line bg-paper/95 px-6 pb-3 pt-2 backdrop-blur",
+        className,
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        {Icon && (
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-teal-soft text-teal-strong">
+            <Icon size={17} aria-hidden="true" />
+          </span>
+        )}
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-ink">{title || children}</p>
+          {hint && <p className="text-xs text-muted">{hint}</p>}
+        </div>
+      </div>
+      {aside}
+    </div>
+  );
+}
+
 export function Badge({ tone = "neutral", className, children }) {
   const tones = {
     neutral: "bg-overlay text-ink-soft",
@@ -273,42 +301,18 @@ export function Avatar({ name = "", className, size = "size-9" }) {
   );
 }
 
-// Logo del alojamiento: baldosa blanca limpia que respeta la proporción real
-// del archivo (cuadrado, horizontal o vertical) en lugar de recortarlo o
-// encajarlo en un cuadrado con aire raro. Si no hay logo, muestra iniciales
-// con el color de la cabecera de marca.
+// Logo del alojamiento: círculo limpio, sin marco blanco ni relleno, para que
+// la marca se integre a la banda de color. La imagen se centra y cubre el
+// círculo (encuadre tipo avatar), así se ve redonda en cualquier tamaño. Si no
+// hay logo, muestra iniciales con el color de la cabecera de marca.
 export function BrandLogo({ src, name = "", size = "md", alt, className }) {
-  const [ratio, setRatio] = useState(0);
-  const imgRef = useRef(null);
-  useEffect(() => setRatio(0), [src]);
-  // Si la imagen ya estaba en caché, onLoad puede no dispararse: se mide al
-  // montar para que el logo horizontal siempre reciba su ancho real.
-  useEffect(() => {
-    const img = imgRef.current;
-    if (img?.complete && img.naturalWidth && img.naturalHeight) {
-      setRatio(img.naturalWidth / img.naturalHeight);
-    }
-  }, [src]);
-
-  const box = { sm: "h-9", md: "h-11", lg: "h-16" }[size] || "h-11";
-  const square = { sm: "w-9", md: "w-11", lg: "w-16" }[size] || "w-11";
-  const base = { sm: 36, md: 44, lg: 64 }[size] || 44;
-  const pad = { sm: "p-1", md: "p-1", lg: "p-1.5" }[size] || "p-1";
-  const wide = ratio >= 1.45;
-  // Los logos horizontales necesitan ancho real: se calcula desde la
-  // proporción del archivo para que no queden diminutos en una baldosa cuadrada.
-  const wideWidth = wide ? Math.min(Math.round(base * ratio), Math.round(base * 3)) : null;
+  const dim = { sm: "size-9", md: "size-11", lg: "size-16" }[size] || "size-11";
 
   if (!src) {
     return (
       <span
         aria-hidden="true"
-        className={cn(
-          "grid shrink-0 place-items-center rounded-[var(--radius-chip,14px)] text-sm font-extrabold",
-          box,
-          square,
-          className,
-        )}
+        className={cn("grid shrink-0 place-items-center rounded-full text-sm font-extrabold", dim, className)}
         style={{
           backgroundColor: "color-mix(in srgb, var(--hf-hero-ink, currentColor) 15%, transparent)",
           color: "var(--hf-hero-ink, currentColor)",
@@ -322,22 +326,15 @@ export function BrandLogo({ src, name = "", size = "md", alt, className }) {
   return (
     <span
       className={cn(
-        "inline-grid shrink-0 place-items-center overflow-hidden rounded-[var(--radius-chip,14px)] border border-black/10 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.14)]",
-        box,
-        wide ? cn("min-w-9 px-2", pad) : cn(square, pad),
+        "inline-block shrink-0 overflow-hidden rounded-full bg-cloud ring-1 ring-black/10 ring-inset",
+        dim,
         className,
       )}
-      style={{ borderRadius: "var(--radius-chip, 14px)", width: wideWidth ? `${wideWidth}px` : undefined }}
     >
       <img
-        ref={imgRef}
         src={src}
         alt={alt || (name ? `Logo de ${name}` : "Logo")}
-        onLoad={(event) => {
-          const img = event.currentTarget;
-          if (img.naturalWidth && img.naturalHeight) setRatio(img.naturalWidth / img.naturalHeight);
-        }}
-        className="max-h-full max-w-full object-contain"
+        className="block size-full object-cover"
       />
     </span>
   );

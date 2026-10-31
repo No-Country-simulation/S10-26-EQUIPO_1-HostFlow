@@ -5,7 +5,12 @@
 export function getBookingRequirements(lodging, payments) {
   const list = [];
 
-  if (!payments?.methods?.some((method) => method.enabled)) {
+  // Un método cuenta como habilitado salvo que esté explícitamente apagado:
+  // estados guardados por versiones viejas podían no traer `enabled` y la
+  // alerta bloqueaba la reserva aunque el anfitrión tuviera métodos cargados.
+  const hasEnabledMethod = (payments?.methods || []).some((method) => method && method.enabled !== false);
+
+  if (!hasEnabledMethod) {
     list.push({
       key: "payments",
       label: "al menos 1 método de pago habilitado",
@@ -32,7 +37,7 @@ export function getBookingRequirements(lodging, payments) {
   }
 
   const bank = payments?.bankDetails || {};
-  if (!bank.holder && !bank.alias && !bank.cbu) {
+  if (!hasEnabledMethod && !bank.holder && !bank.alias && !bank.cbu) {
     list.push({
       key: "bank",
       label: "los datos para transferencia (titular, alias o CBU)",

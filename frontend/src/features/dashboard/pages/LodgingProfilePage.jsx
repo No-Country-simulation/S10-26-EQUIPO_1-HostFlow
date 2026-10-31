@@ -303,7 +303,7 @@ export default function LodgingProfilePage() {
                 <p className="text-sm font-bold text-ink">{lodging.name}</p>
                 <p className="text-xs text-muted">
                   {lodging.logo
-                    ? "Tu logo completo, sin recortes ni deformaciones."
+                    ? "Se muestra en círculo: el motivo principal queda centrado."
                     : "Sin logo: se muestran tus iniciales con el color de marca."}
                 </p>
               </div>
@@ -337,8 +337,7 @@ export default function LodgingProfilePage() {
           </div>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickLogo} />
           <p className="mt-3 text-xs text-muted">
-            PNG, JPG o SVG con fondo transparente. Se respeta la proporción del archivo: cuadrado, horizontal o
-            vertical.
+            PNG, JPG o SVG. El logo se muestra en un círculo, así que conviene que el motivo esté centrado.
           </p>
 
           {/* Colores sugeridos desde el logo (extraídos en el navegador, sin enviar nada) */}
@@ -468,7 +467,7 @@ export default function LodgingProfilePage() {
 
         {/* Datos de la empresa */}
         <Card className="p-6">
-          <div className="mb-4 flex items-center gap-2">
+          <div className="sticky top-[65px] z-20 -mx-6 -mt-6 mb-4 flex items-center gap-2 border-b border-line bg-paper/95 px-6 pb-3 pt-2 backdrop-blur">
             <span className="grid size-10 place-items-center rounded-xl bg-lime-soft text-lime-ink">
               <Building2 size={20} />
             </span>
@@ -485,7 +484,7 @@ export default function LodgingProfilePage() {
               <Field label="Ubicación" name="location" defaultValue={lodging.location} />
               <Field label="Teléfono" name="phone" defaultValue={lodging.phone} />
             </div>
-            <Button type="submit" className="mt-1 w-full sm:w-auto">Guardar datos</Button>
+            <Button type="submit" className="mt-1 w-full sm:w-auto sm:justify-self-end">Guardar datos</Button>
           </form>
         </Card>
       </div>
@@ -499,7 +498,7 @@ export default function LodgingProfilePage() {
             </span>
             <div>
               <h2 className="font-bold text-ink">Personalización visual</h2>
-              <p className="text-xs text-muted">3 colores con rol, forma de las esquinas y patrón del enlace de llegada.</p>
+              <p className="text-xs text-muted">3 colores con rol y patrón del enlace de llegada.</p>
             </div>
           </div>
           {/* Restaurar marca por defecto: confirmación en 2 pasos */}
@@ -550,23 +549,27 @@ export default function LodgingProfilePage() {
               <SlotEditor key={slot.id} slot={slot} brand={lodging.brand} onPick={pickSlot(slot.id)} />
             ))}
 
-            {/* Patrón de fondo del enlace: motivos elegantes, sin imágenes */}
+            {/* Patrón de fondo del enlace: 3 motivos, sin imágenes. Tocar el
+                activo lo quita (queda liso). */}
             <div>
               <p className="mb-1 text-sm font-bold text-ink">Patrón de fondo</p>
               <p className="mb-2 text-[11px] text-muted">
-                Motivos dibujados con tu color de marca sobre el fondo del enlace. Se adaptan solos al modo claro y
-                oscuro.
+                Tres motivos dibujados con tu color de marca. Se adaptan solos al modo claro y oscuro; tocá el que
+                está activo para dejarlo liso.
               </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {PATTERNS.map((pattern) => {
+              <div className="grid grid-cols-3 gap-2">
+                {PATTERNS.filter((pattern) => pattern.id !== "none").map((pattern) => {
                   const active = (lodging.brand.pattern || "none") === pattern.id;
                   return (
                     <button
                       key={pattern.id}
                       type="button"
-                      onClick={() => { actions.updateBrand({ pattern: pattern.id }); flashSaved(); }}
+                      onClick={() => {
+                        actions.updateBrand({ pattern: active ? "none" : pattern.id });
+                        flashSaved();
+                      }}
                       aria-pressed={active}
-                      aria-label={`Patrón ${pattern.label}`}
+                      aria-label={`Patrón ${pattern.label}${active ? " (tocar para quitar)" : ""}`}
                       className={cn(
                         "relative h-16 cursor-pointer overflow-hidden rounded-xl border bg-paper text-ink transition",
                         active ? "border-teal ring-2 ring-teal/25" : "border-line hover:border-line-strong",
@@ -574,7 +577,10 @@ export default function LodgingProfilePage() {
                     >
                       <span
                         aria-hidden="true"
-                        className="pointer-events-none absolute inset-0 text-ink opacity-25"
+                        className={cn(
+                          "pointer-events-none absolute inset-0 text-ink",
+                          active ? "opacity-35" : "opacity-20",
+                        )}
                         style={patternPreviewStyle(pattern.id)}
                       />
                       <span className="absolute inset-x-0 bottom-0 bg-paper/90 py-1 text-[10px] font-bold">
@@ -591,7 +597,7 @@ export default function LodgingProfilePage() {
           <div className="grid content-start gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-bold text-ink">
-                Vista previa para tus huéspedes
+                Vista previa del enlace y del panel
                 {trioPreview && <span className="ml-2 text-xs font-medium text-teal-strong">(sugerido)</span>}
               </p>
               <button
@@ -673,6 +679,31 @@ export default function LodgingProfilePage() {
                       <Button type="button" variant="secondary">Ver detalles</Button>
                     </div>
                   </div>
+
+                  {/* El panel del anfitrión usa la misma marca: navegación activa,
+                      botón primario y superficie tintada con el patrón. */}
+                  <div className="rounded-[var(--radius-card)] border border-line bg-paper p-3">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted">
+                      Panel del anfitrión
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="rounded-lg bg-lime px-2.5 py-1 text-[10px] font-extrabold text-lime-ink">
+                        Reservas
+                      </span>
+                      <span className="rounded-lg border border-line px-2.5 py-1 text-[10px] font-bold text-ink-soft">
+                        Alojamiento
+                      </span>
+                      <span className="rounded-lg border border-line px-2.5 py-1 text-[10px] font-bold text-ink-soft">
+                        Pagos
+                      </span>
+                    </div>
+                    <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-teal-soft px-3 py-2">
+                      <span className="text-[11px] font-bold text-teal-strong">3 llegadas esta semana</span>
+                      <Button type="button" className="min-h-[30px] px-2.5 text-[10px]">
+                        Ver reservas
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </LodgingTheme>
@@ -683,7 +714,7 @@ export default function LodgingProfilePage() {
           <Badge tone="neutral">Tema: automático (claro/oscuro)</Badge>
           <span className="text-xs text-muted">
             Los 3 colores tienen un rol fijo (marca, acción y fondo) y se adaptan solos al modo oscuro. Se aplican al
-            enlace de tus huéspedes y a esta vista previa: el panel queda neutro.
+            enlace de tus huéspedes y a tu panel: navegación, botones y superficies usan la misma identidad.
           </span>
         </div>
       </Card>

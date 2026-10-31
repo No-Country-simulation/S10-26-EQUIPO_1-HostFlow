@@ -96,7 +96,7 @@ export default function AdminOverviewPage() {
     <div className="grid gap-6">
       <header
         className="relative overflow-hidden rounded-[26px] p-6 text-white sm:p-8"
-        style={{ background: "linear-gradient(135deg, #111111 0%, #1f2d2b 55%, #0b6b6b 130%)" }}
+        style={{ background: "linear-gradient(135deg, #101518 0%, #1b2724 55%, #0b6b6b 130%)" }}
       >
         <div className="absolute inset-0 dot-grid opacity-15 [mask-image:radial-gradient(ellipse_at_right,black,transparent_70%)]" />
         <div className="relative flex flex-wrap items-center justify-between gap-4">

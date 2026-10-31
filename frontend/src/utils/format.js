@@ -8,7 +8,7 @@ export const isEmail = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(valu
 
 export const CURRENCIES = {
   ARS: { code: "ARS", symbol: "$", label: "Pesos Argentinos", locale: "es-AR" },
-  USD: { code: "USD", symbol: "US$", label: "Dólares", locale: "en-US" },
+  USD: { code: "USD", symbol: "US$", label: "Dólares", locale: "es-AR" },
   EUR: { code: "EUR", symbol: "€", label: "Euros", locale: "es-ES" },
 };
 
@@ -28,6 +28,29 @@ export function formatMoney(amount = 0, currency = "ARS") {
 }
 
 export const currencySymbol = (currency = "ARS") => CURRENCIES[currency]?.symbol || "$";
+
+// ── Conversión de monedas ─────────────────────────────────────────────────
+// Cotizaciones de REFERENCIA para la demo (no hay backend de tipos de cambio).
+// Se expresan en pesos por unidad: 1 USD = 1.480 ARS, 1 EUR = 1.590 ARS.
+// El panel ofrece dólares y euros como monedas secundarias para billeteras
+// digitales; el huésped ve el equivalente de cada precio antes de pagar.
+export const ARS_PER_UNIT = { ARS: 1, USD: 1480, EUR: 1590 };
+
+export function convertCurrency(amount, from = "ARS", to = "ARS") {
+  const value = Number(amount) || 0;
+  const fromRate = ARS_PER_UNIT[from] || 1;
+  const toRate = ARS_PER_UNIT[to] || 1;
+  const inArs = from === "ARS" ? value : value * fromRate;
+  return to === "ARS" ? inArs : inArs / toRate;
+}
+
+// Equivalencias de un importe en las monedas secundarias habilitadas, listas
+// para mostrar ("≈ US$ 172 · ≈ € 160").
+export function secondaryEquivalents(amount, currency = "ARS", codes = ["USD", "EUR"]) {
+  return codes
+    .filter((code) => code && code !== currency && CURRENCIES[code])
+    .map((code) => ({ code, amount: convertCurrency(amount, currency, code) }));
+}
 
 // ── Fechas ─────────────────────────────────────────────────────────────────
 
