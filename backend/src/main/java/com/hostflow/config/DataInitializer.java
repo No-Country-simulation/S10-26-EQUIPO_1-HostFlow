@@ -7,13 +7,11 @@ import com.hostflow.repository.OwnerRepository;
 import com.hostflow.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
 
 import java.util.Set;
 
@@ -65,8 +63,6 @@ public class DataInitializer implements CommandLineRunner {
      * Garantiza el cumplimiento de las prácticas de seguridad de almacenamiento de credenciales.
      */
     private final PasswordEncoder passwordEncoder;
-    @Value("${app.admin.password}")
-    private String adminPassword;
 
     /**
      * Método principal del ciclo de vida de {@link CommandLineRunner}.
@@ -123,7 +119,7 @@ public class DataInitializer implements CommandLineRunner {
      * como un dueño de alojamiento estándar cuando sea necesario.</p>
      */
     private void inicializarAdministrador() {
-        final String adminEmail = "admin@hostflow.com";
+        final String adminEmail = "adminhostflow@gmail.com";
 
         // Verificación eficiente sin traer toda la entidad a memoria
         if (!ownerRepository.existsByEmail(adminEmail)) {
@@ -141,9 +137,10 @@ public class DataInitializer implements CommandLineRunner {
                     .fullName("Administrador HostFlow")
                     .accommodationName("HostFlow Platform")
                     .email(adminEmail)
-                    .password(passwordEncoder.encode(adminPassword)) // Encriptación BCrypt obligatoria
+                    .password(passwordEncoder.encode("adminPassword")) // Encriptación BCrypt obligatoria
                     .termsAccepted(true)
                     .enabled(true)
+                    .emailVerified(false)
                     .roles(Set.of(adminRole, ownerRole))
                     .build();
 
