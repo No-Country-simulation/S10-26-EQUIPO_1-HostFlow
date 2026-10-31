@@ -44,7 +44,7 @@ import java.util.List;
  * </pre>
  *
  * @author HostFlow Team
- * @version 2.0.0
+ * @version 2.1.0
  * @see AdditionalService
  * @see ConvertedPriceResponse
  * @see AdditionalServiceImageResponse
@@ -130,18 +130,23 @@ public record AdditionalServiceResponse(
 
     /**
      * Factory method que construye el DTO de respuesta a partir de la entidad
-     * {@link AdditionalService} y la lista de precios ya convertidos.
+     * {@link AdditionalService}, la moneda base del alojamiento y la lista de precios ya convertidos.
      *
-     * <p>Este método se utiliza en los controladores para transformar la entidad
-     * JPA en un DTO enriquecido con los precios en todas las monedas habilitadas
-     * y las imágenes asociadas (las cuales ya vienen cargadas en memoria gracias
-     * al {@code @EntityGraph} configurado en el repositorio, evitando el problema N+1).</p>
+     * <p><strong>🆕 SOLUCIÓN DEFINITIVA A LazyInitializationException (v2.1):</strong></p>
+     * <p>Se recibe el parámetro {@code baseCurrency} explícitamente para evitar
+     * acceder a {@code s.getAccommodation().getBaseCurrency()} fuera de la
+     * transacción de Hibernate. Al pasar la moneda base como argumento (que ya
+     * está cargada en memoria desde el controlador/servicio), eliminamos por
+     * completo la dependencia del proxy LAZY y prevenimos el error al serializar
+     * la respuesta a JSON.</p>
      *
-     * @param s         la entidad AdditionalService con los datos del servicio
-     * @param converted la lista de precios convertidos a todas las monedas habilitadas
-     * @return el DTO de respuesta completo con todos los campos poblados
+     * @param s            la entidad AdditionalService con los datos del servicio
+     * @param baseCurrency la moneda base del alojamiento (ya cargada en memoria, ej: acc.getBaseCurrency())
+     * @param converted    la lista de precios convertidos a todas las monedas habilitadas
+     * @return el DTO de respuesta completo con todos los campos poblados de forma segura
      */
     public static AdditionalServiceResponse from(AdditionalService s,
+                                                 Currency baseCurrency,
                                                  List<ConvertedPriceResponse> converted) {
 
         // 🆕 Mapear las imágenes de la entidad a sus respectivos DTOs.
@@ -157,11 +162,11 @@ public record AdditionalServiceResponse(
                 s.getId(),
                 s.getName(),
                 s.getDescription(),
-                s.getAccommodation().getBaseCurrency(),
+                baseCurrency,          // ✅ Usamos el parámetro explícito, NO s.getAccommodation().getBaseCurrency()
                 s.getBasePrice(),
-                s.getPriceType(),          // 🆕 Campo agregado
+                s.getPriceType(),
                 converted,
-                imageResponses,            // 🆕 Campo agregado
+                imageResponses,
                 s.isActive()
         );
     }

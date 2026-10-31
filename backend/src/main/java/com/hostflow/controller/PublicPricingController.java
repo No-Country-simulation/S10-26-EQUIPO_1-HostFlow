@@ -1,6 +1,5 @@
 package com.hostflow.controller;
 
-
 import com.hostflow.dto.response.AdditionalServiceResponse;
 import com.hostflow.dto.response.ConvertedPriceResponse;
 import com.hostflow.enums.Currency;
@@ -17,9 +16,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-        import java.util.ArrayList;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,7 +36,7 @@ import java.util.List;
  * para la ruta {@code /public/**}.</p>
  *
  * @author HostFlow Team
- * @version 1.0.0
+ * @version 1.1.0
  */
 @RestController
 @RequestMapping("/public/accommodations/{accommodationId}")
@@ -59,6 +59,7 @@ public class PublicPricingController {
     // =========================================================================
 
     @GetMapping("/base-price")
+    @Transactional(readOnly = true)
     @Operation(
             summary = "Precio base del alojamiento en todas las monedas habilitadas",
             description = "Devuelve el precio base (basePrice) del alojamiento convertido " +
@@ -102,6 +103,7 @@ public class PublicPricingController {
     // =========================================================================
 
     @GetMapping("/additional-services")
+    @Transactional(readOnly = true) // 🆕 Agregado para optimizar rendimiento y evitar warnings de Hibernate
     @Operation(
             summary = "Servicios adicionales con precios en todas las monedas habilitadas",
             description = "Devuelve los servicios adicionales activos del alojamiento, " +
@@ -119,7 +121,7 @@ public class PublicPricingController {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No se encontró el alojamiento con ID: " + accommodationId));
 
-        // Obtener solo los servicios activos
+        // Obtener solo los servicios activos (ya incluye las imágenes gracias a @EntityGraph en el repositorio)
         List<AdditionalService> services = serviceRepository
                 .findAllByAccommodation_IdAndActiveTrueOrderByCreatedAtAsc(acc.getId());
 
@@ -138,6 +140,16 @@ public class PublicPricingController {
     /**
      * Construye el DTO de respuesta para un servicio adicional, incluyendo
      * los precios convertidos a todas las monedas habilitadas.
+     *
+     * <p><strong>🆕 Corrección definitiva de LazyInitializationException:</strong></p>
+     * <p>Se pasa {@code acc.getBaseCurrency()} explícitamente como segundo argumento al método
+     * {@code from} del DTO. Esto evita que el DTO intente acceder a
+     * {@code s.getAccommodation().getBaseCurrency()} fuera de la transacción de Hibernate,
+     * lo cual era la causa raíz del error al serializar la respuesta a JSON.</p>
+     *
+     * @param acc el alojamiento al que pertenece el servicio (ya cargado en memoria)
+     * @param s   el servicio adicional a mapear (con imágenes ya cargadas vía @EntityGraph)
+     * @return el DTO completo con precios convertidos e imágenes
      */
     private AdditionalServiceResponse toResponse(Accommodation acc, AdditionalService s) {
         List<ConvertedPriceResponse> converted = new ArrayList<>();
@@ -152,11 +164,12 @@ public class PublicPricingController {
                 converted.add(ConvertedPriceResponse.of(
                         c, conversionService.convert(acc.getId(), s.getBasePrice(), c)));
             } catch (RuntimeException e) {
-                // Moneda no habilitada o sin tasa: se omite
+                // Moneda no habilitada o sin tasa: se omite silenciosamente
                 log.debug("Moneda {} omitida para servicio {}: {}", c, s.getId(), e.getMessage());
             }
         }
 
-        return AdditionalServiceResponse.from(s, converted);
+        // ✅ PASAMOS acc.getBaseCurrency() explícitamente como segundo argumento
+        return AdditionalServiceResponse.from(s, acc.getBaseCurrency(), converted);
     }
 }

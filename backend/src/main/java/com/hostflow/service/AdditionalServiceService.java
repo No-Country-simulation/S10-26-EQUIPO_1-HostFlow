@@ -418,7 +418,7 @@ public class AdditionalServiceService {
             }
         }
 
-        return AdditionalServiceResponse.from(s, converted);
+        return AdditionalServiceResponse.from(s, acc.getBaseCurrency(), converted);
     }
 
     /**
