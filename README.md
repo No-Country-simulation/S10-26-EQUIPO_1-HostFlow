@@ -22,5 +22,44 @@ HostFlow propone una aplicación web **B2B2C** que digitaliza el proceso de inco
 
 ---
 
+## Cómo correr el stack completo (back + front)
+
+### 1. Backend (Spring Boot + PostgreSQL)
+
+```powershell
+createdb hostflow_dev                 # base de datos (una sola vez)
+cd backend
+copy .env.example .env                # completar DB_PASSWORD, JWT_SECRET, ADMIN_PASSWORD
+.\mvnw.cmd spring-boot:run            # requiere JDK 17
+```
+
+- API: <http://localhost:8080/api/v1>
+- Swagger UI: <http://localhost:8080/api/v1/swagger-ui.html>
+
+### 2. Frontend (React + Vite)
+
+```powershell
+cd frontend
+pnpm install
+copy .env.example .env                # VITE_API_URL=http://localhost:8080/api/v1
+pnpm dev                              # <http://localhost:5173>
+```
+
+### Modos de uso
+
+| | **Modo demo** (sin `.env` o `VITE_API_URL` vacía) | **Modo real** (`VITE_API_URL=http://localhost:8080/api/v1`) |
+|---|---|---|
+| Datos | En memoria, sin red | Llamadas HTTP al backend |
+| Login | `anfitrion@hostflow.app` / `demo1234` · `admin@hostflow.app` / `admin1234` | Usuarios creados por registro |
+
+Si `VITE_API_URL` apunta al backend pero este no está levantado, el **login
+falla a propósito** (no hay fallback); el resto de las pantallas siguen
+operando con el store local cuando un endpoint aún no existe en el backend.
+
+> Detalle completo de la integración, contrato verificado y checklist de
+> pruebas: [`frontend/docs/integracion-back-front.md`](frontend/docs/integracion-back-front.md).
+
+---
+
 > **Nota del Desarrollo:** El producto se desarrollará en este momento como un **MVP** con prioridad en la experiencia móvil, la facilidad de uso y la centralización de información, limitando la complejidad técnica para cumplir con un plazo máximo de tres semanas y media.
 

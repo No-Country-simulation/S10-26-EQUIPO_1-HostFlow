@@ -70,6 +70,12 @@
   --animate-marquee: marquee 34s linear infinite;
   --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
   --animate-shimmer: shimmer 1.8s linear infinite;
+  --animate-drift: drift 7s ease-in-out infinite;
+  --animate-drift-slow: drift 11s ease-in-out infinite;
+  --animate-sway: sway 6.5s ease-in-out infinite;
+  --animate-bob: bob 5s ease-in-out infinite;
+  --animate-water: water 16s linear infinite;
+  --animate-flicker: flicker 3.2s ease-in-out infinite;
 
   @keyframes rise {
     from {
@@ -131,6 +137,55 @@
     }
     to {
       background-position: -200% 0;
+    }
+  }
+  /* Flotar suave: stickers y tarjetas "vivas" del home. */
+  @keyframes drift {
+    0%,
+    100% {
+      transform: translateY(0) rotate(var(--drift-rotate, 0deg));
+    }
+    50% {
+      transform: translateY(-11px) rotate(var(--drift-rotate, 0deg));
+    }
+  }
+  /* Balanceo: juncos, plantas y elementos colgantes. */
+  @keyframes sway {
+    0%,
+    100% {
+      transform: rotate(-2.2deg);
+    }
+    50% {
+      transform: rotate(2.2deg);
+    }
+  }
+  /* Chapoteo: el bote sube y baja con el agua. */
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0) rotate(-1.2deg);
+    }
+    50% {
+      transform: translateY(-5px) rotate(1.4deg);
+    }
+  }
+  /* Corriente: las líneas del río se desplazan en horizontal (loop). */
+  @keyframes water {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-160px);
+    }
+  }
+  /* Brillo tenue: el sol y las luces de la escena respiran. */
+  @keyframes flicker {
+    0%,
+    100% {
+      opacity: 0.85;
+    }
+    50% {
+      opacity: 1;
     }
   }
 }
@@ -317,5 +372,52 @@
     );
     background-size: 200% 100%;
     animation: var(--animate-shimmer);
+  }
+  /* Grano de película sutil: le baja el "aire de render" a las superficies
+     grandes y unifica la escena con el resto de la página. */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  }
+  /* Cinta adhesiva de polaroid: detalle artesanal para las fotos ilustradas. */
+  .tape::before {
+    content: "";
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    width: 84px;
+    height: 26px;
+    transform: translateX(-50%) rotate(-3deg);
+    background: color-mix(in srgb, var(--color-lime) 62%, transparent);
+    border-left: 1px dashed color-mix(in srgb, var(--color-ink) 18%, transparent);
+    border-right: 1px dashed color-mix(in srgb, var(--color-ink) 18%, transparent);
+    opacity: 0.9;
+  }
+  /* Subrayado a mano (trazo SVG debajo del texto). */
+  .underline-hand {
+    position: relative;
+    display: inline-block;
+  }
+  .underline-hand::after {
+    content: "";
+    position: absolute;
+    left: -2%;
+    bottom: -0.14em;
+    width: 104%;
+    height: 0.34em;
+    background: currentColor;
+    opacity: 0.35;
+    border-radius: 999px;
+    transform: rotate(-0.6deg) scaleX(var(--ul-scale, 1));
+    transform-origin: left center;
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='12' viewBox='0 0 120 12'%3E%3Cpath d='M2 8c22-5 44-6 66-4 18 1.6 33 4 50 1.5' stroke='%23000' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='12' viewBox='0 0 120 12'%3E%3Cpath d='M2 8c22-5 44-6 66-4 18 1.6 33 4 50 1.5' stroke='%23000' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    mask-size: 100% 100%;
+    -webkit-mask-size: 100% 100%;
   }
 }

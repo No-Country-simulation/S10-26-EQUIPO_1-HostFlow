@@ -99,6 +99,17 @@ export function visibleOn(hex, bg, min = 2.2) {
   return out;
 }
 
+// Mezcla dos colores hex en proporción `t` (0 = color A, 1 = color B), igual
+// que `color-mix(in srgb, A (1-t)%, B t%)` pero como hex, para poder calcular
+// encima (texto legible, contrastes) sin parsear CSS.
+export function mixHex(a, b, t = 0.5) {
+  const ra = hexToRgb(a);
+  const rb = hexToRgb(b);
+  if (!ra || !rb) return a || b || "#0fa3a3";
+  const k = Math.min(1, Math.max(0, t));
+  return rgbToHex(ra.r + (rb.r - ra.r) * k, ra.g + (rb.g - ra.g) * k, ra.b + (rb.b - ra.b) * k);
+}
+
 // Distancia euclídea entre dos colores (para descartar parecidos en paletas).
 export function colorDistance(a, b) {
   const dr = a.r - b.r;
