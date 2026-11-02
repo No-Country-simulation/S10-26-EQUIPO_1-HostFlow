@@ -1,6 +1,7 @@
 package com.hostflow.security;
 
 import com.hostflow.service.JwtService;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,6 +12,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -95,37 +97,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Extraer el token (remover el prefijo "Bearer ")
+        // Extraer el token (remover el prefijo "Bearer ").
         final String jwt = authHeader.substring(7);
 
-        // Extraer el email del token JWT
-        final String userEmail = jwtService.extractUsername(jwt);
+        try {
+            // JJWT lanza JwtException si el token está malformado, expirado o la firma falla.
+            final String userEmail = jwtService.extractUsername(jwt);
 
-        // Si el email es válido y no hay autenticación previa en el contexto
-        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
-            // Cargar los detalles del usuario desde la base de datos
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
-
-            // Validar el token contra los detalles del usuario
-            if (jwtService.isTokenValid(jwt, userDetails)) {
-
-                // Crear el objeto de autenticación con los datos del usuario y sus roles
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null, // No se requiere contraseña ya que el token es válido
-                                userDetails.getAuthorities()
-                        );
-
-                // Establecer los detalles de la petición web (IP, sesión, etc.)
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-
-                // Establecer la autenticación en el contexto de seguridad de Spring
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                if (jwtService.isTokenValid(jwt, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
+                    authToken.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (JwtException | IllegalArgumentException | UsernameNotFoundException ex) {
+            // Un token inválido no debe provocar un 500. Spring Security devolverá
+            // 401 si el recurso requiere autenticación; las rutas públicas siguen públicas.
+            SecurityContextHolder.clearContext();
         }
 
         // Continuar con la cadena de filtros para procesar la petición
