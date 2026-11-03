@@ -2,6 +2,7 @@ package com.hostflow.config;
 
 import com.hostflow.security.CustomUserDetailsService;
 import com.hostflow.security.JwtAuthenticationFilter;
+import com.hostflow.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -55,6 +56,9 @@ public class SecurityConfig {
      * Se inyecta automáticamente vía constructor gracias a @RequiredArgsConstructor.
      */
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    /** Maneja las peticiones protegidas que llegan sin autenticación válida. */
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
 
     /**
      * Servicio personalizado para cargar detalles del usuario desde la base de datos.
@@ -131,18 +135,24 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                // 4. GESTIÓN DE SESIONES
+                // 4. MANEJO DE ERRORES DE AUTENTICACIÓN
+                // Las peticiones sin autenticación válida deben recibir 401.
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                )
+
+                // 5. GESTIÓN DE SESIONES
                 // STATELESS significa que no se crea sesión HTTP en el servidor.
                 // Cada petición debe ser independiente y contener su propio token JWT.
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
-                // 5. PROVEEDOR DE AUTENTICACIÓN
+                // 6. PROVEEDOR DE AUTENTICACIÓN
                 // Configura cómo se autentican los usuarios (DAO + BCrypt)
                 .authenticationProvider(authenticationProvider())
 
-                // 6. FILTRO JWT
+                // 7. FILTRO JWT
                 // Se ejecuta antes del filtro estándar de autenticación por username/password
                 // para interceptar y validar el token JWT del header "Authorization".
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

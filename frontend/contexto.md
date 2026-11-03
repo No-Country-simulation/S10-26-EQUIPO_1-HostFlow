@@ -48,16 +48,16 @@ después de cambiar una clave).
 - El **modo claro está preseleccionado**; se cambia con el botón sol/luna (header, panel y pantallas de acceso).
 - La preferencia se guarda en `localStorage` (`hostflow.theme`).
 - La paleta y sus reglas están documentadas en **[docs/paleta-colores.md](docs/paleta-colores.md)**.
-- Los tokens viven en `@theme` (`src/index.css`); la clase `.dark` en `<html>` los sobreescribe.
+- Los tokens viven en `@theme` (`src/styles/globals.css`); la clase `.dark` en `<html>` los sobreescribe.
 
 ## Integración con el backend (Swagger)
 
 - Contrato de API: **[docs/swagger-api.md](docs/swagger-api.md)** (rutas, cuerpos, respuestas y errores).
-- `src/services/endpoints.js` mapea cada operación a su ruta (contrato real del backend, ver
+- `src/lib/api/endpoints.js` mapea cada operación a su ruta (contrato real del backend, ver
   `backend/src/main/java/com/hostflow/controller/`).
-- `src/services/httpApi.js` implementa las llamadas reales; `src/services/demoApi.js` implementa el
+- `src/lib/api/httpApi.js` implementa las llamadas reales; `src/lib/api/demoApi.js` implementa el
   **mismo contrato** con datos en memoria.
-- `src/services/index.js` elige el adaptador según `VITE_API_URL`. Las pantallas nunca llaman a `fetch`.
+- `src/lib/api/index.js` elige el adaptador según `VITE_API_URL`. Las pantallas nunca llaman a `fetch`.
 - El backend expone el context-path `/api/v1`, así que `VITE_API_URL` debe incluirlo:
   `VITE_API_URL=http://localhost:8080/api/v1`.
 - Documentación interactiva del backend: `GET /api/v1/swagger-ui.html` (OpenAPI en `/api/v1/api-docs`).
@@ -66,25 +66,36 @@ después de cambiar una clave).
 
 ```
 src/
-  pages/          Home (presentación)
-  pages/auth/     Login · Register · Recover (OTP)
-  pages/app/      Dashboard · Bookings · Lodging · Availability · Payments · Profile
-  pages/admin/    AdminDashboard (control interno)
-  layouts/        AuthLayout
-  components/     ui.jsx (sistema visual) · AppLayout · RequireAuth · BookingCard
-  context/        ThemeContext (claro/oscuro) · SessionContext (sesión y acciones)
-  data/           store.js (estado demo) · useStore.js (hook reactivo)
-  services/       index (fachada) · httpApi · demoApi · endpoints · httpClient · tokenStorage · errors
-  config/env.js   VITE_API_URL → DEMO_MODE
-  lib/format.js   cn, isEmail, monedas, fechas, textos
-  index.css       sistema visual (paleta, tema, animaciones)
+  features/home/pages/          HomePage (presentación)
+  features/dashboard/
+    pages/      OwnerDashboardPage · BookingsPage · LodgingPage · AvailabilityPage · PaymentMethodsPage · LodgingProfilePage
+    components/ BookingSummaryCard
+  features/admin/pages/         AdminOverviewPage (control interno)
+  features/auth/
+    pages/        LoginPage · CreateAccountPage · PasswordRecoveryPage (OTP)
+    context/      SessionContext (sesión y acciones)
+  routes/         index.jsx (rutas) · guards/ProtectedRoute.jsx
+  components/
+    ui/index.jsx  sistema visual compartido
+    layout/       AuthenticatedAppLayout · AuthLayout
+  lib/
+    api/          index (fachada) · httpApi · demoApi · endpoints · httpClient · tokenStorage · errors
+    state/        store.js (estado demo) · useStore.js (hook reactivo)
+    config/env.js VITE_API_URL → DEMO_MODE
+    theme/        ThemeContext (claro/oscuro)
+    format.js     cn, isEmail, monedas, fechas, textos
+  styles/globals.css sistema visual (paleta, tema, animaciones)
 docs/             paleta-colores.md · swagger-api.md
 ```
+
+Los imports compartidos pueden usar los aliases configurados (`@`, `@components`,
+`@features`, `@hooks`, `@lib`, `@styles` y `@utils`); dentro de `features/auth`, se
+prefieren imports relativos para módulos propios de la feature.
 
 ## Notas
 
 - La sección **Mockups** se eliminó: no forms parte de la presentación final.
-- Las animaciones (`rise`, `fade`, `pop`, `float`, `marquee`) están en `src/index.css` y respetan
+- Las animaciones (`rise`, `fade`, `pop`, `float`, `marquee`) están en `src/styles/globals.css` y respetan
   `prefers-reduced-motion`.
 - El estado de la demo se persiste en `sessionStorage` (`hostflow.app.v1`), por lo que recargar la
   página no pierde los cambios (incluida una clave nueva definida por OTP).

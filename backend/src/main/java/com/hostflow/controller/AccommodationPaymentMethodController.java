@@ -37,7 +37,7 @@ public class AccommodationPaymentMethodController {
     }
 
     @PostMapping
-    @Operation(summary = "Registrar un método de pago", description = "paymentType y displayName son obligatorios. Si no existe un método predeterminado, el primero se establece como tal.")
+    @Operation(summary = "Registrar un método de pago", description = "paymentType y displayName son obligatorios. BANK_TRANSFER requiere bankName, accountHolder, accountType, accountNumber, cbuCvu y alias. DIGITAL_WALLET requiere accountHolder, userIdentifier, walletPhone y walletEmail válido. Si no existe un método predeterminado, el primero se establece como tal.")
     public ResponseEntity<AccommodationPaymentMethodResponse> create(
             @Valid @RequestBody AccommodationPaymentMethodRequest request, Authentication authentication) {
         AccommodationPaymentMethod created = service.create(currentOwnerId(authentication), request);
@@ -45,7 +45,7 @@ public class AccommodationPaymentMethodController {
     }
 
     @PatchMapping("/{methodId}")
-    @Operation(summary = "Actualizar parcialmente un método de pago", description = "Solo modifica los campos enviados y únicamente si el método pertenece al alojamiento autenticado.")
+    @Operation(summary = "Actualizar parcialmente un método de pago", description = "Solo modifica los campos enviados, valida los requisitos del tipo sobre el estado final y únicamente si el método pertenece al alojamiento autenticado.")
     public ResponseEntity<AccommodationPaymentMethodResponse> update(
             @PathVariable Long methodId, @Valid @RequestBody AccommodationPaymentMethodRequest request,
             Authentication authentication) {

@@ -24,6 +24,11 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class AccommodationProfileService {
+    private static final long MAX_GALLERY_IMAGES = 4;
+    private static final String DEFAULT_PRIMARY_COLOR = "#0fa3a3";
+    private static final String DEFAULT_ACCENT_COLOR = "#d4f53c";
+    private static final String DEFAULT_TERTIARY_COLOR = "#f4b8c4";
+    private static final String DEFAULT_BACKGROUND_PATTERN = "none";
     private final AccommodationRepository accommodationRepository;
     private final AccommodationImageRepository imageRepository;
     private final OwnerRepository ownerRepository;
@@ -79,9 +84,16 @@ public class AccommodationProfileService {
      */
     @Transactional
     public AccommodationImage uploadGalleryImage(Long ownerId, MultipartFile file) {
-        Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
+        /*Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Registre los datos generales del alojamiento antes de agregar imágenes."));*/
+
+        // El bloqueo de la fila evita que dos cargas simultáneas superen el máximo de cuatro.
+        Accommodation accommodation = accommodationRepository.findByOwner_IdForUpdate(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Registre los datos generales del alojamiento antes de agregar imágenes."));
+
+        ensureGalleryHasSpace(accommodation.getId());
 
         CloudinaryUploadResult uploaded = cloudinaryImageService.uploadImage(file);
         AccommodationImage image = AccommodationImage.builder()
@@ -156,6 +168,14 @@ public class AccommodationProfileService {
         AccommodationImage image = AccommodationImage.builder()
                 .accommodation(accommodation).imageUrl(request.url().trim()).build();
         return imageRepository.save(image);
+        
+    private void ensureGalleryHasSpace(Long accommodationId) {
+        if (imageRepository.countByAccommodation_Id(accommodationId) >= MAX_GALLERY_IMAGES) {
+            throw new BusinessException(
+                    "La galería permite un máximo de 4 imágenes.",
+                    "GALLERY_IMAGE_LIMIT_EXCEEDED"
+            );
+        }
     }
 
     @Transactional
@@ -167,6 +187,7 @@ public class AccommodationProfileService {
 
         // Solo borramos en Cloudinary recursos subidos por esta aplicación. Las URLs externas
         // registradas mediante POST /gallery no tienen un public_id administrado por HostFlow.
+        // Solo borramos en Cloudinary recursos subidos y administrados por HostFlow.
         if (image.getCloudinaryPublicId() != null && !image.getCloudinaryPublicId().isBlank()) {
             cloudinaryImageService.deleteImage(image.getCloudinaryPublicId());
         }
@@ -185,6 +206,9 @@ public class AccommodationProfileService {
                 && r.getGuestCapacity() == null
                 && r.getBasePrice() == null
                 && r.getPrimaryColor() == null
+                && r.getAccentColor() == null
+                && r.getTertiaryColor() == null
+                && r.getBackgroundPattern() == null
                 && r.getWelcomeMessage() == null
                 && r.getEmail() == null
                 && r.getPhone() == null
@@ -200,6 +224,10 @@ public class AccommodationProfileService {
         a.setGuestCapacity(r.getGuestCapacity());
         a.setBasePrice(r.getBasePrice());
         a.setPrimaryColor(blankToNull(r.getPrimaryColor()));
+        a.setPrimaryColor(defaultIfBlank(r.getPrimaryColor(), DEFAULT_PRIMARY_COLOR));
+        a.setAccentColor(defaultIfBlank(r.getAccentColor(), DEFAULT_ACCENT_COLOR));
+        a.setTertiaryColor(defaultIfBlank(r.getTertiaryColor(), DEFAULT_TERTIARY_COLOR));
+        a.setBackgroundPattern(defaultIfBlank(r.getBackgroundPattern(), DEFAULT_BACKGROUND_PATTERN));
         a.setWelcomeMessage(blankToNull(r.getWelcomeMessage()));
         a.setEmail(blankToNull(r.getEmail()));
         a.setPhone(blankToNull(r.getPhone()));
@@ -224,10 +252,17 @@ public class AccommodationProfileService {
         if (r.getGuestCapacity() != null) a.setGuestCapacity(r.getGuestCapacity());
         if (r.getBasePrice() != null) a.setBasePrice(r.getBasePrice());
         if (r.getPrimaryColor() != null) a.setPrimaryColor(blankToNull(r.getPrimaryColor()));
+        if (r.getAccentColor() != null) a.setAccentColor(blankToNull(r.getAccentColor()));
+        if (r.getTertiaryColor() != null) a.setTertiaryColor(blankToNull(r.getTertiaryColor()));
+        if (r.getBackgroundPattern() != null) a.setBackgroundPattern(blankToNull(r.getBackgroundPattern()));
         if (r.getWelcomeMessage() != null) a.setWelcomeMessage(blankToNull(r.getWelcomeMessage()));
         if (r.getEmail() != null) a.setEmail(blankToNull(r.getEmail()));
         if (r.getPhone() != null) a.setPhone(blankToNull(r.getPhone()));
         if (r.getAddress() != null) a.setAddress(blankToNull(r.getAddress()));
+    }
+
+    private String defaultIfBlank(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
     private String blankToNull(String value) {

@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import com.hostflow.exception.CloudinaryDeleteException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -11,6 +12,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -119,6 +124,72 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Maneja los casos en que el usuario está autenticado, pero no tiene
+     * permisos suficientes para realizar la operación solicitada.
+     *
+     * @param ex la excepción de acceso denegado
+     * @return respuesta HTTP 403 Forbidden
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+        return buildErrorResponse(
+                HttpStatus.FORBIDDEN,
+                "No tienes permisos para realizar esta operación.",
+                "ACCESS_DENIED"
+        );
+    }
+
+    /**
+     * Maneja solicitudes que no incluyen el parámetro de archivo requerido.
+     * En endpoints multipart, Spring puede reportarlo como parámetro ausente.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingRequestParameter(
+            MissingServletRequestParameterException ex) {
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "Debes adjuntar una imagen usando el campo 'file'.",
+                "INVALID_IMAGE"
+        );
+    }
+
+    /** Maneja solicitudes que omiten la parte multipart requerida. */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingServletRequestPart(
+            MissingServletRequestPartException ex) {
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "Debes adjuntar una imagen usando el campo 'file'.",
+                "INVALID_IMAGE"
+        );
+    }
+
+    /**
+     * Si el cliente no envía multipart/form-data (por ejemplo, no envía Content-Type),
+     * responde 415 en lugar de convertir el error en un 500 genérico.
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException ex) {
+        return buildErrorResponse(
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                "El contenido debe enviarse como multipart/form-data e incluir el archivo en el campo 'file'.",
+                "UNSUPPORTED_MEDIA_TYPE"
+        );
+    }
+
+    /** Maneja solicitudes multipart mal formadas o que no se pueden analizar. */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<Map<String, Object>> handleMultipartException(MultipartException ex) {
+        log.warn("Solicitud multipart inválida o incompleta", ex);
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "La solicitud de carga de imagen está incompleta o mal formada.",
+                "INVALID_MULTIPART_REQUEST"
+        );
+    }
+
+    /**
      * Maneja todas las excepciones no capturadas específicamente.
      *
      * @param ex la excepción lanzada
@@ -178,7 +249,7 @@ public class GlobalExceptionHandler {
         );
     }
 
-    @ExceptionHandler(MissingServletRequestPartException.class)
+    /*@ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<Map<String, Object>> handleMissingServletRequestPart(
             MissingServletRequestPartException ex) {
 
@@ -187,7 +258,7 @@ public class GlobalExceptionHandler {
                 "Debes seleccionar una imagen para subir.",
                 "INVALID_IMAGE"
         );
-    }
+    }*/
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceeded(

@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_payment_methods_accommodation
 CREATE UNIQUE INDEX IF NOT EXISTS uk_payment_methods_one_default_per_accommodation
     ON accommodation_payment_methods(accommodation_id) WHERE is_default = TRUE;
 
--- Migra datos bancarios heredados a un método por alojamiento, si hay alguno informado.
+/*-- Migra datos bancarios heredados a un método por alojamiento, si hay alguno informado.
 INSERT INTO accommodation_payment_methods (
     accommodation_id, payment_type, display_name, provider_name, bank_name,
     account_holder, account_number, cbu_cvu, alias, tax_id,
@@ -49,7 +49,54 @@ ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_account_holder;
 ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_account_number;
 ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_cbu_cvu;
 ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_alias;
-ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_cuit;
+ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_cuit;*/
+-- La estructura heredada puede variar entre bases creadas con distintas versiones de JPA/SQL.
+-- Solo migramos y eliminamos las columnas bancarias cuando están presentes TODAS.
+-- Si el esquema es parcial, conservamos las columnas y sus datos para revisión manual.
+DO $$
+DECLARE
+    legacy_columns_count INTEGER;
+BEGIN
+    SELECT COUNT(*)
+      INTO legacy_columns_count
+      FROM information_schema.columns
+     WHERE table_schema = current_schema()
+       AND table_name = 'accommodations'
+       AND column_name IN (
+           'bank_name', 'bank_account_holder', 'bank_account_number',
+           'bank_cbu_cvu', 'bank_alias', 'bank_cuit'
+       );
+
+    IF legacy_columns_count = 6 THEN
+        INSERT INTO accommodation_payment_methods (
+            accommodation_id, payment_type, display_name, provider_name, bank_name,
+            account_holder, account_number, cbu_cvu, alias, tax_id,
+            is_default, is_active, created_at, updated_at
+        )
+        SELECT a.id,
+               CASE WHEN a.bank_name ILIKE '%mercado pago%' OR a.bank_name ILIKE '%uala%'
+                    THEN 'DIGITAL_WALLET' ELSE 'BANK_TRANSFER' END,
+               COALESCE(NULLIF(BTRIM(a.bank_name), ''), 'Cuenta bancaria'),
+               a.bank_name, a.bank_name, a.bank_account_holder, a.bank_account_number,
+               a.bank_cbu_cvu, a.bank_alias, a.bank_cuit,
+               TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+          FROM accommodations a
+         WHERE a.bank_name IS NOT NULL OR a.bank_account_holder IS NOT NULL
+            OR a.bank_account_number IS NOT NULL OR a.bank_cbu_cvu IS NOT NULL
+            OR a.bank_alias IS NOT NULL OR a.bank_cuit IS NOT NULL;
+
+        ALTER TABLE accommodations DROP COLUMN bank_name;
+        ALTER TABLE accommodations DROP COLUMN bank_account_holder;
+        ALTER TABLE accommodations DROP COLUMN bank_account_number;
+        ALTER TABLE accommodations DROP COLUMN bank_cbu_cvu;
+        ALTER TABLE accommodations DROP COLUMN bank_alias;
+        ALTER TABLE accommodations DROP COLUMN bank_cuit;
+    ELSIF legacy_columns_count = 0 THEN
+        RAISE NOTICE 'No existen columnas bancarias heredadas en accommodations; no hay datos que migrar.';
+    ELSE
+        RAISE NOTICE 'Se encontraron % de 6 columnas bancarias heredadas. Se conservan sin migrar ni eliminar para evitar pérdida de datos.', legacy_columns_count;
+    END IF;
+END $$;
 
 COMMENT ON TABLE accommodation_payment_methods IS 'Métodos de pago configurados por cada alojamiento; un alojamiento puede tener varios.';
 COMMENT ON COLUMN accommodation_payment_methods.payment_type IS 'BANK_TRANSFER, DIGITAL_WALLET, CASH, CARD u OTHER.';

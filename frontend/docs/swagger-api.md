@@ -14,11 +14,11 @@ resume el contrato real; la fuente de verdad es el propio backend:
 VITE_API_URL=http://localhost:8080/api/v1
 ```
 
-Las rutas de `src/services/endpoints.js` son relativas a esa base.
+Las rutas de `src/lib/api/endpoints.js` son relativas a esa base.
 
 - Formato: JSON. Errores con `{ "message": "..." }` (se muestra tal cual al usuario).
 - Autenticación: `Authorization: Bearer <token>` (JWT, TTL 24 h).
-- En modo **demo** (sin `VITE_API_URL`) el frontend usa `src/services/demoApi.js`, que
+- En modo **demo** (sin `VITE_API_URL`) el frontend usa `src/lib/api/demoApi.js`, que
   implementa el **mismo contrato** con datos en memoria.
 
 ---
@@ -130,9 +130,9 @@ pero conserva los datos.
 ## Pendiente de definir en el backend
 
 Estos módulos todavía **no existen** en `backend/`. Mientras tanto la capa de servicios
-(`src/services/index.js`) cae al **store local** (`src/data/store.js`), de modo que las
+(`src/lib/api/index.js`) cae al **store local** (`src/lib/state/store.js`), de modo que las
 pantallas siguen siendo usables; cuando el backend los implemente, alcanza con agregar las
-rutas en `src/services/endpoints.js` y los métodos en `src/services/httpApi.js`: las
+rutas en `src/lib/api/endpoints.js` y los métodos en `src/lib/api/httpApi.js`: las
 pantallas ya consumen la capa de servicios y no cambian.
 
 | Módulo | Rutas reservadas en `endpoints.js` |

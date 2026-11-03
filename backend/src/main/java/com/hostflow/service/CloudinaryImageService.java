@@ -10,7 +10,11 @@ import com.hostflow.exception.InvalidImageException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
+import com.hostflow.exception.CloudinaryUploadException;
+import com.hostflow.exception.InvalidImageException;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -61,6 +65,17 @@ public class CloudinaryImageService {
      * @param cloudinary el cliente configurado de Cloudinary
      * @param properties las propiedades de configuración de Cloudinary
      */
+
+
+@Service
+public class CloudinaryImageService {
+
+    private static final long MIN_IMAGE_SIZE_BYTES = 500_000L;
+    private static final long MAX_IMAGE_SIZE_BYTES = 2_000_000L;
+
+    private final Cloudinary cloudinary;
+    private final String folder;
+
     public CloudinaryImageService(
             Cloudinary cloudinary,
             CloudinaryProperties properties) {
@@ -113,6 +128,13 @@ public class CloudinaryImageService {
             log.debug("📤 Subiendo imagen a Cloudinary en carpeta: {}", folder);
 
             // 2. Ejecutar la subida a Cloudinary
+        this.folder = properties.getFolder();
+    }
+
+    public CloudinaryUploadResult uploadImage(MultipartFile file) {
+        validateImage(file);
+
+        try {
             Map<?, ?> uploaded = cloudinary.uploader().upload(
                     file.getBytes(),
                     ObjectUtils.asMap(
@@ -244,10 +266,15 @@ public class CloudinaryImageService {
             );
         }
 
+        if (file.getSize() < MIN_IMAGE_SIZE_BYTES) {
+            throw new InvalidImageException(
+                    "La imagen debe pesar al menos 500 KB."
+            );
+        }
+
         if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
             throw new InvalidImageException(
-                    String.format("La imagen no puede superar el tamaño máximo permitido de %.1f MB.",
-                            MAX_IMAGE_SIZE_BYTES / (1024.0 * 1024.0))
+                    "La imagen no puede superar los 2 MB."
             );
         }
 

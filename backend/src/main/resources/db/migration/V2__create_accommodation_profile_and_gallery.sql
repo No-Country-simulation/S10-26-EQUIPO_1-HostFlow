@@ -1,6 +1,37 @@
 -- HostFlow: perfil general del alojamiento y galería de imágenes.
 -- La tabla accommodations es independiente de accommodation_temporary_disables:
 -- editar datos del perfil no activa ni desactiva la disponibilidad.
+-- HostFlow: esquema base de propietarios, roles, perfil del alojamiento y galería.
+-- Las tablas owners/roles/owner_roles deben existir antes de crear la FK de accommodations.
+-- IF NOT EXISTS permite trabajar sobre una BD donde Hibernate ya creó estas tablas,
+-- sin reemplazarlas ni borrar sus registros.
+
+CREATE TABLE IF NOT EXISTS owners (
+    id BIGSERIAL PRIMARY KEY,
+    full_name VARCHAR(150) NOT NULL,
+    accommodation_name VARCHAR(200) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    terms_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS roles (
+    id BIGSERIAL PRIMARY KEY,
+    role_name VARCHAR(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS owner_roles (
+    owner_id BIGINT NOT NULL,
+    role_id BIGINT NOT NULL,
+    CONSTRAINT pk_owner_roles PRIMARY KEY (owner_id, role_id),
+    CONSTRAINT fk_owner_roles_owner FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE,
+    CONSTRAINT fk_owner_roles_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_owner_roles_role ON owner_roles(role_id);
 
 CREATE TABLE IF NOT EXISTS accommodations (
     id BIGSERIAL PRIMARY KEY,
@@ -46,5 +77,8 @@ CREATE TABLE IF NOT EXISTS accommodation_images (
 CREATE INDEX IF NOT EXISTS idx_accommodation_images_accommodation
     ON accommodation_images(accommodation_id);
 
+COMMENT ON TABLE owners IS 'Propietarios registrados en HostFlow';
+COMMENT ON TABLE roles IS 'Roles de seguridad del sistema';
+COMMENT ON TABLE owner_roles IS 'Relación muchos a muchos entre propietarios y roles';
 COMMENT ON TABLE accommodations IS 'Datos generales, capacidad, precio y datos de contacto/comerciales del alojamiento';
 COMMENT ON TABLE accommodation_images IS 'Galería de imágenes del alojamiento; almacena URLs, no archivos binarios';

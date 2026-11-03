@@ -30,6 +30,13 @@ public class AccommodationProfileRequest {
     @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "primaryColor debe ser un color hexadecimal, por ejemplo #AABBCC")
     private String primaryColor;
 
+    /*public String getUserIdentifier() { return userIdentifier; }
+    public void setUserIdentifier(String userIdentifier) { this.userIdentifier = userIdentifier; }
+    public String getWalletPhone() { return walletPhone; }
+    public void setWalletPhone(String walletPhone) { this.walletPhone = walletPhone; }
+    public String getWalletEmail() { return walletEmail; }
+    public void setWalletEmail(String walletEmail) { this.walletEmail = walletEmail; }*/
+
     @Schema(description = "Mensaje de bienvenida del alojamiento.", example = "¡Te damos la bienvenida!", maxLength = 5000, nullable = true)
     @Size(max = 5000)
     private String welcomeMessage;
@@ -58,6 +65,12 @@ public class AccommodationProfileRequest {
     public void setBasePrice(BigDecimal basePrice) { this.basePrice = basePrice; }
     public String getPrimaryColor() { return primaryColor; }
     public void setPrimaryColor(String primaryColor) { this.primaryColor = primaryColor; }
+    /*public String getAccentColor() { return accentColor; }
+    public void setAccentColor(String accentColor) { this.accentColor = accentColor; }
+    public String getTertiaryColor() { return tertiaryColor; }
+    public void setTertiaryColor(String tertiaryColor) { this.tertiaryColor = tertiaryColor; }
+    public String getBackgroundPattern() { return backgroundPattern; }
+    public void setBackgroundPattern(String backgroundPattern) { this.backgroundPattern = backgroundPattern; }*/
     public String getWelcomeMessage() { return welcomeMessage; }
     public void setWelcomeMessage(String welcomeMessage) { this.welcomeMessage = welcomeMessage; }
     public String getEmail() { return email; }

@@ -1,0 +1,290 @@
+@import "tailwindcss";
+
+/* ══════════════════════════════════════════════════════════════════════════
+   HostFlow · sistema visual (Tailwind v4)
+   Paleta "Booksy" (tomada de las capturas de referencia):
+     · Lima        #D4F53C  → acción primaria (botones, acentos)
+     · Teal        #0FA3A3  → acción secundaria / datos
+     · Rosa        #F4B8C4  → acentos suaves (precios, estados)
+     · Carbón      #111111  → fondo oscuro / texto
+     · Papel       #FFFFFF  → fondo claro (preseleccionado)
+   Tipografía: DM Sans (interfaz y titulares) + Fraunces (wordmark).
+
+   Modo claro/oscuro: los tokens viven en @theme (se emiten como --color-*)
+   y la clase `.dark` en <html> los sobreescribe. Ver src/lib/theme/ThemeContext.jsx.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* ── Neutros (modo claro) ── */
+  --color-paper: #ffffff;
+  --color-cloud: #f6f6f4;
+  --color-ink: #111111;
+  --color-ink-soft: rgba(17, 17, 17, 0.72);
+  --color-muted: rgba(17, 17, 17, 0.5);
+  --color-line: rgba(17, 17, 17, 0.1);
+  --color-line-strong: rgba(17, 17, 17, 0.2);
+  --color-overlay: rgba(17, 17, 17, 0.04);
+  --color-shadow: rgba(17, 17, 17, 0.12);
+
+  /* ── Acentos (idénticos en ambos modos) ── */
+  --color-lime: #d4f53c;
+  --color-lime-strong: #b9e02c;
+  --color-lime-soft: #eefb9a;
+  --color-lime-ink: #33400c;
+  --color-teal: #0fa3a3;
+  --color-teal-strong: #0b8787;
+  --color-teal-soft: rgba(15, 163, 163, 0.12);
+  --color-pink: #f4b8c4;
+  --color-pink-strong: #e892a6;
+  --color-pink-soft: rgba(244, 184, 196, 0.2);
+
+  /* ── Estados ── */
+  --color-danger: #e5484d;
+  --color-danger-soft: rgba(229, 72, 77, 0.1);
+  --color-success: #12a150;
+  --color-success-soft: rgba(18, 161, 80, 0.12);
+
+  /* ── Tipografía ── */
+  --font-sans: "DM Sans Variable", "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fraunces Variable", "Fraunces", Georgia, serif;
+
+  /* ── Radios y sombras ── */
+  --radius-chip: 12px;
+  --radius-card: 18px;
+  --radius-card-lg: 26px;
+  --shadow-card: 0 1px 2px var(--color-shadow), 0 12px 32px -12px var(--color-shadow);
+  --shadow-pop: 0 2px 6px var(--color-shadow), 0 24px 48px -16px var(--color-shadow);
+  --shadow-lime: 0 8px 24px -8px rgba(185, 224, 44, 0.55);
+
+  /* ── Animaciones ── */
+  --animate-rise: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-fade: fade 0.4s ease both;
+  --animate-pop: pop 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-float-slow: float 11s ease-in-out infinite;
+  --animate-marquee: marquee 34s linear infinite;
+  --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
+  --animate-shimmer: shimmer 1.8s linear infinite;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
+  }
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* ── Modo oscuro: sobreescribe los tokens del tema ──────────────────────── */
+
+.dark {
+  --color-paper: #111111;
+  --color-cloud: #1a1a1a;
+  --color-ink: #f4f4f1;
+  --color-ink-soft: rgba(244, 244, 241, 0.72);
+  --color-muted: rgba(244, 244, 241, 0.52);
+  --color-line: rgba(244, 244, 241, 0.1);
+  --color-line-strong: rgba(244, 244, 241, 0.22);
+  --color-overlay: rgba(244, 244, 241, 0.05);
+  --color-shadow: rgba(0, 0, 0, 0.55);
+}
+
+/* ── Variables auxiliares (fuera del namespace de Tailwind) ─────────────── */
+
+:root {
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* ── Base global ───────────────────────────────────────────────────────────── */
+
+@layer base {
+  html {
+    background: var(--color-paper);
+    color-scheme: light;
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    color: var(--color-ink);
+    background: var(--color-paper);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  h1,
+  h2 {
+    font-weight: 700;
+  }
+  h3 {
+    font-weight: 650;
+  }
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button,
+  a,
+  label,
+  select,
+  input {
+    touch-action: manipulation;
+  }
+  svg {
+    flex: 0 0 auto;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-lime) 55%, transparent);
+    color: var(--color-lime-ink);
+  }
+  :focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--color-lime) 65%, var(--color-teal));
+    outline-offset: 2px;
+    border-radius: 10px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--color-ink) 24%, transparent) transparent;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ── Utilidades propias ────────────────────────────────────────────────────── */
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .card {
+    border: 1px solid var(--color-line);
+    background: var(--color-paper);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  .card-hover {
+    transition:
+      transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1),
+      border-color 0.25s,
+      box-shadow 0.25s;
+  }
+  .card-hover:hover {
+    transform: translateY(-3px);
+    border-color: var(--color-line-strong);
+    box-shadow: var(--shadow-pop);
+  }
+  .glass {
+    background: color-mix(in srgb, var(--color-paper) 78%, transparent);
+    backdrop-filter: blur(14px) saturate(1.2);
+  }
+  .text-gradient-lime {
+    background: linear-gradient(
+      92deg,
+      var(--color-teal) 0%,
+      var(--color-lime-strong) 55%,
+      var(--color-pink-strong) 120%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .dot-grid {
+    background-image: radial-gradient(
+      color-mix(in srgb, var(--color-ink) 14%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-ink) 4%, transparent) 25%,
+      color-mix(in srgb, var(--color-ink) 10%, transparent) 37%,
+      color-mix(in srgb, var(--color-ink) 4%, transparent) 63%
+    );
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+}
