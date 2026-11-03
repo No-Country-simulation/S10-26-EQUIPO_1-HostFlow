@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { Eye, EyeOff, Moon, Sun } from "lucide-react";
+import { CircleAlert, Eye, EyeOff, Moon, Sun } from "lucide-react";
 import { DEMO_MODE } from "@lib/config/env";
 import { useTheme } from "@lib/theme/ThemeContext";
 import { cn, initials } from "@utils/format";
@@ -49,9 +49,27 @@ const CONTROL_ERROR =
 export const controlClass = (error, className) =>
   cn(CONTROL, error ? CONTROL_ERROR : CONTROL_OK, className);
 
+// Aviso de error de un campo. Va debajo del input (no en un cartel suelto al
+// final del formulario) pero con el mismo peso visual que una alerta: caja
+// suave, borde y tilde de aviso, para que no pase desapercibido.
+export function FieldError({ children, id }) {
+  if (!children) return null;
+  return (
+    <span
+      id={id}
+      role="alert"
+      className="animate-rise flex items-start gap-2 rounded-xl border border-danger/35 bg-danger-soft px-3 py-2 text-[12.5px] font-semibold leading-snug text-danger"
+    >
+      <CircleAlert size={14} className="mt-px shrink-0" aria-hidden="true" />
+      <span>{children}</span>
+    </span>
+  );
+}
+
 export function Field({ label, error, hint, as = "input", children, className, ...props }) {
   const Element = as;
   const custom = Boolean(children) && as === "input";
+  const errorId = error && props.name ? `${props.name}-error` : undefined;
 
   return (
     <label className={cn("grid gap-1.5 text-[13.5px] font-semibold text-ink", className)}>
@@ -69,13 +87,14 @@ export function Field({ label, error, hint, as = "input", children, className, .
                 "appearance-none bg-[image:var(--select-arrow)] bg-[right_13px_center] bg-no-repeat pr-10",
             ),
           )}
+          aria-describedby={errorId}
           {...props}
         >
           {children}
         </Element>
       )}
 
-      {error && <small className="text-[12.5px] font-semibold text-danger">{error}</small>}
+      <FieldError id={errorId}>{error}</FieldError>
       {!error && hint && <small className="text-[12.5px] font-normal text-muted">{hint}</small>}
     </label>
   );
@@ -126,6 +145,24 @@ export function Alert({ children, tone = "danger" }) {
 }
 
 // ── Marca ───────────────────────────────────────────────────────────────────
+
+// Logo de WhatsApp. lucide ya no incluye íconos de marcas, así que va como SVG
+// propio: es el ícono que el huésped reconoce de inmediato.
+export function WhatsAppIcon({ size = 16, className, ...props }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+    </svg>
+  );
+}
 
 export function LogoMark({ className }) {
   return (
@@ -199,6 +236,34 @@ export function Card({ className, children, as: Element = "div", ...props }) {
   );
 }
 
+// Título de un formulario dentro de una Card. Queda pegado arriba (debajo de
+// la barra del panel) mientras se completa el formulario, así sigue visible
+// aun cuando el usuario llega al final y tiene que confirmar.
+// Los márgenes negativos lo estiran hasta los bordes de la card.
+export function StickyFormTitle({ icon: Icon, title, hint, aside, className, children }) {
+  return (
+    <div
+      className={cn(
+        "sticky top-[65px] z-20 -mx-6 flex flex-wrap items-center justify-between gap-2 border-b border-line bg-paper/95 px-6 pb-3 pt-2 backdrop-blur",
+        className,
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        {Icon && (
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-teal-soft text-teal-strong">
+            <Icon size={17} aria-hidden="true" />
+          </span>
+        )}
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-ink">{title || children}</p>
+          {hint && <p className="text-xs text-muted">{hint}</p>}
+        </div>
+      </div>
+      {aside}
+    </div>
+  );
+}
+
 export function Badge({ tone = "neutral", className, children }) {
   const tones = {
     neutral: "bg-overlay text-ink-soft",
@@ -232,6 +297,45 @@ export function Avatar({ name = "", className, size = "size-9" }) {
       )}
     >
       {initials(name) || "·"}
+    </span>
+  );
+}
+
+// Logo del alojamiento: círculo limpio, sin marco blanco ni relleno, para que
+// la marca se integre a la banda de color. La imagen se centra y cubre el
+// círculo (encuadre tipo avatar), así se ve redonda en cualquier tamaño. Si no
+// hay logo, muestra iniciales con el color de la cabecera de marca.
+export function BrandLogo({ src, name = "", size = "md", alt, className }) {
+  const dim = { sm: "size-9", md: "size-11", lg: "size-16" }[size] || "size-11";
+
+  if (!src) {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn("grid shrink-0 place-items-center rounded-full text-sm font-extrabold", dim, className)}
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--hf-hero-ink, currentColor) 15%, transparent)",
+          color: "var(--hf-hero-ink, currentColor)",
+        }}
+      >
+        {initials(name) || "·"}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-block shrink-0 overflow-hidden rounded-full bg-cloud ring-1 ring-black/10 ring-inset",
+        dim,
+        className,
+      )}
+    >
+      <img
+        src={src}
+        alt={alt || (name ? `Logo de ${name}` : "Logo")}
+        className="block size-full object-cover"
+      />
     </span>
   );
 }
@@ -305,6 +409,7 @@ export function Switch({ checked, onChange, label, description }) {
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={label}
         onClick={() => onChange?.(!checked)}
         className={cn(
           "relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors duration-200",
@@ -319,6 +424,8 @@ export function Switch({ checked, onChange, label, description }) {
         />
       </button>
       {(label || description) && (
+        // El `<label>` nativo ya forwardea los clicks de esta zona al botón
+        // (button es "labelable"): tocar el texto alterna el switch una sola vez.
         <span className="grid">
           {label && <span className="text-sm font-semibold text-ink">{label}</span>}
           {description && <span className="text-xs text-muted">{description}</span>}
@@ -370,7 +477,7 @@ export function OtpInput({ value = "", onChange, length = 6, autoFocus = true, e
   };
 
   return (
-    <div className="flex justify-between gap-2" onPaste={handlePaste}>
+    <div className="flex justify-between gap-1.5 sm:gap-2" onPaste={handlePaste}>
       {digits.map((digit, index) => (
         <input
           key={index}
@@ -384,7 +491,7 @@ export function OtpInput({ value = "", onChange, length = 6, autoFocus = true, e
           onKeyDown={handleKeyDown(index)}
           aria-label={`Dígito ${index + 1}`}
           className={cn(
-            "size-12 appearance-none rounded-xl border bg-paper text-center text-xl font-extrabold text-ink outline-none transition-all duration-200 placeholder:text-muted",
+            "size-10 appearance-none rounded-xl border bg-paper text-center text-lg font-extrabold text-ink outline-none transition-all duration-200 placeholder:text-muted sm:size-12 sm:text-xl",
             error
               ? "border-danger"
               : "border-line-strong hover:border-ink/35 focus:border-teal focus:shadow-[0_0_0_4px_var(--color-teal-soft)]",
@@ -436,11 +543,12 @@ export function DemoBanner({ className }) {
     <div
       role="note"
       className={cn(
-        "border-b border-lime/40 bg-lime-soft px-4 py-2 text-center text-[12.5px] font-semibold text-lime-ink",
+        "border-b border-lime/50 bg-paper px-4 py-2 text-center text-[12.5px] font-semibold text-ink-soft",
         className,
       )}
     >
-      Modo demostración · datos de prueba. Nada se envía a ningún servidor.
+      <strong className="font-bold text-lime-strong">Modo demostración</strong> · datos de prueba. Nada se envía a
+      ningún servidor.
     </div>
   );
 }
