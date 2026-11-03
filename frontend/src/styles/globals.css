@@ -6,7 +6,7 @@
      · Lima        #D4F53C  → acción primaria (botones, acentos)
      · Teal        #0FA3A3  → acción secundaria / datos
      · Rosa        #F4B8C4  → acentos suaves (precios, estados)
-     · Carbón      #111111  → fondo oscuro / texto
+     · Carbón      #101518  → fondo oscuro (casi negro, con un leve azul) / texto
      · Papel       #FFFFFF  → fondo claro (preseleccionado)
    Tipografía: DM Sans (interfaz y titulares) + Fraunces (wordmark).
 
@@ -59,7 +59,10 @@
   --shadow-lime: 0 8px 24px -8px rgba(185, 224, 44, 0.55);
 
   /* ── Animaciones ── */
-  --animate-rise: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  /* `backwards` (no `both`): al terminar, la animación no conserva el
+     `transform`; un transform retenido crea un stacking context y deja debajo
+     a los elementos sticky (título del formulario, barra de progreso). */
+  --animate-rise: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   --animate-fade: fade 0.4s ease both;
   --animate-pop: pop 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-float: float 7s ease-in-out infinite;
@@ -67,6 +70,12 @@
   --animate-marquee: marquee 34s linear infinite;
   --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
   --animate-shimmer: shimmer 1.8s linear infinite;
+  --animate-drift: drift 7s ease-in-out infinite;
+  --animate-drift-slow: drift 11s ease-in-out infinite;
+  --animate-sway: sway 6.5s ease-in-out infinite;
+  --animate-bob: bob 5s ease-in-out infinite;
+  --animate-water: water 16s linear infinite;
+  --animate-flicker: flicker 3.2s ease-in-out infinite;
 
   @keyframes rise {
     from {
@@ -130,19 +139,70 @@
       background-position: -200% 0;
     }
   }
+  /* Flotar suave: stickers y tarjetas "vivas" del home. */
+  @keyframes drift {
+    0%,
+    100% {
+      transform: translateY(0) rotate(var(--drift-rotate, 0deg));
+    }
+    50% {
+      transform: translateY(-11px) rotate(var(--drift-rotate, 0deg));
+    }
+  }
+  /* Balanceo: juncos, plantas y elementos colgantes. */
+  @keyframes sway {
+    0%,
+    100% {
+      transform: rotate(-2.2deg);
+    }
+    50% {
+      transform: rotate(2.2deg);
+    }
+  }
+  /* Chapoteo: el bote sube y baja con el agua. */
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0) rotate(-1.2deg);
+    }
+    50% {
+      transform: translateY(-5px) rotate(1.4deg);
+    }
+  }
+  /* Corriente: las líneas del río se desplazan en horizontal (loop). */
+  @keyframes water {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-160px);
+    }
+  }
+  /* Brillo tenue: el sol y las luces de la escena respiran. */
+  @keyframes flicker {
+    0%,
+    100% {
+      opacity: 0.85;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
 }
 
 /* ── Modo oscuro: sobreescribe los tokens del tema ──────────────────────── */
 
 .dark {
-  --color-paper: #111111;
-  --color-cloud: #1a1a1a;
-  --color-ink: #f4f4f1;
-  --color-ink-soft: rgba(244, 244, 241, 0.72);
-  --color-muted: rgba(244, 244, 241, 0.52);
-  --color-line: rgba(244, 244, 241, 0.1);
-  --color-line-strong: rgba(244, 244, 241, 0.22);
-  --color-overlay: rgba(244, 244, 241, 0.05);
+  /* Fondo casi negro, nunca #000: un carbón con un leve tinte azul evita el
+     "halo" del negro puro y separa mejor las superficies. */
+  --color-paper: #101518;
+  --color-cloud: #171d21;
+  --color-ink: #f2f5f4;
+  --color-ink-soft: rgba(242, 245, 244, 0.74);
+  --color-muted: rgba(242, 245, 244, 0.56);
+  --color-line: rgba(242, 245, 244, 0.1);
+  --color-line-strong: rgba(242, 245, 244, 0.22);
+  --color-overlay: rgba(242, 245, 244, 0.06);
   --color-shadow: rgba(0, 0, 0, 0.55);
 }
 
@@ -244,14 +304,40 @@
       border-color 0.25s,
       box-shadow 0.25s;
   }
-  .card-hover:hover {
-    transform: translateY(-3px);
-    border-color: var(--color-line-strong);
-    box-shadow: var(--shadow-pop);
+  /* Solo con puntero real: en táctil el hover "se queda pegado" tras el tap */
+  @media (hover: hover) {
+    .card-hover:hover {
+      transform: translateY(-3px);
+      border-color: var(--color-line-strong);
+      box-shadow: var(--shadow-pop);
+    }
   }
   .glass {
     background: color-mix(in srgb, var(--color-paper) 78%, transparent);
     backdrop-filter: blur(14px) saturate(1.2);
+  }
+  /* Superficie de la marca: fondo teñido + patrón elegido por el alojamiento.
+     El patrón es una MÁSCARA en ::before, detrás del contenido, así cualquier
+     forma (hojas, olas, pétalos…) se pinta con el color de marca. Las variables
+     las define LodgingTheme dentro del scope de la marca. */
+  .hf-surface {
+    position: relative;
+    isolation: isolate;
+    background-color: var(--hf-surface, var(--color-cloud));
+  }
+  .hf-surface::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--hf-pattern-color, transparent);
+    -webkit-mask-image: var(--hf-pattern-mask, none);
+    mask-image: var(--hf-pattern-mask, none);
+    -webkit-mask-size: var(--hf-pattern-size, auto);
+    mask-size: var(--hf-pattern-size, auto);
+    -webkit-mask-repeat: repeat;
+    mask-repeat: repeat;
   }
   .text-gradient-lime {
     background: linear-gradient(
@@ -286,5 +372,52 @@
     );
     background-size: 200% 100%;
     animation: var(--animate-shimmer);
+  }
+  /* Grano de película sutil: le baja el "aire de render" a las superficies
+     grandes y unifica la escena con el resto de la página. */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  }
+  /* Cinta adhesiva de polaroid: detalle artesanal para las fotos ilustradas. */
+  .tape::before {
+    content: "";
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    width: 84px;
+    height: 26px;
+    transform: translateX(-50%) rotate(-3deg);
+    background: color-mix(in srgb, var(--color-lime) 62%, transparent);
+    border-left: 1px dashed color-mix(in srgb, var(--color-ink) 18%, transparent);
+    border-right: 1px dashed color-mix(in srgb, var(--color-ink) 18%, transparent);
+    opacity: 0.9;
+  }
+  /* Subrayado a mano (trazo SVG debajo del texto). */
+  .underline-hand {
+    position: relative;
+    display: inline-block;
+  }
+  .underline-hand::after {
+    content: "";
+    position: absolute;
+    left: -2%;
+    bottom: -0.14em;
+    width: 104%;
+    height: 0.34em;
+    background: currentColor;
+    opacity: 0.35;
+    border-radius: 999px;
+    transform: rotate(-0.6deg) scaleX(var(--ul-scale, 1));
+    transform-origin: left center;
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='12' viewBox='0 0 120 12'%3E%3Cpath d='M2 8c22-5 44-6 66-4 18 1.6 33 4 50 1.5' stroke='%23000' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='12' viewBox='0 0 120 12'%3E%3Cpath d='M2 8c22-5 44-6 66-4 18 1.6 33 4 50 1.5' stroke='%23000' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    mask-size: 100% 100%;
+    -webkit-mask-size: 100% 100%;
   }
 }
