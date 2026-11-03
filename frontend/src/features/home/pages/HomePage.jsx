@@ -526,31 +526,78 @@ function Tree({ x, y, s = 1, o = 0.5 }) {
 
 // ── Marquee ─────────────────────────────────────────────────────────────────
 
+// Iniciales de un alojamiento, salteando artículos y preposiciones.
+const TRUST_STOPWORDS = new Set(["del", "de", "la", "las", "los", "el", "y"]);
+const trustInitials = (name) =>
+  name
+    .split(" ")
+    .filter((word) => word.length >= 2 && !TRUST_STOPWORDS.has(word.toLowerCase()))
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+
+// Tonos de marca sólidos (los mismos del hero): se leen bien en claro y oscuro,
+// a diferencia de los tintes suaves que sobre el fondo oscuro quedaban turbios.
+const TRUST_TONES = ["bg-lime text-lime-ink", "bg-teal text-white", "bg-pink text-ink"];
+
 function LogoMarquee() {
   const names = ["Cabañas del Río", "Posada Delta", "Albergue La Lancha", "Hotel Tigre", "Lo del Mono", "Mirador del Paraná", "Casa Flotante"];
-  const doubled = [...names, ...names];
+  // Dos grupos IDÉNTICOS: el keyframe mueve el track un -50 %, que equivale
+  // exactamente al ancho de un grupo. Así el bucle cierra sin saltos (antes el
+  // `gap` y el `pr` de la lista duplicada no coincidían y la animación “cortaba”
+  // al reiniciar).
+  const groups = [0, 1];
 
   return (
-    <section className="relative overflow-hidden border-y border-line bg-cloud py-8">
+    <section className="relative overflow-hidden border-y border-line bg-cloud py-8 sm:py-9">
+      {/* Manchas de marca muy suaves: dan color sin las tramas de líneas, que
+          ensuciaban la lectura y chocaban con el estilo limpio del home. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-[0.14]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(-45deg, var(--color-ink) 0 1px, transparent 1px 9px)",
-        }}
+        className="pointer-events-none absolute -left-20 top-1/2 size-56 -translate-y-1/2 rounded-full bg-lime/25 blur-3xl"
       />
-      <p className="relative mb-6 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-muted">
-        Confían en HostFlow
-      </p>
-      <div className="relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_12%,black_88%,transparent)]">
-        <div className="flex w-max animate-marquee gap-10 pr-10">
-          {doubled.map((name, index) => (
-            <span key={`${name}-${index}`} className="flex items-center gap-2 whitespace-nowrap text-sm font-bold text-ink-soft/70">
-              <Sparkles size={14} className="text-teal-strong" />
-              {name}
-            </span>
-          ))}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-20 top-1/2 size-56 -translate-y-1/2 rounded-full bg-teal/20 blur-3xl"
+      />
+
+      <div className="relative mx-auto max-w-6xl px-5 sm:px-6">
+        {/* Rótulo centrado con punto de marca: el recurso de eyebrow del home,
+            sin las reglas largas a los costados. */}
+        <p className="mb-5 flex items-center justify-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-lime" />
+          Confían en HostFlow
+        </p>
+
+        <div className="group relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]">
+          <div className="flex w-max animate-marquee group-hover:[animation-play-state:paused] motion-reduce:animate-none">
+            {groups.map((group) => (
+              <ul
+                key={group}
+                aria-hidden={group === 1 ? "true" : undefined}
+                className="flex shrink-0 items-center gap-3 pr-3"
+              >
+                {names.map((name, index) => (
+                  <li
+                    key={`${group}-${name}`}
+                    className="flex shrink-0 items-center gap-2 rounded-full border border-line-strong bg-paper py-1.5 pl-1.5 pr-4"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "grid size-6 place-items-center rounded-full text-[10px] font-extrabold",
+                        TRUST_TONES[index % TRUST_TONES.length],
+                      )}
+                    >
+                      {trustInitials(name)}
+                    </span>
+                    <span className="whitespace-nowrap text-[13px] font-bold text-ink">{name}</span>
+                  </li>
+                ))}
+              </ul>
+            ))}
+          </div>
         </div>
       </div>
     </section>

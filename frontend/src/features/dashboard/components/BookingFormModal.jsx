@@ -14,6 +14,40 @@ function isPhone(value) {
   return /^[+0-9()\s.-]+$/.test(value) && digits.length >= 6 && digits.length <= 15;
 }
 
+// Validación campo por campo: cada mensaje se muestra DEBAJO de su input (igual
+// que en el onboarding), no en un cartel suelto al final del formulario.
+const FIELD_ORDER = ["guestName", "guestEmail", "guestPhone", "checkIn", "checkOut", "guests"];
+
+const readForm = (form) => ({
+  guestName: String(form.get("guestName") || "").trim(),
+  guestEmail: String(form.get("guestEmail") || "").trim(),
+  guestPhone: String(form.get("guestPhone") || "").trim(),
+  checkIn: String(form.get("checkIn") || ""),
+  checkOut: String(form.get("checkOut") || ""),
+  guests: Number(form.get("guests")),
+});
+
+const validateFields = (data) => ({
+  guestName: !data.guestName ? "Ingresá el nombre del huésped." : "",
+  guestEmail: !data.guestEmail
+    ? "Ingresá el correo del huésped."
+    : !isEmail(data.guestEmail)
+      ? "Ingresá un correo válido."
+      : "",
+  guestPhone: !data.guestPhone
+    ? "Ingresá el teléfono del huésped."
+    : !isPhone(data.guestPhone)
+      ? "Revisá el teléfono del huésped: tiene que ser un número real."
+      : "",
+  checkIn: !data.checkIn ? "Elegí la fecha de ingreso." : "",
+  checkOut: !data.checkOut
+    ? "Elegí la fecha de salida."
+    : data.checkOut <= data.checkIn
+      ? "La salida debe ser posterior al ingreso."
+      : "",
+  guests: !data.guests || data.guests < 1 ? "La cantidad de huéspedes debe ser al menos 1." : "",
+});
+
 // Alta de una reserva desde el panel del anfitrión (entregable C).
 // Requisitos previos (spec): antes de crear una reserva el alojamiento debe
 // tener al menos 1 método de pago, el logo subido, la descripción de
@@ -25,6 +59,7 @@ export function BookingFormModal({ open, onClose, onCreated }) {
   const bookings = useStore((s) => s.bookings);
   const blockedDays = useStore((s) => s.blockedDays);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [saving, setSaving] = useState(false);
   // Fechas elegidas en el form: alimentan el chequeo de disponibilidad en vivo.
   const [dates, setDates] = useState({ checkIn: "", checkOut: "" });
@@ -44,7 +79,9 @@ export function BookingFormModal({ open, onClose, onCreated }) {
     if (blockedDays.some((d) => d >= checkIn && d < checkOut)) {
       return "Hay días bloqueados en esas fechas: revisá la pantalla de Disponibilidad.";
     }
-    const clash = bookings.find((b) => b.checkIn < checkOut && b.checkOut > checkIn);
+    const clash = bookings.find(
+      (b) => b.status !== "CANCELLED" && b.checkIn < checkOut && b.checkOut > checkIn,
+    );
     if (clash) return `Esas fechas ya tienen una reserva de ${clash.guestName}.`;
     return "";
   };
@@ -55,7 +92,31 @@ export function BookingFormModal({ open, onClose, onCreated }) {
     [dates, bookings, blockedDays],
   );
 
-  const setDate = (key) => (event) => setDates((current) => ({ ...current, [key]: event.target.value }));
+  // Revalida un campo con los valores actuales del form. `onlyIfShown` evita
+  // mostrar errores en campos que el anfitrión todavía no tocó.
+  const revalidateField = (name, form, onlyIfShown = false) => {
+    const errors = validateFields(readForm(new FormData(form)));
+    setFieldErrors((current) => {
+      if (onlyIfShown && !current[name]) return current;
+      return { ...current, [name]: errors[name] || "" };
+    });
+  };
+
+  // Al escribir, si el campo ya mostraba un error se recalcula en vivo para que
+  // desaparezca apenas se corrige (sin esperar a reintentar el alta).
+  const onFieldChange = (name) => (event) => {
+    setError("");
+    revalidateField(name, event.currentTarget.form, true);
+  };
+
+  // Al salir del campo se valida: el aviso aparece debajo del input.
+  const onFieldBlur = (name) => (event) => revalidateField(name, event.currentTarget.form);
+
+  const setDate = (key) => (event) => {
+    setDates((current) => ({ ...current, [key]: event.target.value }));
+    setError("");
+    revalidateField(key, event.currentTarget.form, true);
+  };
 
   // El total no se escribe a mano: son las noches por el precio del alojamiento.
   // La moneda sale del alojamiento y los adicionales que el huésped elija en el
@@ -69,6 +130,7 @@ export function BookingFormModal({ open, onClose, onCreated }) {
 
   const close = () => {
     setError("");
+    setFieldErrors({});
     setDates({ checkIn: "", checkOut: "" });
     onClose();
   };
@@ -77,24 +139,23 @@ export function BookingFormModal({ open, onClose, onCreated }) {
     event.preventDefault();
     if (saving) return; // evita dobles envíos por clicks repetidos
 
-    const form = new FormData(event.currentTarget);
+    const form = event.currentTarget;
     const data = {
-      guestName: String(form.get("guestName") || "").trim(),
-      guestEmail: String(form.get("guestEmail") || "").trim(),
-      guestPhone: String(form.get("guestPhone") || "").trim(),
-      checkIn: String(form.get("checkIn") || ""),
-      checkOut: String(form.get("checkOut") || ""),
-      guests: Number(form.get("guests")),
-      status: String(form.get("status") || "PENDING"),
+      ...readForm(new FormData(form)),
+      // Las reservas nuevas siempre nacen pendientes. El estado se cambia
+      // después, desde el detalle de la reserva.
+      status: "PENDING",
     };
 
-    if (!data.guestName) return setError("Ingresá el nombre del huésped.");
-    if (!data.guestEmail || !isEmail(data.guestEmail)) return setError("Ingresá un correo válido.");
-    if (!data.guestPhone) return setError("Ingresá el teléfono del huésped.");
-    if (!isPhone(data.guestPhone)) return setError("Revisá el teléfono del huésped: tiene que ser un número real.");
-    if (!data.checkIn) return setError("Elegí la fecha de ingreso.");
-    if (!data.checkOut || data.checkOut <= data.checkIn) return setError("La salida debe ser posterior al ingreso.");
-    if (!data.guests || data.guests < 1) return setError("La cantidad de huéspedes debe ser al menos 1.");
+    // Errores de los campos: cada uno se muestra debajo de su input.
+    const errors = validateFields(data);
+    setFieldErrors(errors);
+    const firstInvalid = FIELD_ORDER.find((key) => errors[key]);
+    if (firstInvalid) {
+      form.elements[firstInvalid]?.focus();
+      return;
+    }
+
     if (!pricePerNight) {
       return setError("Definí el precio por noche del alojamiento para poder calcular el total.");
     }
@@ -133,7 +194,7 @@ export function BookingFormModal({ open, onClose, onCreated }) {
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={close}
       title="Nueva reserva"
       subtitle="Registrá una reserva recibida por WhatsApp, teléfono o en persona."
     >
@@ -143,7 +204,7 @@ export function BookingFormModal({ open, onClose, onCreated }) {
           <BookingRequirementsAlert
             compact
             requirements={requirements}
-            intro="Completala en Perfil o Pagos antes de crear la reserva."
+            intro="Completalos en el panel antes de crear la reserva."
           />
         </div>
 
@@ -152,8 +213,21 @@ export function BookingFormModal({ open, onClose, onCreated }) {
           name="guestName"
           placeholder="Ej. María González"
           autoFocus={requirements.length === 0}
+          onChange={onFieldChange("guestName")}
+          onBlur={onFieldBlur("guestName")}
+          error={fieldErrors.guestName}
+          aria-invalid={Boolean(fieldErrors.guestName)}
         />
-        <Field label="Correo del huésped" name="guestEmail" type="email" placeholder="maria@example.com" />
+        <Field
+          label="Correo del huésped"
+          name="guestEmail"
+          type="email"
+          placeholder="maria@example.com"
+          onChange={onFieldChange("guestEmail")}
+          onBlur={onFieldBlur("guestEmail")}
+          error={fieldErrors.guestEmail}
+          aria-invalid={Boolean(fieldErrors.guestEmail)}
+        />
         <Field
           label="Teléfono del huésped"
           name="guestPhone"
@@ -161,23 +235,54 @@ export function BookingFormModal({ open, onClose, onCreated }) {
           inputMode="tel"
           placeholder="Ej. +54 9 11 5555 0101"
           hint="Lo usamos para coordinar la llegada y queda precargado en su ficha."
+          onChange={onFieldChange("guestPhone")}
+          onBlur={onFieldBlur("guestPhone")}
+          error={fieldErrors.guestPhone}
+          aria-invalid={Boolean(fieldErrors.guestPhone)}
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Ingreso" name="checkIn" type="date" min={today} value={dates.checkIn} onChange={setDate("checkIn")} />
-          <Field label="Salida" name="checkOut" type="date" min={today} value={dates.checkOut} onChange={setDate("checkOut")} />
+          <Field
+            label="Ingreso"
+            name="checkIn"
+            type="date"
+            min={today}
+            value={dates.checkIn}
+            onChange={setDate("checkIn")}
+            onBlur={onFieldBlur("checkIn")}
+            error={fieldErrors.checkIn}
+            aria-invalid={Boolean(fieldErrors.checkIn)}
+          />
+          <Field
+            label="Salida"
+            name="checkOut"
+            type="date"
+            min={today}
+            value={dates.checkOut}
+            onChange={setDate("checkOut")}
+            onBlur={onFieldBlur("checkOut")}
+            error={fieldErrors.checkOut}
+            aria-invalid={Boolean(fieldErrors.checkOut)}
+          />
         </div>
 
         {/* Disponibilidad en vivo de las fechas elegidas */}
         {conflict && <Alert>{conflict}</Alert>}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Huéspedes" name="guests" type="number" min="1" defaultValue={2} />
-          <Field as="select" label="Estado" name="status" defaultValue="PENDING">
-            <option value="PENDING">Pendiente</option>
-            <option value="CONFIRMED">Confirmada</option>
-          </Field>
-        </div>
+        {/* Sin selector de estado: toda reserva nueva nace pendiente y se
+            confirma después desde el detalle. */}
+        <Field
+          label="Huéspedes"
+          name="guests"
+          type="number"
+          min="1"
+          defaultValue={2}
+          className="sm:max-w-[calc(50%-0.5rem)]"
+          onChange={onFieldChange("guests")}
+          onBlur={onFieldBlur("guests")}
+          error={fieldErrors.guests}
+          aria-invalid={Boolean(fieldErrors.guests)}
+        />
 
         {/* Total calculado: noches × precio por noche del alojamiento. No se
             escribe a mano; los adicionales se suman en el onboarding. */}
