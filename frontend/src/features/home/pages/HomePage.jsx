@@ -551,15 +551,24 @@ function LogoMarquee() {
 
   return (
     <section className="relative overflow-hidden border-y border-line bg-cloud py-8 sm:py-9">
-      {/* Manchas de marca muy suaves: dan color sin las tramas de líneas, que
-          ensuciaban la lectura y chocaban con el estilo limpio del home. */}
+      {/* Trama diagonal fina: da textura sin competir con las etiquetas. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -left-20 top-1/2 size-56 -translate-y-1/2 rounded-full bg-lime/25 blur-3xl"
+        className="pointer-events-none absolute inset-0 opacity-[0.1]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(-45deg, var(--color-ink) 0 1px, transparent 1px 9px)",
+        }}
+      />
+      {/* Manchas de marca apenas visibles: solo un halo de color en los bordes,
+          sin el degradado fuerte que dominaba la sección. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-28 top-1/2 size-40 -translate-y-1/2 rounded-full bg-lime/10 blur-3xl"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-20 top-1/2 size-56 -translate-y-1/2 rounded-full bg-teal/20 blur-3xl"
+        className="pointer-events-none absolute -right-28 top-1/2 size-40 -translate-y-1/2 rounded-full bg-teal/10 blur-3xl"
       />
 
       <div className="relative mx-auto max-w-6xl px-5 sm:px-6">
