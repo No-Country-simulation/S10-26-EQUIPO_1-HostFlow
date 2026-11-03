@@ -526,21 +526,6 @@ function Tree({ x, y, s = 1, o = 0.5 }) {
 
 // ── Marquee ─────────────────────────────────────────────────────────────────
 
-// Iniciales de un alojamiento, salteando artículos y preposiciones.
-const TRUST_STOPWORDS = new Set(["del", "de", "la", "las", "los", "el", "y"]);
-const trustInitials = (name) =>
-  name
-    .split(" ")
-    .filter((word) => word.length >= 2 && !TRUST_STOPWORDS.has(word.toLowerCase()))
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
-
-// Tonos de marca sólidos (los mismos del hero): se leen bien en claro y oscuro,
-// a diferencia de los tintes suaves que sobre el fondo oscuro quedaban turbios.
-const TRUST_TONES = ["bg-lime text-lime-ink", "bg-teal text-white", "bg-pink text-ink"];
-
 function LogoMarquee() {
   const names = ["Cabañas del Río", "Posada Delta", "Albergue La Lancha", "Hotel Tigre", "Lo del Mono", "Mirador del Paraná", "Casa Flotante"];
   // Dos grupos IDÉNTICOS: el keyframe mueve el track un -50 %, que equivale
@@ -585,23 +570,15 @@ function LogoMarquee() {
               <ul
                 key={group}
                 aria-hidden={group === 1 ? "true" : undefined}
-                className="flex shrink-0 items-center gap-3 pr-3"
+                className="flex shrink-0 items-center gap-8 pr-8"
               >
-                {names.map((name, index) => (
+                {names.map((name) => (
                   <li
                     key={`${group}-${name}`}
-                    className="flex shrink-0 items-center gap-2 rounded-full border border-line-strong bg-paper py-1.5 pl-1.5 pr-4"
+                    className="flex shrink-0 items-center gap-2 whitespace-nowrap"
                   >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "grid size-6 place-items-center rounded-full text-[10px] font-extrabold",
-                        TRUST_TONES[index % TRUST_TONES.length],
-                      )}
-                    >
-                      {trustInitials(name)}
-                    </span>
-                    <span className="whitespace-nowrap text-[13px] font-bold text-ink">{name}</span>
+                    <Sparkles size={14} className="text-teal-strong" aria-hidden="true" />
+                    <span className="text-[13px] font-bold text-ink">{name}</span>
                   </li>
                 ))}
               </ul>
