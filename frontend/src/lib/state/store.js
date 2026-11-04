@@ -5,183 +5,29 @@
 // conecte el backend real, `src/lib/api/index.js` pasará a usar `httpApi` y este
 // archivo se usa solo como referencia de datos de ejemplo.
 //
-// Persistencia: sessionStorage (se borra al cerrar la pestaña, como un token real).
+// Persistencia: localStorage (compartido por TODAS las pestañas y ventanas de
+// este navegador, como una "base de datos local" de la demo). Así el enlace de
+// llegada abierto en otra pestaña ve los cambios que hizo el anfitrión.
+// En OTRO navegador/equipo no viajan: eso recién existe con backend real.
+//
+// Este archivo solo contiene el núcleo pub/sub y las acciones. Los datos de
+// ejemplo viven en seedData.js, las migraciones en normalizeState.js, la
+// persistencia en persistence.js y las reglas de dominio en lib/domain.
 
-import { addDays, toISODate } from "@utils/format";
-
-const STORAGE_KEY = "hostflow.app.v1";
-const today = toISODate();
-
-// ── Datos de ejemplo ────────────────────────────────────────────────────────
-
-const seedUsers = [
-  {
-    id: "u_host",
-    name: "Martina Silva",
-    email: "anfitrion@hostflow.app",
-    password: "demo1234",
-    role: "HOST",
-    lodgingId: "lod_1",
-  },
-  {
-    id: "u_admin",
-    name: "Equipo HostFlow",
-    email: "admin@hostflow.app",
-    password: "admin1234",
-    role: "ADMIN",
-    lodgingId: null,
-  },
-];
-
-const seedLodging = {
-  id: "lod_1",
-  name: "Cabañas del Arroyo",
-  tagline: "Descanso frente al río",
-  location: "Tigre, Buenos Aires",
-  phone: "+54 9 11 5555 0101",
-  rooms: 4,
-  bathrooms: 3,
-  pricePerNight: 85000,
-  currency: "ARS",
-  images: [],
-  logo: null,
-  brand: { primary: "#0fa3a3", accent: "#d4f53c", radius: "rounded" },
-};
-
-const seedBookings = [
-  {
-    id: "bk_1",
-    guestName: "María González",
-    guestEmail: "maria@example.com",
-    checkIn: addDays(today, 3),
-    checkOut: addDays(today, 6),
-    guests: 3,
-    total: 255000,
-    currency: "ARS",
-    status: "CONFIRMED",
-    additional: "Desayuno × 3",
-  },
-  {
-    id: "bk_2",
-    guestName: "Lucas Fernández",
-    guestEmail: "lucas@example.com",
-    checkIn: addDays(today, 5),
-    checkOut: addDays(today, 9),
-    guests: 2,
-    total: 340,
-    currency: "USD",
-    status: "PENDING",
-    additional: "Lancha 09:30hs",
-  },
-  {
-    id: "bk_3",
-    guestName: "Sofía Ramírez",
-    guestEmail: "sofia@example.com",
-    checkIn: addDays(today, 8),
-    checkOut: addDays(today, 11),
-    guests: 4,
-    total: 255000,
-    currency: "ARS",
-    status: "CONFIRMED",
-    additional: "Excursión al delta",
-  },
-  {
-    id: "bk_4",
-    guestName: "Diego Torres",
-    guestEmail: "diego@example.com",
-    checkIn: addDays(today, 12),
-    checkOut: addDays(today, 14),
-    guests: 2,
-    total: 170000,
-    currency: "ARS",
-    status: "PENDING",
-    additional: "",
-  },
-  {
-    id: "bk_5",
-    guestName: "Camila Suárez",
-    guestEmail: "camila@example.com",
-    checkIn: addDays(today, -10),
-    checkOut: addDays(today, -7),
-    guests: 2,
-    total: 255000,
-    currency: "ARS",
-    status: "COMPLETED",
-    additional: "Desayuno × 2",
-  },
-];
-
-const seedBlockedDays = [addDays(today, 4), addDays(today, 15)];
-
-const seedPayments = {
-  primary: "ARS",
-  wallets: ["USD", "EUR"],
-  methods: [
-    { id: "pm_1", type: "WALLET", label: "Mercado Pago", enabled: true },
-    { id: "pm_2", type: "WALLET", label: "PayPal", enabled: true },
-    { id: "pm_3", type: "CARD", label: "Tarjeta de crédito", enabled: true },
-    { id: "pm_4", type: "WALLET", label: "Ualá", enabled: false },
-  ],
-};
-
-const seedAdmin = {
-  lodgings: [
-    { id: "lod_1", name: "Cabañas del Arroyo", owner: "Martina Silva", ownerEmail: "anfitrion@hostflow.app", rooms: 4, status: "ACTIVE" },
-    { id: "lod_2", name: "Posada del Delta", owner: "Juan Pérez", ownerEmail: "juan@posada.com", rooms: 6, status: "ACTIVE" },
-    { id: "lod_3", name: "Hotel Río Luján", owner: "Laura Gómez", ownerEmail: "laura@rulujan.com", rooms: 12, status: "ACTIVE" },
-    { id: "lod_4", name: "Cabañas La Lancha", owner: "Pedro Díaz", ownerEmail: "pedro@lalancha.com", rooms: 3, status: "PAUSED" },
-    { id: "lod_5", name: "Albergue Tigre", owner: "Ana López", ownerEmail: "ana@albergue.com", rooms: 8, status: "ACTIVE" },
-    { id: "lod_6", name: "Lo del Mono", owner: "Rosa Castro", ownerEmail: "rosa@lodemono.com", rooms: 2, status: "ACTIVE" },
-    { id: "lod_7", name: "Mirador del Paraná", owner: "Nico Ruiz", ownerEmail: "nico@mirador.com", rooms: 5, status: "PAUSED" },
-    { id: "lod_8", name: "Casa Flotante", owner: "Elena Vidal", ownerEmail: "elena@casaf.com", rooms: 1, status: "ACTIVE" },
-  ],
-};
-
-function buildInitialState() {
-  return {
-    user: null,
-    // Usuarios conocidos (se persisten para que los cambios de clave sobrevivan recargas).
-    users: seedUsers.map((user) => ({ ...user })),
-    lodging: { ...seedLodging },
-    bookings: seedBookings.map((b) => ({ ...b })),
-    blockedDays: [...seedBlockedDays],
-    payments: {
-      primary: seedPayments.primary,
-      wallets: [...seedPayments.wallets],
-      methods: seedPayments.methods.map((m) => ({ ...m })),
-    },
-    admin: { lodgings: seedAdmin.lodgings.map((l) => ({ ...l })) },
-    pendingOtp: null, // { email, code, expiresAt, password }
-    lastOtp: null, // código mostrado en modo demo
-  };
-}
-
-function loadState() {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...buildInitialState(), ...JSON.parse(raw) };
-  } catch {
-    /* almacenamiento no disponible */
-  }
-  return buildInitialState();
-}
+import { MAX_IMAGES } from "@lib/domain/lodging";
+import { MAX_PAYMENT_METHODS } from "@lib/domain/payments";
+import { onboardingLinkIssuedAt } from "@lib/domain/onboarding";
+import { buildBoatQuotePayload } from "./boatQuotePayload";
+import { loadState, persistState, watchStorage } from "./persistence";
+import { seedLodging } from "./seedData";
 
 // ── Núcleo pub/sub ──────────────────────────────────────────────────────────
 
 let state = loadState();
 const listeners = new Set();
 
-function persist() {
-  try {
-    const { pendingOtp, lastOtp, ...persistable } = state;
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
-  } catch {
-    /* noop */
-  }
-}
-
 function emit() {
-  persist();
+  persistState(state);
   listeners.forEach((listener) => listener(state));
 }
 
@@ -194,6 +40,13 @@ function subscribe(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
+
+// Otra pestaña de este navegador cambió el estado: se adopta sin re-persistir
+// (ver persistence.js) para que el enlace de llegada se mantenga al día.
+watchStorage((next) => {
+  state = next;
+  listeners.forEach((listener) => listener(state));
+});
 
 export const store = {
   get: () => state,
@@ -308,6 +161,10 @@ export const actions = {
   },
 
   // ── Alojamiento ──────────────────────────────────────────────────────────
+  getLodging() {
+    return state.lodging;
+  },
+
   updateLodging(patch) {
     setState((s) => ({ ...s, lodging: { ...s.lodging, ...patch } }));
   },
@@ -317,7 +174,11 @@ export const actions = {
   },
 
   addImage(dataUrl) {
-    setState((s) => ({ ...s, lodging: { ...s.lodging, images: [...s.lodging.images, dataUrl] } }));
+    setState((s) => {
+      // Tope de 4 fotos: el enlace de llegada muestra 0 a 4 y la primera es portada.
+      if (s.lodging.images.length >= MAX_IMAGES) return s;
+      return { ...s, lodging: { ...s.lodging, images: [...s.lodging.images, dataUrl] } };
+    });
   },
 
   removeImage(index) {
@@ -332,6 +193,12 @@ export const actions = {
       ...s,
       lodging: { ...s.lodging, brand: { ...s.lodging.brand, ...patch } },
     }));
+  },
+
+  // Reemplaza la colección completa de reservas. Lo usa el adaptador real
+  // (httpApi) para adoptar lo que devuelve el backend; en modo demo no se usa.
+  setBookings(bookings) {
+    setState((s) => ({ ...s, bookings: bookings.map((b) => ({ ...b })) }));
   },
 
   // ── Disponibilidad ───────────────────────────────────────────────────────
@@ -357,7 +224,131 @@ export const actions = {
     }));
   },
 
+  // Equivale a POST /lodgings/mine/bookings (pendiente en el backend).
+  createBooking(data) {
+    const booking = {
+      id: `bk_${Date.now().toString(36)}`,
+      guestName: String(data.guestName || "").trim(),
+      guestEmail: String(data.guestEmail || "").trim(),
+      guestPhone: String(data.guestPhone || "").trim(),
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
+      guests: Number(data.guests) || 1,
+      total: Number(data.total) || 0,
+      currency: data.currency || state.lodging.currency,
+      status: data.status || "PENDING",
+      paymentStatus: "PENDING",
+      additional: String(data.additional || "").trim(),
+      selectedServices: [],
+      // El enlace de llegada se emite al crear la reserva y dura 24 h.
+      onboardingLinkIssuedAt: onboardingLinkIssuedAt(),
+    };
+    setState((s) => ({ ...s, bookings: [...s.bookings, booking] }));
+    return booking;
+  },
+
+  // Renueva el enlace de llegada de una reserva: nueva marca de emisión →
+  // vuelve a valer 24 h.
+  regenerateOnboardingLink(id) {
+    const issuedAt = onboardingLinkIssuedAt();
+    setState((s) => ({
+      ...s,
+      bookings: s.bookings.map((b) => (b.id === id ? { ...b, onboardingLinkIssuedAt: issuedAt } : b)),
+    }));
+    return issuedAt;
+  },
+
+  // Equivale a PATCH /bookings/{id} (pendiente en el backend).
+  updateBooking(id, patch) {
+    setState((s) => ({
+      ...s,
+      bookings: s.bookings.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    }));
+  },
+
+  // Estado del pago de una reserva: "PENDING" (pendiente) | "PAID" (pagado).
+  setPaymentStatus(id, paymentStatus) {
+    setState((s) => ({
+      ...s,
+      bookings: s.bookings.map((b) => (b.id === id ? { ...b, paymentStatus } : b)),
+    }));
+  },
+
+  // ── Onboarding del huésped (B2C, sin cuenta) ─────────────────────────────
+  // Guarda los datos completados por el huésped en el enlace de llegada.
+  submitOnboarding(id, data) {
+    setState((s) => ({
+      ...s,
+      bookings: s.bookings.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              guestName: data.guestName || b.guestName,
+              guestEmail: data.guestEmail || b.guestEmail,
+              guestPhone: data.guestPhone || b.guestPhone || "",
+              selectedServices: Array.isArray(data.selectedServices) ? data.selectedServices : b.selectedServices || [],
+              onboarding: { ...data, completedAt: new Date().toISOString() },
+            }
+          : b,
+      ),
+    }));
+  },
+
+  // Registra la solicitud de cotización de lancha con su payload JSON.
+  // El JSON se GENERA aquí para que otra API pueda consumirlo después:
+  // NO se envía a ningún endpoint (la integración externa está pendiente).
+  createBoatQuoteRequest(id, quote) {
+    const booking = state.bookings.find((b) => b.id === id);
+    const payload = buildBoatQuotePayload(state.lodging, booking, quote);
+    const request = {
+      ...quote,
+      id: `bq_${Date.now().toString(36)}`,
+      status: "REQUESTED",
+      createdAt: new Date().toISOString(),
+      // Pendiente: el backend aún no expone un endpoint para notificar por correo
+      // ni para reenviar la solicitud a la API de transporte.
+      delivery: { email: "PENDING_BACKEND", forward: "PENDING_INTEGRATION" },
+      payload,
+    };
+    setState((s) => ({
+      ...s,
+      bookings: s.bookings.map((b) => (b.id === id ? { ...b, boatQuote: request } : b)),
+    }));
+    return request;
+  },
+
+  // El huésped puede declinar la cotización: el onboarding continúa igual.
+  declineBoatQuote(id) {
+    setState((s) => ({
+      ...s,
+      bookings: s.bookings.map((b) =>
+        b.id === id ? { ...b, boatQuote: { status: "DECLINED", createdAt: new Date().toISOString() } } : b,
+      ),
+    }));
+  },
+
   // ── Pagos ────────────────────────────────────────────────────────────────
+  // Sincronización con el backend: reemplaza SOLO las claves que vengan
+  // definidas (primary / wallets / methods / bankDetails), sin tocar el resto.
+  // El tope de métodos se respeta también acá por si el backend lo manda mal.
+  setPayments(patch) {
+    setState((s) => {
+      const current = s.payments;
+      const methods = Array.isArray(patch?.methods)
+        ? patch.methods.slice(0, MAX_PAYMENT_METHODS).map((m) => ({ ...m, keys: { ...(m.keys || {}) } }))
+        : current.methods;
+      return {
+        ...s,
+        payments: {
+          primary: patch?.primary ?? current.primary,
+          wallets: Array.isArray(patch?.wallets) ? [...patch.wallets] : current.wallets,
+          methods,
+          bankDetails: patch?.bankDetails ? { ...current.bankDetails, ...patch.bankDetails } : current.bankDetails,
+        },
+      };
+    });
+  },
+
   setPrimaryCurrency(code) {
     setState((s) => ({ ...s, payments: { ...s.payments, primary: code } }));
   },
@@ -385,22 +376,133 @@ export const actions = {
     }));
   },
 
-  addPaymentMethod(label, type = "WALLET") {
+  addPaymentMethod(payload, maybeType = "WALLET") {
+    const isObj = typeof payload === "object" && payload !== null;
+    const label = isObj ? payload.label : payload;
+    const type = isObj ? payload.type || "WALLET" : maybeType;
+    const keys = isObj && payload.keys ? payload.keys : {};
+    const notes = isObj ? payload.notes || "" : "";
+
+    setState((s) => {
+      if (s.payments.methods.length >= MAX_PAYMENT_METHODS) {
+        return s; // Límite de 4 métodos
+      }
+      return {
+        ...s,
+        payments: {
+          ...s.payments,
+          methods: [
+            ...s.payments.methods,
+            {
+              id: `pm_${Date.now().toString(36)}`,
+              type,
+              label: String(label || "Nuevo método").trim(),
+              enabled: true,
+              keys,
+              notes,
+            },
+          ],
+        },
+      };
+    });
+  },
+
+  updatePaymentMethod(id, patch) {
     setState((s) => ({
       ...s,
       payments: {
         ...s.payments,
-        methods: [...s.payments.methods, { id: `pm_${Date.now().toString(36)}`, type, label, enabled: true }],
+        methods: s.payments.methods.map((m) =>
+          m.id === id
+            ? {
+                ...m,
+                ...patch,
+                keys: patch.keys ? { ...m.keys, ...patch.keys } : m.keys,
+              }
+            : m,
+        ),
       },
     }));
   },
 
+  removePaymentMethod(id) {
+    setState((s) => ({
+      ...s,
+      payments: {
+        ...s.payments,
+        methods: s.payments.methods.filter((m) => m.id !== id),
+      },
+    }));
+  },
+
+  // Datos bancarios del alojamiento (transferencia externa) que ve el huésped.
+  updateBankDetails(patch) {
+    setState((s) => ({
+      ...s,
+      payments: { ...s.payments, bankDetails: { ...s.payments.bankDetails, ...patch } },
+    }));
+  },
+
+  // ── Servicios adicionales ────────────────────────────────────────────────
+  // Reemplaza el listado completo (sincronización con el backend).
+  setServices(services) {
+    setState((s) => ({ ...s, services: services.map((sv) => ({ ...sv })) }));
+  },
+
+  addService({ name, price, description, pricing, perGuest }) {
+    const service = {
+      id: `sv_${Date.now().toString(36)}`,
+      name: String(name || "").trim(),
+      price: Number(price) || 0,
+      pricing: pricing === "PER_NIGHT" ? "PER_NIGHT" : "FIXED",
+      // Cobro por huésped: el importe se multiplica por la cantidad de personas
+      // de la reserva (comidas, toallas, excursiones por persona).
+      perGuest: Boolean(perGuest),
+      description: String(description || "").trim(),
+      enabled: true,
+    };
+    setState((s) => ({ ...s, services: [...s.services, service] }));
+    return service;
+  },
+
+  updateService(id, patch) {
+    setState((s) => ({
+      ...s,
+      services: s.services.map((sv) => (sv.id === id ? { ...sv, ...patch } : sv)),
+    }));
+  },
+
+  removeService(id) {
+    setState((s) => ({ ...s, services: s.services.filter((sv) => sv.id !== id) }));
+  },
+
+  toggleService(id) {
+    setState((s) => ({
+      ...s,
+      services: s.services.map((sv) => (sv.id === id ? { ...sv, enabled: !sv.enabled } : sv)),
+    }));
+  },
+
   // ── Admin ────────────────────────────────────────────────────────────────
+  getAdminLodgings() {
+    return state.admin?.lodgings || [];
+  },
+
+  // Reemplaza el listado completo (sincronización con GET /owners).
+  setAdminLodgings(lodgings) {
+    setState((s) => ({
+      ...s,
+      admin: { lodgings: lodgings.map((l) => ({ ...l })) },
+    }));
+  },
+
   setAdminLodgingStatus(id, status) {
     setState((s) => ({
       ...s,
       admin: {
-        lodgings: s.admin.lodgings.map((l) => (l.id === id ? { ...l, status } : l)),
+        lodgings: (s.admin?.lodgings || []).map((l) =>
+          String(l.id) === String(id) ? { ...l, status, enabled: status === "ACTIVE" } : l,
+        ),
       },
     }));
   },
