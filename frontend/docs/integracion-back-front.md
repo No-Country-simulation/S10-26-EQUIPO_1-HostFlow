@@ -44,7 +44,7 @@ copy .env.example .env           # editar DB_PASSWORD, JWT_SECRET, ADMIN_PASSWOR
 cd frontend
 pnpm install
 copy .env.example .env           # y poner VITE_API_URL=http://localhost:8080/api/v1
-pnpm dev                         # http://localhost:5173
+pnpm dev                         # http://localhost:3000 (fijado en vite.config.ts)
 ```
 
 ### 1.4 Modo demo vs. modo real
@@ -105,10 +105,17 @@ Fuente de verdad: `backend/src/main/java/com/hostflow/controller/`
 
 ### 2.3 CORS ✅
 
-`WebConfig` permite `*` origins con `GET, POST, PUT, DELETE, PATCH, OPTIONS`,
-así que el dev server de Vite (`http://localhost:5173`) puede hablar con el
-backend sin configuración extra. **En producción hay que restringir el
-origen** (comentario ya presente en `WebConfig`).
+El backend permite CORS solo desde `http://localhost:3000`,
+`http://localhost:4200` y `http://localhost:8080` (configuración efectiva en
+`SecurityConfig`; `WebConfig` no aplica porque Spring Security registra su
+propio `CorsConfigurationSource`).
+
+Por eso el dev server de Vite queda fijado en **`http://localhost:3000`** en
+`vite.config.ts` (`server.port` + `strictPort`). Si se cambia el puerto hay que
+agregar ese origen en el backend: Vite en 5173 no pasa el preflight.
+
+**En producción** el dominio de Vercel también tiene que estar permitido en el
+backend, o publicar la API detrás del mismo origen mediante un rewrite/proxy.
 
 ### 2.4 Módulos aún no implementados en el backend
 
