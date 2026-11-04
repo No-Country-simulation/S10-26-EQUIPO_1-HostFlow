@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { BedDouble, ImagePlus, MapPin, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Alert, Badge, Button, Card, Field, StickyFormTitle } from "@components/ui";
-import { useStore } from "@lib/state/useStore";
+import { useLodging } from "@lib/api/hooks";
 import { useSession } from "@features/auth/context/SessionContext";
-import { MAX_IMAGES } from "@lib/state/store";
+import { MAX_IMAGES } from "@lib/domain/lodging";
 import { DEMO_MODE } from "@lib/config/env";
 import { readableOn } from "@utils/color";
 import { CURRENCIES, formatMoney, plural } from "@utils/format";
@@ -18,7 +18,7 @@ const formatSize = (bytes) =>
 
 export default function LodgingPage() {
   const { actions } = useSession();
-  const lodging = useStore((s) => s.lodging);
+  const lodging = useLodging();
   const images = Array.isArray(lodging.images) ? lodging.images : [];
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);

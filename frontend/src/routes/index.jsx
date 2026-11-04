@@ -1,7 +1,7 @@
 import { Navigate } from "react-router"
 import ProtectedRoute from "./guards/ProtectedRoute"
 import AuthenticatedAppLayout from "@components/layout/AuthenticatedAppLayout"
-import AuthLayout from "@/components/layout/AuthLayout"
+import AuthLayout from "@components/layout/AuthLayout"
 import { useSession } from "@features/auth/context/SessionContext"
 import LoginPage from "@features/auth/pages/LoginPage"
 import CreateAccountPage from "@features/auth/pages/CreateAccountPage"

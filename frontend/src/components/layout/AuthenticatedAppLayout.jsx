@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Avatar, Brand, ThemeToggle } from "@components/ui";
 import { useSession } from "@features/auth/context/SessionContext";
-import { useStore } from "@lib/state/useStore";
+import { useLodging } from "@lib/api/hooks";
 import { LodgingTheme } from "@lib/theme/LodgingTheme";
 import { cn } from "@utils/format";
 
@@ -81,7 +81,7 @@ function UserCard({ user, isAdmin, onLogout }) {
 
 export default function AuthenticatedAppLayout() {
   const { user, logout, isAdmin } = useSession();
-  const lodging = useStore((s) => s.lodging);
+  const lodging = useLodging();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);

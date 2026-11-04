@@ -14,16 +14,16 @@ import { Badge, Card, Stat } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
 import { BookingDetailModal } from "../components/BookingDetailModal";
 import { guardAction } from "../lib/guardAction";
-import { useStore } from "@lib/state/useStore";
+import { useBlockedDays, useBookings, useLodging } from "@lib/api/hooks";
 import { useSession } from "@features/auth/context/SessionContext";
 import { DEMO_MODE } from "@lib/config/env";
 import { addDays, bookingGrandTotal, formatMoney, toISODate } from "@utils/format";
 
 export default function OwnerDashboardPage() {
   const { user, actions } = useSession();
-  const bookings = useStore((s) => s.bookings);
-  const lodging = useStore((s) => s.lodging);
-  const blockedDays = useStore((s) => s.blockedDays);
+  const bookings = useBookings();
+  const lodging = useLodging();
+  const blockedDays = useBlockedDays();
   const [detailId, setDetailId] = useState(null);
 
   // Métricas y próximas reservas: se cargan desde el backend. En modo demo el

@@ -7,6 +7,7 @@ import { DEMO_MODE } from "../config/env"
 import { demoApi } from "./demoApi"
 import { ApiNotConfiguredError } from "./errors"
 import { httpApi } from "./httpApi"
+import { buildAdminStats } from "./adminStats"
 import { actions, store } from "../state/store"
 import { tokenStorage } from "./tokenStorage"
 
@@ -45,14 +46,7 @@ const op =
     if (name === "getLodging") return s.lodging
     if (name === "getAdminLodgings") return s.admin?.lodgings || []
     if (name === "getAdminStats") {
-      const lodgings = s.admin?.lodgings || []
-      return {
-        lodgings: lodgings.length,
-        active: lodgings.filter((l) => l.status === "ACTIVE").length,
-        paused: lodgings.filter((l) => l.status === "PAUSED").length,
-        hosts: new Set(lodgings.map((l) => l.ownerEmail)).size,
-        bookings: 0,
-      }
+      return buildAdminStats({ lodgings: s.admin?.lodgings })
     }
     if (name === "getBlockedDays") return s.blockedDays || []
     if (name === "getBookings") return s.bookings || []

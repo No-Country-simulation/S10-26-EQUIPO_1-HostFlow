@@ -3,7 +3,7 @@ import { Alert, Button, Field } from "@components/ui";
 import Modal from "@components/ui/Modal";
 import { BookingRequirementsAlert } from "./BookingRequirementsAlert";
 import { getBookingRequirements } from "../lib/bookingRequirements";
-import { useStore } from "@lib/state/useStore";
+import { useBlockedDays, useBookings, useLodging, usePayments } from "@lib/api/hooks";
 import { useSession } from "@features/auth/context/SessionContext";
 import { daysBetween, formatMoney, isEmail, plural, toISODate } from "@utils/format";
 
@@ -54,10 +54,10 @@ const validateFields = (data) => ({
 // habitaciones/baños/capacidad y disponibilidad en las fechas elegidas.
 export function BookingFormModal({ open, onClose, onCreated }) {
   const { actions } = useSession();
-  const lodging = useStore((s) => s.lodging);
-  const payments = useStore((s) => s.payments);
-  const bookings = useStore((s) => s.bookings);
-  const blockedDays = useStore((s) => s.blockedDays);
+  const lodging = useLodging();
+  const payments = usePayments();
+  const bookings = useBookings();
+  const blockedDays = useBlockedDays();
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [saving, setSaving] = useState(false);

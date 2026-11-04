@@ -3,17 +3,17 @@ import { ArrowRight, Check, Copy, HeartPulse, Landmark, Ship, Users } from "luci
 import { Alert, Badge, Button, Switch } from "@components/ui";
 import Modal from "@components/ui/Modal";
 import { PaymentStatusBadge, StatusBadge } from "./BookingSummaryCard";
-import { useStore } from "@lib/state/useStore";
+import { useBankDetails, useLodging } from "@lib/api/hooks";
 import { useSession } from "@features/auth/context/SessionContext";
-import { ONBOARDING_LINK_TTL_MS, isOnboardingLinkExpired } from "@lib/state/store";
+import { ONBOARDING_LINK_TTL_MS, isOnboardingLinkExpired } from "@lib/domain/onboarding";
 import { guardAction } from "../lib/guardAction";
 import { DEMO_MODE } from "@lib/config/env";
 import { bookingGrandTotal, bookingServices, bookingServicesTotal, daysBetween, formatDate, formatMoney, plural, serviceLineDetail, serviceLineTotal } from "@utils/format";
 
 export function BookingDetailModal({ booking, open, onClose }) {
   const { actions } = useSession();
-  const lodging = useStore((s) => s.lodging);
-  const bankDetails = useStore((s) => s.payments.bankDetails);
+  const lodging = useLodging();
+  const bankDetails = useBankDetails();
   const [copied, setCopied] = useState(false);
 
   if (!booking) return null;

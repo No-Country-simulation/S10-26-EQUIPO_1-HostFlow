@@ -4,9 +4,9 @@ import { Alert, Badge, BrandLogo, Button, Card, Field, Switch } from "@component
 import { LodgingTheme } from "@lib/theme/LodgingTheme";
 import { PATTERNS, patternPreviewStyle } from "@lib/theme/patterns";
 import { extractPaletteFromImage, suggestBrandTrio } from "@lib/theme/extractPalette";
-import { useStore } from "@lib/state/useStore";
+import { useLodging } from "@lib/api/hooks";
 import { useSession } from "@features/auth/context/SessionContext";
-import { BRAND_DEFAULTS } from "@lib/state/store";
+import { BRAND_DEFAULTS } from "@lib/domain/lodging";
 import { colorDistance, contrastRatio, hexToRgb, lighten, normalizeHex, readableOn, strongOn } from "@utils/color";
 import { cn } from "@utils/format";
 
@@ -128,7 +128,7 @@ function SlotEditor({ slot, brand, onPick }) {
 
 export default function LodgingProfilePage() {
   const { actions } = useSession();
-  const lodging = useStore((s) => s.lodging);
+  const lodging = useLodging();
   const [saved, setSaved] = useState(false);
   const fileRef = useRef(null);
 

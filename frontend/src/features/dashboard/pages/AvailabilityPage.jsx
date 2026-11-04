@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Alert, Badge, Card } from "@components/ui";
 import { BookingDetailModal } from "../components/BookingDetailModal";
-import { useStore } from "@lib/state/useStore";
+import { useBlockedDays, useBookings, useBrand } from "@lib/api/hooks";
 import { useSession } from "@features/auth/context/SessionContext";
 import { useTheme } from "@lib/theme/ThemeContext";
 import { DEMO_MODE } from "@lib/config/env";
@@ -39,9 +39,9 @@ function endOfMonth(date) {
 export default function AvailabilityPage() {
   const { actions } = useSession();
   const { isDark } = useTheme();
-  const blockedDays = useStore((s) => s.blockedDays);
-  const bookings = useStore((s) => s.bookings);
-  const brand = useStore((s) => s.lodging?.brand);
+  const blockedDays = useBlockedDays();
+  const bookings = useBookings();
+  const brand = useBrand();
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [detailId, setDetailId] = useState(null);
   // Reserva resaltada al pasar el cursor por su tarjeta del panel lateral:

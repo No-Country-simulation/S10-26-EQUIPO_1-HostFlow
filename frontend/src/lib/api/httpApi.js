@@ -24,7 +24,8 @@
 import { ENDPOINTS as E } from "./endpoints"
 import { request } from "./httpClient"
 import { actions, store } from "../state/store"
-import { MAX_IMAGES, MAX_PAYMENT_METHODS } from "../state/store"
+import { MAX_IMAGES } from "../domain/lodging"
+import { MAX_PAYMENT_METHODS } from "../domain/payments"
 
 // Rellena los placeholders de la ruta: pathFor(E.toggleBlockedDay, { date })
 //   → "/lodgings/mine/blocked-days/2026-10-30"
@@ -702,13 +703,7 @@ export const httpApi = {
         } catch (error) {
           if (!isEndpointUnavailable(error)) throw error
         }
-        return {
-          lodgings: lodgings.length,
-          active: lodgings.filter((l) => l.status === "ACTIVE").length,
-          paused: lodgings.filter((l) => l.status === "PAUSED").length,
-          hosts: new Set(lodgings.map((l) => l.ownerEmail)).size,
-          bookings: 0,
-        }
+        return buildAdminStats({ lodgings })
       },
     ),
 

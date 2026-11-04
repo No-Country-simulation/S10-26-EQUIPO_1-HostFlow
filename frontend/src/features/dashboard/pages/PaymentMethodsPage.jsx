@@ -15,9 +15,9 @@ import {
 } from "lucide-react";
 import { Alert, Badge, Button, Card, Field, Switch } from "@components/ui";
 import Modal from "@components/ui/Modal";
-import { useStore } from "@lib/state/useStore";
+import { useLodging, usePayments } from "@lib/api/hooks";
 import { useSession } from "@features/auth/context/SessionContext";
-import { MAX_PAYMENT_METHODS } from "@lib/state/store";
+import { MAX_PAYMENT_METHODS } from "@lib/domain/payments";
 import { DEMO_MODE } from "@lib/config/env";
 import { CURRENCIES, cn, copyText, formatMoney } from "@utils/format";
 
@@ -57,8 +57,8 @@ const PRESET_PROVIDERS = [
 
 export default function PaymentMethodsPage() {
   const { actions } = useSession();
-  const payments = useStore((s) => s.payments);
-  const lodging = useStore((s) => s.lodging);
+  const payments = usePayments();
+  const lodging = useLodging();
   const bankDetails = payments.bankDetails || {};
   const methods = Array.isArray(payments.methods) ? payments.methods : [];
 

@@ -7,7 +7,7 @@ import { BookingFormModal } from "../components/BookingFormModal";
 import { BookingRequirementsAlert } from "../components/BookingRequirementsAlert";
 import { getBookingRequirements } from "../lib/bookingRequirements";
 import { guardAction } from "../lib/guardAction";
-import { useStore } from "@lib/state/useStore";
+import { useBookings, useLodging, usePayments } from "@lib/api/hooks";
 import { useSession } from "@features/auth/context/SessionContext";
 import { DEMO_MODE } from "@lib/config/env";
 import { cn, toISODate } from "@utils/format";
@@ -21,9 +21,9 @@ const FILTERS = [
 
 export default function BookingsPage() {
   const { actions } = useSession();
-  const bookings = useStore((s) => s.bookings);
-  const lodging = useStore((s) => s.lodging);
-  const payments = useStore((s) => s.payments);
+  const bookings = useBookings();
+  const lodging = useLodging();
+  const payments = usePayments();
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);

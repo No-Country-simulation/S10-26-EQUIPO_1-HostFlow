@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Building2, CalendarDays, CheckCircle2, RefreshCw, Search, ShieldCheck, Users } from "lucide-react";
 import { Alert, Badge, Button, Card, EmptyState, Stat } from "@components/ui";
-import { useStore } from "@lib/state/useStore";
+import { useAdminLodgings } from "@lib/api/hooks";
 import { useSession } from "@features/auth/context/SessionContext";
 import { DEMO_MODE } from "@lib/config/env";
 
 export default function AdminOverviewPage() {
   const { actions } = useSession();
-  const storeLodgings = useStore((s) => s.admin?.lodgings || []);
+  const storeLodgings = useAdminLodgings();
   const [lodgings, setLodgings] = useState(storeLodgings);
   const [stats, setStats] = useState(null);
   const [query, setQuery] = useState("");
