@@ -1,5 +1,6 @@
 package com.hostflow.service;
 
+import com.hostflow.dto.request.AccommodationImageRequest;
 import com.hostflow.dto.request.AccommodationProfileRequest;
 import com.hostflow.dto.response.CloudinaryUploadResult;
 import com.hostflow.exception.BusinessException;
@@ -83,6 +84,10 @@ public class AccommodationProfileService {
      */
     @Transactional
     public AccommodationImage uploadGalleryImage(Long ownerId, MultipartFile file) {
+        /*Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Registre los datos generales del alojamiento antes de agregar imágenes."));*/
+
         // El bloqueo de la fila evita que dos cargas simultáneas superen el máximo de cuatro.
         Accommodation accommodation = accommodationRepository.findByOwner_IdForUpdate(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -156,6 +161,14 @@ public class AccommodationProfileService {
         return accommodationRepository.save(accommodation);
     }
 
+    @Transactional
+    public AccommodationImage addImage(Long ownerId, AccommodationImageRequest request) {
+        Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Registre los datos generales del alojamiento antes de agregar imágenes."));
+        AccommodationImage image = AccommodationImage.builder()
+                .accommodation(accommodation).imageUrl(request.url().trim()).build();
+        return imageRepository.save(image);
+    }
     private void ensureGalleryHasSpace(Long accommodationId) {
         if (imageRepository.countByAccommodation_Id(accommodationId) >= MAX_GALLERY_IMAGES) {
             throw new BusinessException(
@@ -172,6 +185,8 @@ public class AccommodationProfileService {
         AccommodationImage image = imageRepository.findByIdAndAccommodation_Id(imageId, accommodation.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontró esa imagen en la galería de tu alojamiento."));
 
+        // Solo borramos en Cloudinary recursos subidos por esta aplicación. Las URLs externas
+        // registradas mediante POST /gallery no tienen un public_id administrado por HostFlow.
         // Solo borramos en Cloudinary recursos subidos y administrados por HostFlow.
         if (image.getCloudinaryPublicId() != null && !image.getCloudinaryPublicId().isBlank()) {
             cloudinaryImageService.deleteImage(image.getCloudinaryPublicId());
@@ -208,6 +223,7 @@ public class AccommodationProfileService {
         a.setBathroomCount(r.getBathroomCount());
         a.setGuestCapacity(r.getGuestCapacity());
         a.setBasePrice(r.getBasePrice());
+        a.setPrimaryColor(blankToNull(r.getPrimaryColor()));
         a.setPrimaryColor(defaultIfBlank(r.getPrimaryColor(), DEFAULT_PRIMARY_COLOR));
         a.setAccentColor(defaultIfBlank(r.getAccentColor(), DEFAULT_ACCENT_COLOR));
         a.setTertiaryColor(defaultIfBlank(r.getTertiaryColor(), DEFAULT_TERTIARY_COLOR));

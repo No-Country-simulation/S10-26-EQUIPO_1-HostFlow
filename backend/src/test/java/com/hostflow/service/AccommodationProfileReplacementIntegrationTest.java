@@ -56,6 +56,7 @@ class AccommodationProfileReplacementIntegrationTest {
                 .password("not-used-in-this-test")
                 .termsAccepted(true)
                 .enabled(true)
+                .emailVerified(false)
                 .build();
         owner = ownerRepository.saveAndFlush(owner);
         ownerId = owner.getId();

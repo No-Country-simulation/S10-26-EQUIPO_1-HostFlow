@@ -1,5 +1,6 @@
 package com.hostflow.controller;
 
+import com.hostflow.dto.request.AccommodationImageRequest;
 import com.hostflow.dto.request.AccommodationProfileRequest;
 import com.hostflow.dto.response.AccommodationImageResponse;
 import com.hostflow.dto.response.AccommodationProfileResponse;
@@ -132,6 +133,27 @@ public class AccommodationProfileController {
                 .stream().map(AccommodationImageResponse::from).toList();
         return ResponseEntity.ok(images);
     }
+
+   /* @PostMapping("/gallery")
+    @Operation(operationId = "addAccommodationGalleryImage",
+            summary = "Agregar una imagen a mi galería",
+            description = "Registra una referencia de imagen por URL HTTPS; el archivo binario no se carga al backend.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true, description = "URL HTTPS de la imagen.",
+                    content = @Content(schema = @Schema(implementation = AccommodationImageRequest.class),
+                            examples = @ExampleObject(name = "URL de imagen", value = "{ \"url\": \"https://example.com/images/cabin-exterior.jpg\" }"))))
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Imagen registrada correctamente", content = @Content(schema = @Schema(implementation = AccommodationImageResponse.class))),
+            @ApiResponse(responseCode = "400", description = "URL vacía, inválida o no HTTPS", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Token ausente o inválido", content = @Content),
+            @ApiResponse(responseCode = "403", description = "El usuario no tiene el rol OWNER", content = @Content),
+            @ApiResponse(responseCode = "404", description = "No existe un perfil para el propietario autenticado", content = @Content)
+    })
+    public ResponseEntity<AccommodationImageResponse> addImage(
+            @Valid @RequestBody AccommodationImageRequest request, Authentication authentication) {
+        AccommodationImage image = profileService.addImage(getCurrentOwnerId(authentication), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(AccommodationImageResponse.from(image));
+    }*/
 
     @PostMapping(value = "/gallery/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(operationId = "uploadAccommodationGalleryImage",

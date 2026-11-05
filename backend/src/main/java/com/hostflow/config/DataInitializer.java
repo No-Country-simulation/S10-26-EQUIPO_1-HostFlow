@@ -7,13 +7,11 @@ import com.hostflow.repository.OwnerRepository;
 import com.hostflow.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
 
 import java.util.Set;
 
@@ -37,59 +35,40 @@ import java.util.Set;
  * </ul>
  *
  * <p><strong>⚠️ ADVERTENCIA DE SEGURIDAD:</strong> Este inicializador está diseñado exclusivamente
- * para entornos de desarrollo (perfil 'dev'). En producción, debe ser deshabilitado mediante
- * perfiles de Spring (@Profile("dev")) o eliminado del contexto para evitar la exposición
- * de credenciales por defecto.</p>
+ * para entornos de desarrollo. En producción, debe ser deshabilitado mediante perfiles de Spring
+ * (@Profile("dev")) o eliminado del contexto para evitar la exposición de credenciales por defecto.</p>
  *
  * @author HostFlow Team
- * @version 2.0.0
+ * @version 2.1.0
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@DependsOn("entityManagerFactory") // CLAVE: Fuerza a Spring a esperar a que Hibernate termine de crear las tablas antes de ejecutar este runner.
+@DependsOn("entityManagerFactory") // Fuerza a Spring a esperar a que Hibernate cree las tablas antes de ejecutar este runner.
 public class DataInitializer implements CommandLineRunner {
 
-    /**
-     * Repositorio para operaciones de persistencia de la entidad {@link Role}.
-     */
     private final RoleRepository roleRepository;
-
-    /**
-     * Repositorio para operaciones de persistencia de la entidad {@link Owner}.
-     */
     private final OwnerRepository ownerRepository;
-
-    /**
-     * Implementación de codificación de contraseñas inyectada por Spring Security.
-     * Garantiza el cumplimiento de las prácticas de seguridad de almacenamiento de credenciales.
-     */
     private final PasswordEncoder passwordEncoder;
-    @Value("${app.admin.password}")
-    private String adminPassword;
 
-    /**
-     * Método principal del ciclo de vida de {@link CommandLineRunner}.
-     * Se ejecuta después de que todos los beans y la base de datos estén listos.
-     *
-     * @param args argumentos de línea de comandos pasados a la aplicación (no utilizados aquí).
-     */
+    // =========================================================================
+    // CREDENCIALES DEL ADMINISTRADOR POR DEFECTO (Solo para Desarrollo)
+    // =========================================================================
+    private static final String ADMIN_EMAIL = "adminhostflow@gmail.com";
+    private static final String ADMIN_PASSWORD = "AdminHostFlow2026!";
+    private static final String ADMIN_FULL_NAME = "Administrador HostFlow";
+    private static final String ADMIN_ACCOMMODATION = "HostFlow Platform";
+
     @Override
-    @Transactional // Garantiza atomicidad: si falla la creación del admin, se revierte cualquier cambio parcial en esta transacción.
+    @Transactional // Garantiza atomicidad: si falla la creación, se revierte cualquier cambio parcial.
     public void run(String... args) {
         log.info("🚀 Iniciando proceso de carga de datos base (Seed Data) del sistema HostFlow...");
 
         try {
-            // Paso 1: Asegurar la existencia de los roles del sistema
             inicializarRoles();
-
-            // Paso 2: Asegurar la existencia del usuario administrador
             inicializarAdministrador();
-
             log.info("✅ Proceso de inicialización de datos base completado exitosamente.");
         } catch (Exception e) {
-            // Capturamos la excepción para evitar que un error en los datos iniciales
-            // derribe toda la aplicación. La app arrancará, pero con un registro del fallo.
             log.error("❌ Error crítico durante la inicialización de datos base: {}", e.getMessage(), e);
         }
     }
@@ -97,9 +76,8 @@ public class DataInitializer implements CommandLineRunner {
     /**
      * Verifica y crea los roles del sistema de manera idempotente.
      *
-     * <p>Utiliza {@code orElseGet} en lugar de {@code orElse} para evaluar
-     * perezosamente (lazy evaluation) la creación del rol, evitando consultas
-     * de escritura (INSERT) innecesarias si el rol ya existe en la base de datos.</p>
+     * <p>Utiliza {@code orElseGet} para evaluación perezosa (lazy evaluation),
+     * evitando consultas de escritura (INSERT) innecesarias si el rol ya existe.</p>
      */
     private void inicializarRoles() {
         log.info("📋 Verificando integridad de roles del sistema...");
@@ -123,37 +101,39 @@ public class DataInitializer implements CommandLineRunner {
      * como un dueño de alojamiento estándar cuando sea necesario.</p>
      */
     private void inicializarAdministrador() {
-        final String adminEmail = "admin@hostflow.com";
-
         // Verificación eficiente sin traer toda la entidad a memoria
-        if (!ownerRepository.existsByEmail(adminEmail)) {
+        if (!ownerRepository.existsByEmail(ADMIN_EMAIL)) {
             log.info("👤 Usuario administrador no encontrado. Procediendo a su creación...");
 
-            // Recuperamos los roles. Si no existen aquí, algo falló catastróficamente en el paso anterior.
+            // Recuperamos los roles. Si no existen aquí, algo falló en el paso anterior.
             Role adminRole = roleRepository.findByRoleName(RoleType.ROLE_ADMIN)
-                    .orElseThrow(() -> new IllegalStateException("Inconsistencia de datos: El rol ROLE_ADMIN debería existir en este punto."));
+                    .orElseThrow(() -> new IllegalStateException("Inconsistencia de datos: El rol ROLE_ADMIN debería existir."));
 
             Role ownerRole = roleRepository.findByRoleName(RoleType.ROLE_OWNER)
-                    .orElseThrow(() -> new IllegalStateException("Inconsistencia de datos: El rol ROLE_OWNER debería existir en este punto."));
+                    .orElseThrow(() -> new IllegalStateException("Inconsistencia de datos: El rol ROLE_OWNER debería existir."));
 
-            // Construcción de la entidad utilizando el patrón Builder para inmutabilidad y legibilidad
+            // Construcción de la entidad utilizando el patrón Builder
             Owner admin = Owner.builder()
-                    .fullName("Administrador HostFlow")
-                    .accommodationName("HostFlow Platform")
-                    .email(adminEmail)
-                    .password(passwordEncoder.encode(adminPassword)) // Encriptación BCrypt obligatoria
+                    .fullName(ADMIN_FULL_NAME)
+                    .accommodationName(ADMIN_ACCOMMODATION)
+                    .email(ADMIN_EMAIL)
+                    .password(passwordEncoder.encode(ADMIN_PASSWORD)) // Encriptación BCrypt obligatoria
                     .termsAccepted(true)
                     .enabled(true)
-                    .roles(Set.of(adminRole, ownerRole))
+                    .emailVerified(true) // ✅ CORRECCIÓN: El admin del sistema debe estar verificado automáticamente
+                    .roles(Set.of(adminRole, ownerRole)) // ✅ CLAVE: Se le asignan AMBOS roles
                     .build();
 
             ownerRepository.save(admin);
 
             log.info("   ✅ Super usuario creado y persistido exitosamente.");
-            log.info("      📧 Email:    {}", adminEmail);
-            log.info("      ⚠️  NOTA DE SEGURIDAD: Cambie estas credenciales inmediatamente antes de pasar a producción.");
+            log.info("      📧 Email:    {}", ADMIN_EMAIL);
+            log.info("      🔑 Password: {}", ADMIN_PASSWORD);
+            log.info("      🎭 Roles:    ROLE_ADMIN, ROLE_OWNER");
+            log.info("      ⚠️  NOTA: Si intentaste registrar este correo manualmente antes, este script lo omite. Borra el registro manual de la BD si quieres que este script tome el control.");
         } else {
             log.info("   ℹ️  El super usuario administrador ya existe. Omitiendo creación para preservar integridad.");
+            log.info("   💡 TIP: Si este usuario tiene el rol incorrecto (solo ROLE_OWNER), bórralo de la tabla 'owners' y reinicia la aplicación.");
         }
     }
 }
