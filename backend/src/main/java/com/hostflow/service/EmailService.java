@@ -2,11 +2,13 @@ package com.hostflow.service;
 
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.Reservation;
+import com.resend.Resend;
+import com.resend.services.emails.model.SendEmailRequest;
+import com.resend.services.emails.model.SendEmailResponse;
 import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -21,30 +23,37 @@ import java.time.format.DateTimeFormatter;
 /**
  * Servicio centralizado para el envío de correos electrónicos en HostFlow.
  *
- * <p>Utiliza Spring Boot Mail y Thymeleaf para enviar notificaciones transaccionales, incluyendo:</p>
+ * <p>Utiliza un enfoque HÍBRIDO inteligente:</p>
  * <ul>
- *   <li>Recuperación y cambio de contraseñas (Texto plano).</li>
- *   <li>Verificación de cuentas de usuario (Texto plano).</li>
- *   <li>Creación, confirmación (HTML personalizado con branding, alergias y lógica de monedas) y cancelación de reservas.</li>
- *   <li>Registro de nuevos métodos de pago por parte del propietario.</li>
+ *   <li>🟢 <strong>Producción (Render):</strong> Usa Resend API si la clave está configurada.</li>
+ *   <li>🟡 <strong>Desarrollo (Local):</strong> Usa Gmail SMTP si Resend no está configurado.</li>
+ *   <li>🔴 <strong>Modo Fallback:</strong> Si ninguno está configurado, solo registra el enlace en los logs.</li>
  * </ul>
  *
  * <p><strong>Política de resiliencia:</strong> Todos los métodos de envío están envueltos
- * en bloques {@code try-catch}. Si el envío de email falla (ej. servidor SMTP caído),
- * se registra el error en los logs pero NO se lanza una excepción. Esto evita que fallos
- * externos en el servicio de correo interrumpan o reviertan el flujo principal de negocio.</p>
+ * en bloques {@code try-catch}. Si el envío de email falla, se registra el error en los logs
+ * pero NO se lanza una excepción, evitando interrumpir el flujo principal de negocio.</p>
  *
  * @author HostFlow Team
- * @version 3.3.0 (Corregido manejo de enum Currency y robustez en conversión de monedas)
+ * @version 4.1.0 (Corregido patrón Builder en Resend SDK y optimización de código)
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    // =========================================================================
+    // DEPENDENCIAS E INYECCIÓN HÍBRIDA
+    // =========================================================================
+
+    // required = false evita que la aplicación falle al iniciar en Render si no hay config SMTP
+    @Autowired(required = false)
+    private JavaMailSender mailSender;
+
     private final TemplateEngine templateEngine;
     private final ExchangeRateProviderService exchangeRateService;
+
+    @Value("${resend.api.key:}")
+    private String resendApiKey;
 
     @Value("${spring.mail.username:no-reply@hostflow.com}")
     private String fromEmail;
@@ -54,39 +63,93 @@ public class EmailService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
 
+    // Constructor manual (necesario porque mezclamos @Autowired y inyección por constructor)
+    public EmailService(TemplateEngine templateEngine, ExchangeRateProviderService exchangeRateService) {
+        this.templateEngine = templateEngine;
+        this.exchangeRateService = exchangeRateService;
+    }
+
+    // =========================================================================
+    // MOTOR HÍBRIDO DE ENVÍO DE CORREOS (NÚCLEO)
+    // =========================================================================
+
+    /**
+     * Enrutador inteligente que decide si usar Resend (Nube) o Gmail SMTP (Local).
+     */
+    private void sendHybridEmail(String to, String subject, String htmlContent, String plainTextContent) {
+        // 🟢 ESCENARIO A: Render / Producción (API Key de Resend configurada y válida)
+        if (resendApiKey != null && !resendApiKey.trim().isEmpty() && resendApiKey.startsWith("re_")) {
+            sendViaResend(to, subject, htmlContent != null ? htmlContent : plainTextContent);
+        }
+        // 🟡 ESCENARIO B: Local (No hay API Key de Resend, usamos Gmail SMTP)
+        else if (mailSender != null) {
+            sendViaGmail(to, subject, htmlContent, plainTextContent);
+        }
+        // 🔴 ESCENARIO C: Modo desarrollo sin proveedores de email configurados
+        else {
+            log.warn("⚠️ MODO DESARROLLO: No se configuró ni Resend ni Gmail. El correo NO se envió a {}", to);
+            log.info("🔗 Contenido simulado:\nAsunto: {}\n{}", subject, plainTextContent != null ? plainTextContent : htmlContent);
+        }
+    }
+
+    /**
+     * Implementación 1: Envío vía Resend (Ideal para Render / Producción)
+     */
+    private void sendViaResend(String to, String subject, String content) {
+        try {
+            Resend resend = new Resend(resendApiKey);
+
+            // ✅ CORRECCIÓN: Usar Builder pattern requerido por el SDK de Resend
+            SendEmailRequest request = SendEmailRequest.builder()
+                    .from("HostFlow <onboarding@resend.dev>") // Cambiar por tu dominio verificado ej: "HostFlow <noreply@tu-dominio.com>"
+                    .to(java.util.List.of(to))
+                    .subject(subject)
+                    .html(content)
+                    .build();
+
+            SendEmailResponse response = resend.emails().send(request);
+            log.info("✅ Email enviado exitosamente vía Resend a {}. ID: {}", to, response.getId());
+        } catch (Exception e) {
+            log.error("❌ Error enviando email vía Resend a {}: {}", to, e.getMessage(), e);
+            // No lanzamos excepción para cumplir con la política de resiliencia
+        }
+    }
+
+    /**
+     * Implementación 2: Envío vía Gmail SMTP (Ideal para Desarrollo Local)
+     */
+    private void sendViaGmail(String to, String subject, String htmlContent, String plainTextContent) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(to);
+            helper.setSubject(subject);
+
+            if (htmlContent != null && !htmlContent.trim().isEmpty()) {
+                helper.setText(htmlContent, true); // true = es HTML
+            } else if (plainTextContent != null) {
+                helper.setText(plainTextContent, false); // false = es texto plano
+            }
+
+            mailSender.send(message);
+            log.info("✅ Email enviado exitosamente vía Gmail SMTP a: {}", to);
+        } catch (Exception e) {
+            log.error("❌ Error enviando email vía Gmail a {}: {}", to, e.getMessage(), e);
+            // No lanzamos excepción para cumplir con la política de resiliencia
+        }
+    }
+
     // =========================================================================
     // MÉTODOS AUXILIARES PARA LÓGICA DE MONEDAS
     // =========================================================================
 
-    /**
-     * Determina si el alojamiento opera exclusivamente con billeteras digitales argentinas.
-     *
-     * @param accommodation El alojamiento a evaluar.
-     * @return true si solo debe mostrarse en ARS, false si deben mostrarse las 3 monedas.
-     */
     private boolean isArgentinaOnly(Accommodation accommodation) {
-        // ✅ CORRECCIÓN: Usamos .toString() para manejar tanto String como Enum Currency sin errores de compilación
         boolean isArsCurrency = accommodation.getBaseCurrency() != null &&
                 accommodation.getBaseCurrency().toString().equalsIgnoreCase("ARS");
-
-        // Si tu entidad Accommodation tiene una lista de métodos de pago, descomenta y adapta esto:
-        /*
-        boolean hasArgentinaWallets = accommodation.getPaymentMethods() != null &&
-            accommodation.getPaymentMethods().stream().anyMatch(pm ->
-                pm.getProviderName() != null && (pm.getProviderName().toLowerCase().contains("mercado pago") ||
-                                                 pm.getProviderName().toLowerCase().contains("uala") ||
-                                                 pm.getProviderName().toLowerCase().contains("argentina"))
-            );
-        return isArsCurrency && hasArgentinaWallets;
-        */
-
-        // Fallback seguro: si la moneda base es ARS, lo tratamos como caso local.
         return isArsCurrency;
     }
 
-    /**
-     * Convierte un monto de una moneda a otra utilizando el servicio de tasas de cambio.
-     */
     private BigDecimal convertCurrency(BigDecimal amount, String fromCurrency, String toCurrency) {
         if (amount == null || fromCurrency == null || toCurrency == null) {
             return BigDecimal.ZERO;
@@ -104,332 +167,147 @@ public class EmailService {
     }
 
     // =========================================================================
-    // MÉTODOS: AUTENTICACIÓN Y SEGURIDAD (Texto Plano)
+    // MÉTODOS: AUTENTICACIÓN Y SEGURIDAD
     // =========================================================================
 
     public void sendPasswordResetEmail(String toEmail, String resetCode, int expirationMin) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("🔐 " + appName + " - Código de recuperación de contraseña");
+        String resetLink = "https://hostflow-lilac.vercel.app/reset-password?token=" + resetCode; // Ajusta a tu URL real
 
-            String emailBody = String.format("""
-                Hola,
-                
-                Hemos recibido una solicitud para restablecer tu contraseña en %s.
-                
-                Tu código de recuperación es:
-                ╔══════════════════════╗
-                ║   CÓDIGO: %s   ║
-                ╚══════════════════════╝
-                
-                Este código expirará en %d minutos.
-                
-                Si no solicitaste este cambio, puedes ignorar este correo de forma segura.
-                
-                Saludos,
-                El equipo de %s
-                """, appName, resetCode, expirationMin, appName);
+        // Contenido HTML profesional
+        String htmlContent = String.format("""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                    <h1>🏨 %s</h1>
+                </div>
+                <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+                    <h2>Hola,</h2>
+                    <p>Hemos recibido una solicitud para restablecer tu contraseña.</p>
+                    <p><strong>Tu código de recuperación es:</strong> <span style="font-size: 24px; font-weight: bold; color: #667eea;">%s</span></p>
+                    <p style="margin-top: 20px; font-size: 14px; color: #666;">O haz clic en el siguiente enlace (expira en %d minutos):<br>
+                    <a href="%s" style="color: #667eea;">%s</a></p>
+                    <p style="margin-top: 20px; font-size: 14px; color: #666;">Si no lo solicitaste, ignora este correo.</p>
+                </div>
+            </div>
+            """, appName, resetCode, expirationMin, resetLink, resetLink);
 
-            message.setText(emailBody);
-            mailSender.send(message);
-            log.info("✅ Email de recuperación enviado a: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Error al enviar email de recuperación a {}: {}", toEmail, e.getMessage(), e);
-        }
+        // Texto plano como fallback
+        String plainText = String.format("Tu código de recuperación en %s es: %s. Expira en %d minutos. Link: %s", appName, resetCode, expirationMin, resetLink);
+
+        sendHybridEmail(toEmail, "🔐 " + appName + " - Código de recuperación de contraseña", htmlContent, plainText);
     }
 
     public void sendPasswordChangedConfirmation(String toEmail) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("✅ " + appName + " - Contraseña actualizada exitosamente");
-
-            String emailBody = String.format("""
-                Hola,
-                
-                Te confirmamos que tu contraseña en %s ha sido actualizada exitosamente.
-                
-                Si no realizaste este cambio, contacta inmediatamente con nuestro equipo de soporte.
-                
-                Saludos,
-                El equipo de %s
-                """, appName, appName);
-
-            message.setText(emailBody);
-            mailSender.send(message);
-            log.info("✅ Email de confirmación de cambio de contraseña enviado a: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Error al enviar email de confirmación de cambio a {}: {}", toEmail, e.getMessage(), e);
-        }
+        String plainText = String.format("Te confirmamos que tu contraseña en %s ha sido actualizada exitosamente.", appName);
+        sendHybridEmail(toEmail, "✅ " + appName + " - Contraseña actualizada", null, plainText);
     }
 
-    public void sendEmailVerificationEmail(String toEmail, String verificationToken,
-                                           String verificationUrl, int expirationMin) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("✅ " + appName + " - Verifica tu correo electrónico");
-
-            String emailBody = String.format("""
-                ¡Bienvenido a %s!
-                
-                Gracias por registrarte en nuestra plataforma.
-                
-                Para completar tu registro y activar tu cuenta, 
-                por favor verifica tu correo electrónico haciendo clic en el siguiente enlace:
-                
-                ╔══════════════════════════════════════════════════════════╗
-                ║  ENLACE DE VERIFICACIÓN:                                 ║
-                ║  %s  ║
-                ╚══════════════════════════════════════════════════════════╝
-                
-                ⚠️ Importante:
-                • Este enlace expirará en %d minutos.
-                • Es de un solo uso.
-                
-                Saludos,
-                El equipo de %s
-                """, appName, verificationUrl, expirationMin, appName);
-
-            message.setText(emailBody);
-            mailSender.send(message);
-            log.info("✅ Email de verificación de cuenta enviado a: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Error al enviar email de verificación a {}: {}", toEmail, e.getMessage(), e);
-        }
+    public void sendEmailVerificationEmail(String toEmail, String verificationToken, String verificationUrl, int expirationMin) {
+        String plainText = String.format("¡Bienvenido a %s!\n\nVerifica tu correo haciendo clic aquí: %s\nExpira en %d minutos.", appName, verificationUrl, expirationMin);
+        sendHybridEmail(toEmail, "✅ " + appName + " - Verifica tu correo electrónico", null, plainText);
     }
 
-    public void sendEmailVerificationResendEmail(String toEmail, String verificationToken,
-                                                 String verificationUrl, int expirationMin) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("🔄 " + appName + " - Nuevo enlace de verificación");
-
-            String emailBody = String.format("""
-                Hola,
-                
-                Hemos recibido una solicitud para reenviar el enlace de verificación
-                de tu cuenta en %s.
-                
-                Tu nuevo enlace de verificación es:
-                
-                ╔══════════════════════════════════════════════════════════╗
-                ║  NUEVO ENLACE DE VERIFICACIÓN:                           ║
-                ║  %s  ║
-                ╚══════════════════════════════════════════════════════════╝
-                
-                ⚠️ Importante:
-                • Este enlace expirará en %d minutos.
-                • El enlace anterior ha sido invalidado automáticamente.
-                
-                Saludos,
-                El equipo de %s
-                """, appName, verificationUrl, expirationMin, appName);
-
-            message.setText(emailBody);
-            mailSender.send(message);
-            log.info("✅ Email de reenvío de verificación enviado a: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Error al enviar email de reenvío de verificación a {}: {}", toEmail, e.getMessage(), e);
-        }
+    public void sendEmailVerificationResendEmail(String toEmail, String verificationToken, String verificationUrl, int expirationMin) {
+        String plainText = String.format("Aquí tienes tu nuevo enlace de verificación para %s: %s\nExpira en %d minutos.", appName, verificationUrl, expirationMin);
+        sendHybridEmail(toEmail, "🔄 " + appName + " - Nuevo enlace de verificación", null, plainText);
     }
 
     // =========================================================================
-    // MÉTODOS: SISTEMA DE RESERVAS (Texto Plano y HTML con Thymeleaf)
+    // MÉTODOS: SISTEMA DE RESERVAS
     // =========================================================================
 
     public void sendReservationConfirmationEmail(String toEmail, String guestName, String confirmationCode,
                                                  String confirmationUrl, String accommodationName,
                                                  LocalDateTime checkIn, LocalDateTime checkOut,
                                                  BigDecimal totalAmount, int expirationHours) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("🏨 " + appName + " - Confirma tu reserva " + confirmationCode);
+        String plainText = String.format("""
+            ¡Hola %s!
+            Un propietario ha creado una reserva para ti en %s.
+            Código: %s | Check-in: %s | Check-out: %s | Monto total: $%,.2f
+            Para confirmar, haz clic en: %s (Expira en %d horas)
+            """, guestName, accommodationName, confirmationCode,
+                checkIn.format(DATE_FORMATTER), checkOut.format(DATE_FORMATTER), totalAmount, confirmationUrl, expirationHours);
 
-            String emailBody = String.format("""
-                ¡Hola %s!
-                
-                Un propietario ha creado una reserva para ti en %s.
-                
-                ═══════════════════════════════════════════════════════
-                📋 DETALLES DE LA RESERVA
-                ═══════════════════════════════════════════════════════
-                Código: %s | Alojamiento: %s
-                Check-in: %s | Check-out: %s
-                Monto total: $%,.2f
-                ═══════════════════════════════════════════════════════
-                
-                Para confirmar tu reserva, haz clic en el siguiente enlace:
-                %s
-                
-                ⚠️ Este enlace expirará en %d horas y es de un solo uso.
-                
-                Saludos,
-                El equipo de %s
-                """,
-                    guestName, accommodationName, confirmationCode, accommodationName,
-                    checkIn.format(DATE_FORMATTER), checkOut.format(DATE_FORMATTER),
-                    totalAmount, confirmationUrl, expirationHours, appName
-            );
-
-            message.setText(emailBody);
-            mailSender.send(message);
-            log.info("✅ Email de solicitud de confirmación de reserva enviado a: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Error al enviar email de confirmación de reserva a {}: {}", toEmail, e.getMessage(), e);
-        }
+        sendHybridEmail(toEmail, "🏨 " + appName + " - Confirma tu reserva " + confirmationCode, null, plainText);
     }
 
-    /**
-     * 🆕 Envía un correo HTML personalizado al HUÉSPED tras confirmar la reserva.
-     * Incluye branding, alergias y lógica de conversión de monedas.
-     */
     public void sendReservationConfirmedGuestEmail(Reservation reservation, Accommodation accommodation,
                                                    String guestName, String reservationUrl) {
-        try {
-            if (reservation.getGuest() == null || reservation.getGuest().getEmail() == null) {
-                log.warn("⚠️ No se puede enviar email al huésped: datos de huésped o email nulos.");
-                return;
-            }
-
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setFrom(fromEmail);
-            helper.setTo(reservation.getGuest().getEmail());
-            helper.setSubject("✅ " + appName + " - ¡Reserva confirmada! " + reservation.getConfirmationCode());
-
-            Context context = new Context();
-            context.setVariable("reservation", reservation);
-            context.setVariable("accommodation", accommodation);
-            context.setVariable("guestName", guestName);
-            context.setVariable("watermark", "Plataforma de Reservas HostFlow");
-            context.setVariable("reservationUrl", reservationUrl);
-
-            // 🆕 Lógica de Monedas
-            boolean argentinaOnly = isArgentinaOnly(accommodation);
-            context.setVariable("isArgentinaOnly", argentinaOnly);
-
-            // ✅ CORRECCIÓN: Usamos la moneda base del alojamiento como referencia principal
-            String originalCurrency = accommodation.getBaseCurrency() != null ?
-                    accommodation.getBaseCurrency().toString().toUpperCase() : "ARS";
-            BigDecimal total = reservation.getTotalAmount() != null ? reservation.getTotalAmount() : BigDecimal.ZERO;
-
-            context.setVariable("totalArs", convertCurrency(total, originalCurrency, "ARS"));
-            context.setVariable("totalUsd", convertCurrency(total, originalCurrency, "USD"));
-            context.setVariable("totalEur", convertCurrency(total, originalCurrency, "EUR"));
-            context.setVariable("originalCurrency", originalCurrency);
-
-            String htmlContent = templateEngine.process("emails/reservation-confirmation-guest", context);
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-
-            log.info("✅ Email HTML de reserva confirmada enviado al huésped: {}", reservation.getGuest().getEmail());
-        } catch (Exception e) {
-            log.error("❌ Error al enviar email HTML de reserva confirmada al huésped: {}", e.getMessage(), e);
+        if (reservation.getGuest() == null || reservation.getGuest().getEmail() == null) {
+            log.warn("⚠️ No se puede enviar email al huésped: datos nulos.");
+            return;
         }
+
+        Context context = new Context();
+        context.setVariable("reservation", reservation);
+        context.setVariable("accommodation", accommodation);
+        context.setVariable("guestName", guestName);
+        context.setVariable("watermark", "Plataforma de Reservas HostFlow");
+        context.setVariable("reservationUrl", reservationUrl);
+
+        boolean argentinaOnly = isArgentinaOnly(accommodation);
+        context.setVariable("isArgentinaOnly", argentinaOnly);
+
+        String originalCurrency = accommodation.getBaseCurrency() != null ?
+                accommodation.getBaseCurrency().toString().toUpperCase() : "ARS";
+        BigDecimal total = reservation.getTotalAmount() != null ? reservation.getTotalAmount() : BigDecimal.ZERO;
+
+        context.setVariable("totalArs", convertCurrency(total, originalCurrency, "ARS"));
+        context.setVariable("totalUsd", convertCurrency(total, originalCurrency, "USD"));
+        context.setVariable("totalEur", convertCurrency(total, originalCurrency, "EUR"));
+        context.setVariable("originalCurrency", originalCurrency);
+
+        String htmlContent = templateEngine.process("emails/reservation-confirmation-guest", context);
+
+        sendHybridEmail(
+                reservation.getGuest().getEmail(),
+                "✅ " + appName + " - ¡Reserva confirmada! " + reservation.getConfirmationCode(),
+                htmlContent,
+                null // No necesita texto plano porque Thymeleaf ya genera HTML perfecto
+        );
     }
 
-    /**
-     * 🆕 Envía un correo HTML personalizado al PROPIETARIO notificando una nueva reserva confirmada.
-     * Incluye branding, alergias y lógica de conversión de monedas.
-     */
     public void sendReservationConfirmedOwnerEmail(Reservation reservation, Accommodation accommodation,
                                                    String ownerName, String reservationUrl) {
-        try {
-            if (accommodation.getOwner() == null || accommodation.getOwner().getEmail() == null) {
-                log.error("❌ No se puede enviar email al propietario: el alojamiento (ID: {}) no tiene un propietario válido o el email es nulo.", accommodation.getId());
-                return;
-            }
-
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setFrom(fromEmail);
-            helper.setTo(accommodation.getOwner().getEmail());
-            helper.setSubject("🔔 " + appName + " - ¡Nueva reserva confirmada! " + reservation.getConfirmationCode());
-
-            Context context = new Context();
-            context.setVariable("reservation", reservation);
-            context.setVariable("accommodation", accommodation);
-            context.setVariable("ownerName", ownerName);
-            context.setVariable("watermark", "Panel de Administración HostFlow");
-            context.setVariable("reservationUrl", reservationUrl);
-
-            // 🆕 Lógica de Monedas
-            boolean argentinaOnly = isArgentinaOnly(accommodation);
-            context.setVariable("isArgentinaOnly", argentinaOnly);
-
-            // ✅ CORRECCIÓN: Usamos la moneda base del alojamiento como referencia principal
-            String originalCurrency = accommodation.getBaseCurrency() != null ?
-                    accommodation.getBaseCurrency().toString().toUpperCase() : "ARS";
-            BigDecimal total = reservation.getTotalAmount() != null ? reservation.getTotalAmount() : BigDecimal.ZERO;
-
-            context.setVariable("totalArs", convertCurrency(total, originalCurrency, "ARS"));
-            context.setVariable("totalUsd", convertCurrency(total, originalCurrency, "USD"));
-            context.setVariable("totalEur", convertCurrency(total, originalCurrency, "EUR"));
-            context.setVariable("originalCurrency", originalCurrency);
-
-            String htmlContent = templateEngine.process("emails/reservation-notification-owner", context);
-
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-
-            log.info("✅ Email HTML de nueva reserva enviado al propietario: {}", accommodation.getOwner().getEmail());
-        } catch (Exception e) {
-            log.error("❌ Error al enviar email HTML de nueva reserva al propietario: {}", e.getMessage(), e);
+        if (accommodation.getOwner() == null || accommodation.getOwner().getEmail() == null) {
+            log.error("❌ No se puede enviar email al propietario: datos nulos.");
+            return;
         }
+
+        Context context = new Context();
+        context.setVariable("reservation", reservation);
+        context.setVariable("accommodation", accommodation);
+        context.setVariable("ownerName", ownerName);
+        context.setVariable("watermark", "Panel de Administración HostFlow");
+        context.setVariable("reservationUrl", reservationUrl);
+
+        boolean argentinaOnly = isArgentinaOnly(accommodation);
+        context.setVariable("isArgentinaOnly", argentinaOnly);
+
+        String originalCurrency = accommodation.getBaseCurrency() != null ?
+                accommodation.getBaseCurrency().toString().toUpperCase() : "ARS";
+        BigDecimal total = reservation.getTotalAmount() != null ? reservation.getTotalAmount() : BigDecimal.ZERO;
+
+        context.setVariable("totalArs", convertCurrency(total, originalCurrency, "ARS"));
+        context.setVariable("totalUsd", convertCurrency(total, originalCurrency, "USD"));
+        context.setVariable("totalEur", convertCurrency(total, originalCurrency, "EUR"));
+        context.setVariable("originalCurrency", originalCurrency);
+
+        String htmlContent = templateEngine.process("emails/reservation-notification-owner", context);
+
+        sendHybridEmail(
+                accommodation.getOwner().getEmail(),
+                "🔔 " + appName + " - ¡Nueva reserva confirmada! " + reservation.getConfirmationCode(),
+                htmlContent,
+                null
+        );
     }
 
     public void sendReservationCancelledEmail(String toEmail, String guestName, String confirmationCode,
                                               String accommodationName, String reason) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("❌ " + appName + " - Reserva cancelada " + confirmationCode);
+        String plainText = String.format("¡Hola %s!\n\nTu reserva %s en %s ha sido cancelada.\nMotivo: %s",
+                guestName, confirmationCode, accommodationName, reason != null ? reason : "No especificado");
 
-            StringBuilder emailBody = new StringBuilder();
-            emailBody.append(String.format("""
-                ¡Hola %s!
-                
-                Lamentamos informarte que tu reserva ha sido cancelada.
-                
-                ═══════════════════════════════════════════════════════
-                📋 DETALLES DE LA RESERVA CANCELADA
-                ═══════════════════════════════════════════════════════
-                Código de confirmación: %s
-                Alojamiento: %s
-                ═══════════════════════════════════════════════════════
-                """, guestName, confirmationCode, accommodationName));
-
-            if (reason != null && !reason.isBlank()) {
-                emailBody.append(String.format("\nMotivo de la cancelación:\n%s\n", reason));
-            }
-
-            emailBody.append(String.format("""
-                
-                Si tienes alguna pregunta o deseas realizar una nueva reserva en el futuro,
-                no dudes en contactarnos a través de la plataforma.
-                
-                Saludos,
-                El equipo de %s
-                """, appName));
-
-            message.setText(emailBody.toString());
-            mailSender.send(message);
-            log.info("✅ Email de cancelación de reserva enviado a: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Error al enviar email de cancelación de reserva a {}: {}", toEmail, e.getMessage(), e);
-        }
+        sendHybridEmail(toEmail, "❌ " + appName + " - Reserva cancelada " + confirmationCode, null, plainText);
     }
 
     // =========================================================================
@@ -441,42 +319,9 @@ public class EmailService {
                                               String paymentMethodName,
                                               String paymentType,
                                               boolean isDefault) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("💳 " + appName + " - Nuevo método de pago registrado");
+        String plainText = String.format("Hola %s,\n\nSe ha registrado un nuevo método de pago (%s - %s) en tu alojamiento \"%s\".",
+                ownerName, paymentMethodName, paymentType, accommodationName);
 
-            String defaultBadge = isDefault ? "⭐ SÍ (este es tu método predeterminado)" : "No";
-
-            String emailBody = String.format("""
-                    Hola %s,
-
-                    Te informamos que se ha registrado un nuevo método de pago
-                    en tu alojamiento "%s" dentro de la plataforma %s.
-
-                    ╔══════════════════════════════════════════════════════════╗
-                    ║  DETALLES DEL MÉTODO DE PAGO                             ║
-                    ╠══════════════════════════════════════════════════════════╣
-                    ║  Nombre:         %s
-                    ║  Tipo:           %s
-                    ║  Predeterminado: %s
-                    ╚══════════════════════════════════════════════════════════╝
-
-                    Puedes gestionar tus métodos de pago en cualquier momento
-                    desde el panel de administración de tu alojamiento.
-
-                    Saludos,
-                    El equipo de %s
-                    """,
-                    ownerName, accommodationName, appName,
-                    paymentMethodName, paymentType, defaultBadge, appName);
-
-            message.setText(emailBody);
-            mailSender.send(message);
-            log.info("✅ Email de confirmación de método de pago enviado a: {}", toEmail);
-        } catch (Exception e) {
-            log.error("❌ Error al enviar email de método de pago a {}: {}", toEmail, e.getMessage(), e);
-        }
+        sendHybridEmail(toEmail, "💳 " + appName + " - Nuevo método de pago registrado", null, plainText);
     }
 }
