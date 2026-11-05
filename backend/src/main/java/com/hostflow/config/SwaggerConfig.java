@@ -7,6 +7,7 @@ import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -16,23 +17,40 @@ import java.util.List;
  * Configuración de Swagger / OpenAPI 3 para la documentación de la API de HostFlow.
  *
  * <p>Define la información general de la API, los esquemas de seguridad
- * (JWT Bearer Token), los metadatos de contacto y la URL base del servidor.</p>
+ * (JWT Bearer Token), los metadatos de contacto y las URLs base de los servidores.</p>
+ *
+ * <p><strong>Característica Multi-Entorno:</strong></p>
+ * <ul>
+ *   <li>Incluye tanto el servidor local como el de producción (Render).</li>
+ *   <li>Permite cambiar dinámicamente entre servidores desde el dropdown de Swagger UI.</li>
+ *   <li>Evita conflictos de "Failed to fetch" al probar la API desplegada en Render.</li>
+ * </ul>
  *
  * <p><strong>Ubicación de la documentación:</strong></p>
  * <ul>
- *   <li>Interfaz gráfica (Swagger UI): {@code http://localhost:8080/api/v1/swagger-ui.html}</li>
- *   <li>Definición OpenAPI (JSON): {@code http://localhost:8080/api/v1/v3/api-docs}</li>
+ *   <li>Interfaz gráfica (Swagger UI): {@code /api/v1/swagger-ui/index.html}</li>
+ *   <li>Definición OpenAPI (JSON): {@code /api/v1/v3/api-docs}</li>
  * </ul>
  *
  * @author HostFlow Team
- * @version 2.1.0
+ * @version 2.2.0 (Soporte multi-entorno: Local y Render sin conflictos)
  */
 @Configuration
 public class SwaggerConfig {
 
+    // =========================================================================
+    // CONFIGURACIÓN DE SERVIDORES (Inyectada desde application.properties)
+    // =========================================================================
+
+    @Value("${app.swagger.local-url:http://localhost:8080/api/v1}")
+    private String localUrl;
+
+    @Value("${app.swagger.render-url:https://hostflow-backend-mi26.onrender.com/api/v1}")
+    private String renderUrl;
+
     /**
      * Configura el bean de OpenAPI con la información de la API,
-     * la URL del servidor y el esquema de seguridad JWT Bearer.
+     * las URLs de los servidores (Local y Render) y el esquema de seguridad JWT Bearer.
      *
      * @return la configuración completa de OpenAPI
      */
@@ -55,7 +73,7 @@ public class SwaggerConfig {
                                 ## 🔐 Autenticación
                                 La API utiliza tokens JWT (JSON Web Token) para la autenticación.
                                 1. Use el endpoint `/auth/login` para obtener su token.
-                                2. Haga clic en el botón **"Authorize"** (candado) en la parte superior.
+                                2. Haga clic en el botón **"Authorize"** (candado) en la parte superior derecha.
                                 3. Ingrese el token con el formato: `Bearer <tu_token_aquí>`
                                 """)
                         .contact(new Contact()
@@ -68,23 +86,25 @@ public class SwaggerConfig {
                 )
 
                 // =========================================================================
-                // 2. CONFIGURACIÓN DEL SERVIDOR (CRÍTICO PARA CONTEXTO /api/v1)
+                // 2. CONFIGURACIÓN DE SERVIDORES (MULTI-ENTORNO)
                 // =========================================================================
-                // Define explícitamente la URL base. Esto previene el error
-                // "Failed to load remote configuration" al indicar a Swagger
-                // que debe buscar los docs en /api/v1/v3/api-docs y no en la raíz.
+                // Se definen explícitamente ambos servidores.
+                // Swagger UI mostrará un dropdown en la parte superior para que el usuario
+                // elija a qué entorno dirigir las peticiones, evitando el error "Failed to fetch".
                 .servers(List.of(
                         new Server()
-                                .url("http://localhost:8080/api/v1")
-                                .description("Servidor de Desarrollo Local")
+                                .url(localUrl)
+                                .description("Servidor de Desarrollo Local"),
+                        new Server()
+                                .url(renderUrl)
+                                .description("Servidor de Producción (Render)")
                 ))
 
                 // =========================================================================
                 // 3. ESQUEMA DE SEGURIDAD (COMPONENTE REUTILIZABLE)
                 // =========================================================================
                 // Define el esquema "Bearer Authentication" como disponible.
-                // No se aplica globalmente a todos los endpoints aquí; cada
-                // controlador debe declarar explícitamente:
+                // Cada controlador debe declarar explícitamente:
                 // @SecurityRequirement(name = "Bearer Authentication")
                 .components(new Components()
                         .addSecuritySchemes("Bearer Authentication",
