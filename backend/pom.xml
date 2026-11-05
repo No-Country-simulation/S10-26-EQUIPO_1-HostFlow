@@ -154,12 +154,6 @@
 			<artifactId>spring-boot-starter-thymeleaf</artifactId>
 		</dependency>
 
-		<!-- para poder conectar el correo con la aplicacion resend) -->
-		<dependency>
-			<groupId>com.resend</groupId>
-			<artifactId>resend-java</artifactId>
-			<version>2.1.0</version>
-		</dependency>
 
 		<!-- ============================================ -->
 		<!-- Spring Boot Mail: Envío de correos           -->

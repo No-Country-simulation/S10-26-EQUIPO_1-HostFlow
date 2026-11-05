@@ -1,10 +1,8 @@
 package com.hostflow.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.Reservation;
-import com.resend.Resend;
-import com.resend.services.emails.model.SendEmailRequest;
-import com.resend.services.emails.model.SendEmailResponse;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,17 +15,23 @@ import org.thymeleaf.context.Context;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Servicio centralizado para el envío de correos electrónicos en HostFlow.
  *
  * <p>Utiliza un enfoque HÍBRIDO inteligente:</p>
  * <ul>
- *   <li>🟢 <strong>Producción (Render):</strong> Usa Resend API si la clave está configurada.</li>
- *   <li>🟡 <strong>Desarrollo (Local):</strong> Usa Gmail SMTP si Resend no está configurado.</li>
- *   <li>🔴 <strong>Modo Fallback:</strong> Si ninguno está configurado, solo registra el enlace en los logs.</li>
+ *   <li>🟢 <strong>Producción (Render):</strong> Usa la API de Brevo si la clave está configurada.</li>
+ *   <li>🟡 <strong>Desarrollo (Local):</strong> Usa Gmail SMTP si Brevo no está configurado.</li>
+ *   <li>🔴 <strong>Modo Fallback:</strong> Si ninguno está configurado, solo registra el contenido en los logs.</li>
  * </ul>
  *
  * <p><strong>Política de resiliencia:</strong> Todos los métodos de envío están envueltos
@@ -35,7 +39,7 @@ import java.time.format.DateTimeFormatter;
  * pero NO se lanza una excepción, evitando interrumpir el flujo principal de negocio.</p>
  *
  * @author HostFlow Team
- * @version 4.1.0 (Corregido patrón Builder en Resend SDK y optimización de código)
+ * @version 4.3.0 (Corregido error de JSON en Brevo usando ObjectMapper de Jackson)
  */
 @Service
 @Slf4j
@@ -45,15 +49,15 @@ public class EmailService {
     // DEPENDENCIAS E INYECCIÓN HÍBRIDA
     // =========================================================================
 
-    // required = false evita que la aplicación falle al iniciar en Render si no hay config SMTP
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
     private final TemplateEngine templateEngine;
     private final ExchangeRateProviderService exchangeRateService;
+    private final ObjectMapper objectMapper; // 🆕 Para serializar JSON de forma segura
 
-    @Value("${resend.api.key:}")
-    private String resendApiKey;
+    @Value("${brevo.api.key:}")
+    private String brevoApiKey;
 
     @Value("${spring.mail.username:no-reply@hostflow.com}")
     private String fromEmail;
@@ -63,55 +67,68 @@ public class EmailService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
 
-    // Constructor manual (necesario porque mezclamos @Autowired y inyección por constructor)
-    public EmailService(TemplateEngine templateEngine, ExchangeRateProviderService exchangeRateService) {
+    // Constructor actualizado para incluir ObjectMapper
+    public EmailService(TemplateEngine templateEngine, ExchangeRateProviderService exchangeRateService, ObjectMapper objectMapper) {
         this.templateEngine = templateEngine;
         this.exchangeRateService = exchangeRateService;
+        this.objectMapper = objectMapper;
     }
 
     // =========================================================================
     // MOTOR HÍBRIDO DE ENVÍO DE CORREOS (NÚCLEO)
     // =========================================================================
 
-    /**
-     * Enrutador inteligente que decide si usar Resend (Nube) o Gmail SMTP (Local).
-     */
     private void sendHybridEmail(String to, String subject, String htmlContent, String plainTextContent) {
-        // 🟢 ESCENARIO A: Render / Producción (API Key de Resend configurada y válida)
-        if (resendApiKey != null && !resendApiKey.trim().isEmpty() && resendApiKey.startsWith("re_")) {
-            sendViaResend(to, subject, htmlContent != null ? htmlContent : plainTextContent);
-        }
-        // 🟡 ESCENARIO B: Local (No hay API Key de Resend, usamos Gmail SMTP)
-        else if (mailSender != null) {
+        if (brevoApiKey != null && !brevoApiKey.trim().isEmpty() && brevoApiKey.startsWith("xkeysib-")) {
+            sendViaBrevo(to, subject, htmlContent != null ? htmlContent : plainTextContent);
+        } else if (mailSender != null) {
             sendViaGmail(to, subject, htmlContent, plainTextContent);
-        }
-        // 🔴 ESCENARIO C: Modo desarrollo sin proveedores de email configurados
-        else {
-            log.warn("⚠️ MODO DESARROLLO: No se configuró ni Resend ni Gmail. El correo NO se envió a {}", to);
+        } else {
+            log.warn("⚠️ MODO DESARROLLO: No se configuró ni Brevo ni Gmail. El correo NO se envió a {}", to);
             log.info("🔗 Contenido simulado:\nAsunto: {}\n{}", subject, plainTextContent != null ? plainTextContent : htmlContent);
         }
     }
 
     /**
-     * Implementación 1: Envío vía Resend (Ideal para Render / Producción)
+     * Implementación 1: Envío vía API REST de Brevo (Ideal para Render / Producción)
+     * ✅ Usa ObjectMapper para garantizar un JSON 100% válido, sin importar el contenido del HTML.
      */
-    private void sendViaResend(String to, String subject, String content) {
+    private void sendViaBrevo(String to, String subject, String content) {
         try {
-            Resend resend = new Resend(resendApiKey);
+            HttpClient client = HttpClient.newHttpClient();
+            String senderEmail = (fromEmail != null && !fromEmail.isEmpty()) ? fromEmail : "noreply@hostflow.com";
 
-            // ✅ CORRECCIÓN: Usar Builder pattern requerido por el SDK de Resend
-            SendEmailRequest request = SendEmailRequest.builder()
-                    .from("HostFlow <onboarding@resend.dev>") // Cambiar por tu dominio verificado ej: "HostFlow <noreply@tu-dominio.com>"
-                    .to(java.util.List.of(to))
-                    .subject(subject)
-                    .html(content)
+            // 🆕 Construcción segura del payload usando Map y ObjectMapper
+            Map<String, Object> sender = Map.of("name", appName, "email", senderEmail);
+            Map<String, Object> recipient = Map.of("email", to);
+
+            Map<String, Object> requestBody = Map.of(
+                    "sender", sender,
+                    "to", List.of(recipient),
+                    "subject", subject,
+                    "htmlContent", content
+            );
+
+            // ObjectMapper escapa automáticamente comillas, saltos de línea y caracteres especiales
+            String jsonBody = objectMapper.writeValueAsString(requestBody);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
+                    .header("accept", "application/json")
+                    .header("api-key", brevoApiKey)
+                    .header("content-type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                     .build();
 
-            SendEmailResponse response = resend.emails().send(request);
-            log.info("✅ Email enviado exitosamente vía Resend a {}. ID: {}", to, response.getId());
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 201) {
+                log.info("✅ Email enviado exitosamente vía Brevo a: {}", to);
+            } else {
+                log.error("❌ Error enviando email vía Brevo. Status: {}, Respuesta: {}", response.statusCode(), response.body());
+            }
         } catch (Exception e) {
-            log.error("❌ Error enviando email vía Resend a {}: {}", to, e.getMessage(), e);
-            // No lanzamos excepción para cumplir con la política de resiliencia
+            log.error("❌ Excepción enviando email vía Brevo a {}: {}", to, e.getMessage(), e);
         }
     }
 
@@ -127,16 +144,15 @@ public class EmailService {
             helper.setSubject(subject);
 
             if (htmlContent != null && !htmlContent.trim().isEmpty()) {
-                helper.setText(htmlContent, true); // true = es HTML
+                helper.setText(htmlContent, true);
             } else if (plainTextContent != null) {
-                helper.setText(plainTextContent, false); // false = es texto plano
+                helper.setText(plainTextContent, false);
             }
 
             mailSender.send(message);
             log.info("✅ Email enviado exitosamente vía Gmail SMTP a: {}", to);
         } catch (Exception e) {
             log.error("❌ Error enviando email vía Gmail a {}: {}", to, e.getMessage(), e);
-            // No lanzamos excepción para cumplir con la política de resiliencia
         }
     }
 
@@ -171,9 +187,8 @@ public class EmailService {
     // =========================================================================
 
     public void sendPasswordResetEmail(String toEmail, String resetCode, int expirationMin) {
-        String resetLink = "https://hostflow-lilac.vercel.app/reset-password?token=" + resetCode; // Ajusta a tu URL real
+        String resetLink = "https://hostflow-lilac.vercel.app/reset-password?token=" + resetCode;
 
-        // Contenido HTML profesional
         String htmlContent = String.format("""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
@@ -190,7 +205,6 @@ public class EmailService {
             </div>
             """, appName, resetCode, expirationMin, resetLink, resetLink);
 
-        // Texto plano como fallback
         String plainText = String.format("Tu código de recuperación en %s es: %s. Expira en %d minutos. Link: %s", appName, resetCode, expirationMin, resetLink);
 
         sendHybridEmail(toEmail, "🔐 " + appName + " - Código de recuperación de contraseña", htmlContent, plainText);
@@ -262,7 +276,7 @@ public class EmailService {
                 reservation.getGuest().getEmail(),
                 "✅ " + appName + " - ¡Reserva confirmada! " + reservation.getConfirmationCode(),
                 htmlContent,
-                null // No necesita texto plano porque Thymeleaf ya genera HTML perfecto
+                null
         );
     }
 
