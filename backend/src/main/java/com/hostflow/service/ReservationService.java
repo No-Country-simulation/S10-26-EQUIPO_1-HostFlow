@@ -33,7 +33,8 @@ import java.util.stream.Collectors;
  *   <li>Crear reservas validando estrictamente la disponibilidad del alojamiento.</li>
  *   <li>Generar enlaces de confirmación únicos con expiración configurable.</li>
  *   <li>Confirmar reservas mediante el enlace recibido por el huésped.</li>
- *   <li>Reactivar enlaces expirados y gestionar la cancelación de reservas.</li>
+ *   <li>Enviar notificaciones HTML personalizadas (con branding, alergias y lógica de monedas).</li>
+ *   <li>Reactivar enlaces expirados, gestionar cancelaciones y marcar reservas como completadas.</li>
  * </ul>
  *
  * <p><strong>Reglas de negocio estrictas:</strong></p>
@@ -45,7 +46,7 @@ import java.util.stream.Collectors;
  * </ul>
  *
  * @author HostFlow Team
- * @version 2.0.0
+ * @version 3.4.0 (Agregado método para completar reservas y registrar ingresos en el dashboard)
  */
 @Service
 @RequiredArgsConstructor
@@ -76,24 +77,11 @@ public class ReservationService {
     private BigDecimal taxPercentage;
 
     // =========================================================================
-    // CREACIÓN DE RESERVA
+    // 1. CREACIÓN DE RESERVA
     // =========================================================================
 
     /**
      * Crea una nueva reserva y genera el enlace de confirmación.
-     *
-     * <p><strong>Flujo del proceso:</strong></p>
-     * <ol>
-     *   <li>Valida que el alojamiento exista y pertenezca al owner autenticado.</li>
-     *   <li>Valida que las fechas de check-in y check-out sean lógicas y futuras.</li>
-     *   <li>Verifica que no haya reservas overlapping (doble booking) en esas fechas.</li>
-     *   <li>Obtiene o crea el huésped en el sistema.</li>
-     *   <li>Valida que el huésped tenga al menos un método de pago activo.</li>
-     *   <li>Calcula el precio total (noches × precio por noche + impuestos).</li>
-     *   <li>Persiste la reserva en estado {@link ReservationStatus#PENDING}.</li>
-     *   <li>Genera el enlace de confirmación con token UUID único.</li>
-     *   <li>Envía el enlace al huésped por email.</li>
-     * </ol>
      *
      * @param ownerId ID del propietario que crea la reserva
      * @param request datos de la reserva solicitada
@@ -112,21 +100,22 @@ public class ReservationService {
         // 2. Validar que las fechas sean lógicas y futuras
         validateDates(request.checkIn(), request.checkOut());
 
-        // 3. 🆕 VALIDACIÓN CRÍTICA: Verificar disponibilidad (no overlapping)
+        // 3. 🛡️ VALIDACIÓN CRÍTICA: Verificar disponibilidad (no overlapping)
         validateAvailability(accommodation.getId(), request.checkIn(), request.checkOut());
 
-        // 4. Obtener o crear el huésped
-        // Se construye el DTO unificado para delegar la lógica de creación/búsqueda al GuestService
+        // 4. 🆕 Obtener o crear el huésped (incluyendo preferencias y alergias)
         CreateGuestRequest guestRequest = new CreateGuestRequest(
                 request.guestFirstName(),
                 request.guestLastName(),
                 request.guestEmail(),
                 request.guestPhone(),
-                null // El documento de identidad no es obligatorio en este flujo de creación por el owner
+                null, // El documento de identidad no es obligatorio en este flujo
+                request.guestPreferences(), // 🆕 Se mapean las preferencias del huésped
+                request.guestAllergies()    // 🆕 Se mapea la lista de alergias del huésped
         );
         Guest guest = guestService.createOrFindGuest(guestRequest);
 
-        // 5. 🆕 VALIDACIÓN: Verificar que el huésped tenga al menos un método de pago activo
+        // 5. 🛡️ VALIDACIÓN: Verificar que el huésped tenga al menos un método de pago activo
         if (!guestService.hasActivePaymentMethod(guest.getId())) {
             throw new BusinessException(
                     "El huésped debe tener al menos un método de pago activo para realizar una reserva. " +
@@ -167,7 +156,7 @@ public class ReservationService {
         // 9. Generar enlace de confirmación con token UUID
         ReservationLink link = createConfirmationLink(savedReservation, request.getLinkExpirationHoursOrDefault());
 
-        // 10. 🆕 Enviar email al huésped con el enlace de confirmación
+        // 10. 📧 Enviar email al huésped con el enlace de confirmación
         emailService.sendReservationConfirmationEmail(
                 guest.getEmail(),
                 guest.getFullName(),
@@ -186,23 +175,12 @@ public class ReservationService {
     }
 
     // =========================================================================
-    // CONFIRMACIÓN DE RESERVA
+    // 2. CONFIRMACIÓN DE RESERVA
     // =========================================================================
 
     /**
      * Confirma una reserva utilizando el enlace de confirmación recibido por el huésped.
-     *
-     * <p><strong>Flujo del proceso:</strong></p>
-     * <ol>
-     *   <li>Busca el enlace por su token único.</li>
-     *   <li>Valida que el enlace sea válido (no expirado, no usado previamente).</li>
-     *   <li>Valida que el método de pago proporcionado sea válido y esté activo.</li>
-     *   <li>Re-valida la disponibilidad del alojamiento (por si acaso cambió).</li>
-     *   <li>Cambia el estado de la reserva a {@link ReservationStatus#CONFIRMED}.</li>
-     *   <li>Asocia el método de pago seleccionado a la reserva.</li>
-     *   <li>Marca el enlace como usado para prevenir reutilización.</li>
-     *   <li>Envía email de confirmación final al huésped.</li>
-     * </ol>
+     * Envía notificaciones HTML personalizadas tanto al huésped como al propietario.
      *
      * @param token           el token del enlace de confirmación
      * @param paymentMethodId ID del método de pago a utilizar
@@ -233,49 +211,74 @@ public class ReservationService {
             throw new BusinessException("La reserva ya no está pendiente de confirmación. Estado actual: " + reservation.getStatus().getDisplayName());
         }
 
-        // 5. 🆕 VALIDACIÓN: Verificar que el método de pago sea válido y pertenezca al huésped
+        // 5. 🛡️ VALIDACIÓN: Verificar que el método de pago sea válido y pertenezca al huésped
         GuestPaymentMethod paymentMethod = guestService.getPaymentMethod(reservation.getGuest().getId(), paymentMethodId);
         if (!paymentMethod.isActive()) {
             throw new BusinessException("El método de pago seleccionado no está activo. Por favor, seleccione otro método de pago.");
         }
 
-        // 6. 🆕 RE-VALIDACIÓN: Verificar disponibilidad nuevamente (prevención de race conditions)
+        // 6. 🛡️ RE-VALIDACIÓN: Verificar disponibilidad nuevamente (prevención de race conditions)
         validateAvailability(reservation.getAccommodation().getId(), reservation.getCheckIn(), reservation.getCheckOut(), reservation.getId());
 
         // 7. Confirmar la reserva y asociar el método de pago
         reservation.setStatus(ReservationStatus.CONFIRMED);
         reservation.setPaymentMethod(paymentMethod);
-        reservationRepository.save(reservation);
+        Reservation confirmedReservation = reservationRepository.save(reservation);
 
         // 8. Marcar el enlace como usado
         link.markAsUsed();
         linkRepository.save(link);
 
-        log.info("✅ Reserva confirmada: {} - Huésped: {}", reservation.getConfirmationCode(), reservation.getGuest().getEmail());
+        log.info("✅ Reserva confirmada en BD: {} - Huésped: {}", confirmedReservation.getConfirmationCode(), confirmedReservation.getGuest().getEmail());
 
-        // 9. 🆕 Enviar email de confirmación final al huésped
-        emailService.sendReservationConfirmedEmail(
-                reservation.getGuest().getEmail(),
-                reservation.getGuest().getFullName(),
-                reservation.getConfirmationCode(),
-                reservation.getAccommodation().getName(),
-                reservation.getCheckIn(),
-                reservation.getCheckOut(),
-                reservation.getTotalAmount()
-        );
-        log.info("📧 Email de reserva confirmada enviado exitosamente a: {}", reservation.getGuest().getEmail());
+        // =========================================================================
+        // 9. 📧 ENVÍO DE NOTIFICACIONES HTML PERSONALIZADAS (Con política de resiliencia)
+        // =========================================================================
+        try {
+            log.info("📧 Iniciando envío de emails de confirmación para la reserva: {}", confirmedReservation.getConfirmationCode());
 
-        return ReservationResponse.from(reservation, null);
+            // Carga explícita del alojamiento para evitar LazyInitializationException
+            Accommodation accommodation = accommodationRepository.findById(confirmedReservation.getAccommodation().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Alojamiento no encontrado para la reserva confirmada."));
+
+            String guestName = confirmedReservation.getGuest().getFullName();
+
+            // Lógica segura para obtener el nombre del propietario
+            String ownerName = "Propietario";
+            if (accommodation.getOwner() != null) {
+                if (accommodation.getOwner().getFullName() != null && !accommodation.getOwner().getFullName().isBlank()) {
+                    ownerName = accommodation.getOwner().getFullName();
+                } else if (accommodation.getOwner().getEmail() != null && !accommodation.getOwner().getEmail().isBlank()) {
+                    ownerName = accommodation.getOwner().getEmail().split("@")[0];
+                }
+            }
+
+            // Construir URL base para que puedan ver la reserva en la plataforma
+            String baseUrl = frontendConfirmUrl.replace("/confirm", "");
+            String reservationUrl = baseUrl + "/reservations/" + confirmedReservation.getConfirmationCode();
+
+            // A. Enviar email HTML al Huésped
+            emailService.sendReservationConfirmedGuestEmail(confirmedReservation, accommodation, guestName, reservationUrl);
+
+            // B. Enviar email HTML al Propietario
+            emailService.sendReservationConfirmedOwnerEmail(confirmedReservation, accommodation, ownerName, reservationUrl);
+
+            log.info("📧 Emails de confirmación (HTML) enviados exitosamente al huésped y al propietario.");
+
+        } catch (Exception e) {
+            // POLÍTICA DE RESILIENCIA: No lanzar excepción para no revertir la transacción si el servidor de correo falla.
+            log.error("❌ Error al enviar emails de confirmación HTML (Reserva {}): {}", confirmedReservation.getConfirmationCode(), e.getMessage(), e);
+        }
+
+        return ReservationResponse.from(confirmedReservation, null);
     }
 
     // =========================================================================
-    // REACTIVACIÓN DE ENLACE
+    // 3. REACTIVACIÓN DE ENLACE
     // =========================================================================
 
     /**
      * Reactiva un enlace de confirmación expirado.
-     *
-     * <p>Genera un nuevo token UUID y extiende la expiración por las horas especificadas.</p>
      *
      * @param reservationId   ID de la reserva
      * @param expirationHours horas de validez del nuevo enlace
@@ -289,16 +292,13 @@ public class ReservationService {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontró la reserva con ID: " + reservationId));
 
-        // Validar que la reserva esté en estado PENDING
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             throw new BusinessException("Solo se pueden reactivar enlaces de reservas pendientes. Estado actual: " + reservation.getStatus().getDisplayName());
         }
 
-        // Buscar el enlace existente
         ReservationLink link = linkRepository.findByReservation_Id(reservationId)
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontró un enlace para esta reserva."));
 
-        // Reactivar el enlace (genera nuevo token y actualiza fecha de expiración)
         String newToken = link.reactivate(expirationHours);
         String newUrl = frontendConfirmUrl + "?token=" + newToken;
         link.setConfirmationUrl(newUrl);
@@ -306,7 +306,6 @@ public class ReservationService {
 
         log.info("✅ Enlace reactivado. Nuevo token: {}", newToken);
 
-        // 🆕 Enviar email al huésped con el nuevo enlace
         emailService.sendReservationConfirmationEmail(
                 reservation.getGuest().getEmail(),
                 reservation.getGuest().getFullName(),
@@ -324,7 +323,7 @@ public class ReservationService {
     }
 
     // =========================================================================
-    // CANCELACIÓN DE RESERVA
+    // 4. CANCELACIÓN DE RESERVA
     // =========================================================================
 
     /**
@@ -355,7 +354,6 @@ public class ReservationService {
 
         log.info("✅ Reserva cancelada: {}", reservation.getConfirmationCode());
 
-        // 🆕 Enviar email de cancelación al huésped
         emailService.sendReservationCancelledEmail(
                 reservation.getGuest().getEmail(),
                 reservation.getGuest().getFullName(),
@@ -369,7 +367,53 @@ public class ReservationService {
     }
 
     // =========================================================================
-    // CONSULTAS
+    // 5. 🆕 COMPLETAR RESERVA (REGISTRO DE INGRESOS)
+    // =========================================================================
+
+    /**
+     * Marca una reserva como COMPLETADA después del check-out.
+     *
+     * <p>Esta operación es irreversible y actualiza las métricas financieras
+     * del propietario (incomeLastMonth, accumulatedIncome) en el dashboard.</p>
+     *
+     * @param reservationId ID de la reserva a completar
+     * @return la reserva actualizada
+     * @throws BusinessException si la reserva no está en estado CONFIRMED o el check-out no ha pasado
+     * @throws ResourceNotFoundException si la reserva no existe
+     */
+    @Transactional
+    public ReservationResponse completeReservation(Long reservationId) {
+        log.info("✅ Completando reserva ID: {}", reservationId);
+
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("No se encontró la reserva con ID: " + reservationId));
+
+        // Solo se pueden completar reservas CONFIRMED
+        if (reservation.getStatus() != ReservationStatus.CONFIRMED) {
+            throw new BusinessException(
+                    "Solo se pueden completar reservas en estado CONFIRMED. " +
+                            "Estado actual: " + reservation.getStatus().getDisplayName());
+        }
+
+        // Validar que la fecha de check-out ya haya pasado
+        if (reservation.getCheckOut().isAfter(LocalDateTime.now())) {
+            throw new BusinessException(
+                    "No se puede completar una reserva cuya fecha de check-out " +
+                            "aún no ha llegado. Check-out: " + reservation.getCheckOut());
+        }
+
+        // Cambiar estado a COMPLETED
+        reservation.setStatus(ReservationStatus.COMPLETED);
+        Reservation completed = reservationRepository.save(reservation);
+
+        log.info("✅ Reserva completada: {} | Ingreso registrado: ${}",
+                completed.getConfirmationCode(), completed.getTotalAmount());
+
+        return ReservationResponse.from(completed, null);
+    }
+
+    // =========================================================================
+    // 6. CONSULTAS
     // =========================================================================
 
     @Transactional(readOnly = true)
@@ -428,7 +472,7 @@ public class ReservationService {
     }
 
     // =========================================================================
-    // MÉTODOS AUXILIARES PRIVADOS
+    // 7. MÉTODOS AUXILIARES PRIVADOS
     // =========================================================================
 
     /**
@@ -455,14 +499,14 @@ public class ReservationService {
     }
 
     /**
-     * 🆕 VALIDACIÓN CRÍTICA: Verifica que no haya reservas overlapping.
+     * 🛡️ VALIDACIÓN CRÍTICA: Verifica que no haya reservas overlapping.
      */
     private void validateAvailability(Long accommodationId, LocalDateTime checkIn, LocalDateTime checkOut) {
         validateAvailability(accommodationId, checkIn, checkOut, null);
     }
 
     /**
-     * 🆕 VALIDACIÓN CRÍTICA: Verifica que no haya reservas overlapping,
+     * 🛡️ VALIDACIÓN CRÍTICA: Verifica que no haya reservas overlapping,
      * excluyendo una reserva específica (útil al re-confirmar).
      */
     private void validateAvailability(Long accommodationId, LocalDateTime checkIn, LocalDateTime checkOut, Long excludeReservationId) {

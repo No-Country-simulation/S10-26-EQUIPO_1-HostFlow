@@ -168,7 +168,7 @@ public class AccommodationProfileService {
         AccommodationImage image = AccommodationImage.builder()
                 .accommodation(accommodation).imageUrl(request.url().trim()).build();
         return imageRepository.save(image);
-        
+    }
     private void ensureGalleryHasSpace(Long accommodationId) {
         if (imageRepository.countByAccommodation_Id(accommodationId) >= MAX_GALLERY_IMAGES) {
             throw new BusinessException(

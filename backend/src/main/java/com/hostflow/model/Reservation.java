@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -17,7 +18,7 @@ import java.time.LocalDateTime;
  *
  * <p><strong>Estados posibles de una reserva:</strong></p>
  * <ul>
- *   <li>{@code PENDING}: Reserva creada, esperando confirmación del huésped.</li>
+ *   <li>{@code PENDING}: Reserva creada, esperando confirmación.</li>
  *   <li>{@code CONFIRMED}: Huésped confirmó la reserva y el pago.</li>
  *   <li>{@code CANCELLED}: Reserva cancelada (por huésped o propietario).</li>
  *   <li>{@code EXPIRED}: Enlace de confirmación expiró sin confirmación.</li>
@@ -33,7 +34,7 @@ import java.time.LocalDateTime;
  * </ul>
  *
  * @author HostFlow Team
- * @version 1.0.0
+ * @version 1.4.0
  * @see Guest
  * @see Accommodation
  * @see ReservationLink
@@ -44,7 +45,7 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_reservations_accommodation", columnList = "accommodation_id"),
                 @Index(name = "idx_reservations_guest", columnList = "guest_id"),
                 @Index(name = "idx_reservations_status", columnList = "status"),
-                @Index(name = "idx_reservations_dates", columnList = "check_in, check_out"),
+                @Index(name = "idx_reservations_dates", columnList = "check_in_date, check_out_date"),
                 @Index(name = "idx_reservations_confirmation_code", columnList = "confirmation_code")
         })
 @Getter
@@ -104,16 +105,16 @@ public class Reservation {
 
     /**
      * Fecha y hora de check-in (ingreso al alojamiento).
-     * No puede ser en el pasado al momento de crear la reserva.
+     * Mapeado a 'check_in_date' para coincidir con el esquema de la base de datos.
      */
-    @Column(name = "check_in", nullable = false)
+    @Column(name = "check_in_date", nullable = false)
     private LocalDateTime checkIn;
 
     /**
      * Fecha y hora de check-out (salida del alojamiento).
-     * Debe ser posterior a {@link #checkIn}.
+     * Mapeado a 'check_out_date' para coincidir con el esquema de la base de datos.
      */
-    @Column(name = "check_out", nullable = false)
+    @Column(name = "check_out_date", nullable = false)
     private LocalDateTime checkOut;
 
     /**
@@ -148,8 +149,9 @@ public class Reservation {
 
     /**
      * Monto total de la reserva (subtotal + impuestos).
+     * Mapeado a 'total_price' para coincidir con el esquema de la base de datos.
      */
-    @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
+    @Column(name = "total_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount;
 
     // =========================================================================
@@ -167,8 +169,9 @@ public class Reservation {
 
     /**
      * Número de huéspedes que se hospedarán.
+     * Mapeado a 'number_of_guests' para coincidir con el esquema de la base de datos.
      */
-    @Column(name = "guest_count", nullable = false)
+    @Column(name = "number_of_guests", nullable = false)
     @Builder.Default
     private Integer guestCount = 1;
 

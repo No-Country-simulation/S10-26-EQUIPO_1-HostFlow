@@ -834,7 +834,7 @@ Content-Type: application/json
 
 ### 🌐 Precios públicos — `/public/accommodations/{accommodationId}`
 
-Consulta de precios en múltiples monedas, **sin autenticación** (`/public/**` está abierto en `SecurityConfig`). Responden `404` si el alojamiento no existe.
+Consulta de precios en múltiples monedas, **sin autenticación** (`/public/**` está abierto en `SecurityConfig_OLD`). Responden `404` si el alojamiento no existe.
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -1404,7 +1404,7 @@ erDiagram
 - **Autenticación *stateless*** con JWT (HS512); `JwtAuthenticationFilter` actúa antes de `UsernamePasswordAuthenticationFilter`.
 - **Contraseñas** cifradas con **BCrypt**.
 - **CSRF deshabilitado** (API sin sesión).
-- **CORS** (`SecurityConfig`): orígenes `http://localhost:3000`, `http://localhost:4200` y `http://localhost:8080`; métodos `GET, POST, PUT, PATCH, DELETE, OPTIONS`; credenciales permitidas.
+- **CORS** (`SecurityConfig_OLD`): orígenes `http://localhost:3000`, `http://localhost:4200` y `http://localhost:8080`; métodos `GET, POST, PUT, PATCH, DELETE, OPTIONS`; credenciales permitidas.
 - **Rutas públicas:** `/auth/**`, Swagger/OpenAPI, `/static/**` y `/public/**` (precios públicos, huéspedes y confirmación de reservas). El resto requiere autenticación.
 - **Confirmación de reservas:** protegida por un **token UUID** de un solo uso con vencimiento, enviado únicamente al correo del huésped.
 - **Autorización por rol** con `@PreAuthorize`: los endpoints de alojamiento, métodos de pago, monedas y servicios exigen `OWNER` y solo operan sobre el alojamiento del propietario autenticado.
@@ -1450,7 +1450,7 @@ Convención de commits sugerida: `feat`, `fix`, `docs`, `refactor`, `test`, `cho
 - [ ] **Eliminar la contraseña del administrador escrita en el código** (`DataInitializer`) y la contraseña por defecto `adminPassword`; exigir `ADMIN_PASSWORD`.
 - [ ] **`application.properties` incluye un valor por defecto de `jwt.secret` con apariencia real:** quítalo del repositorio y rota el secreto si se usó.
 - [ ] Unificar el correo del administrador (el código crea `adminhostflow@gmail.com`; la plantilla `.env` menciona `admin@hostflow.com`).
-- [ ] Ajustar los orígenes **CORS** al dominio del frontend y unificar `SecurityConfig` con `WebConfig` (que permite `allowedOrigins("*")`).
+- [ ] Ajustar los orígenes **CORS** al dominio del frontend y unificar `SecurityConfig_OLD` con `WebConfig` (que permite `allowedOrigins("*")`).
 - [ ] Limpiar propiedades sin uso (`app.exchange-rate.frankfurter.url`, `app.exchange-rate.max-age-hours`) o conectarlas al código.
 - [ ] La conversión de monedas **asume ARS como moneda base** (las tasas se guardan como ARS→USD/EUR); hoy el perfil no permite cambiar `base_currency`. Si se habilita otra moneda base, hay que adaptar `CurrencyConversionService`.
 - [ ] Incluir también las migraciones de `guests`, `guest_payment_methods`, `reservations` y `reservation_links`.

@@ -21,6 +21,7 @@ import java.util.List;
  * <p>Responsabilidades principales:</p>
  * <ul>
  *   <li>Crear o buscar huéspedes por correo electrónico, validando unicidad de documentos.</li>
+ *   <li>Persistir y actualizar preferencias y alergias del huésped.</li>
  *   <li>Registrar, listar y eliminar métodos de pago asociados a un huésped.</li>
  *   <li>Validar que existan métodos de pago activos antes de permitir una reserva.</li>
  * </ul>
@@ -30,7 +31,7 @@ import java.util.List;
  * usan {@code @Transactional(readOnly = true)} para optimizar el rendimiento.</p>
  *
  * @author HostFlow Team
- * @version 2.1.0
+ * @version 2.3.0 (Agregado soporte para persistencia de preferencias y alergias)
  */
 @Service
 @RequiredArgsConstructor
@@ -50,14 +51,13 @@ public class GuestService {
      * <p><strong>Flujo del proceso:</strong></p>
      * <ol>
      *   <li>Busca si ya existe un huésped con el email proporcionado.</li>
-     *   <li>Si existe, lo retorna inmediatamente (idempotencia).</li>
-     *   <li>Si no existe, valida que el número de documento (si se proporciona)
-     *       no esté ya registrado en el sistema.</li>
-     *   <li>Crea y persiste el nuevo huésped con los datos normalizados (trim, lowercase).</li>
+     *   <li>Si existe, actualiza sus preferencias y alergias si se proporcionan nuevos datos (idempotencia segura).</li>
+     *   <li>Si no existe, valida que el número de documento (si se proporciona) no esté ya registrado.</li>
+     *   <li>Crea y persiste el nuevo huésped con los datos normalizados (incluyendo preferencias y alergias).</li>
      * </ol>
      *
      * @param request los datos del huésped a crear o buscar (usando record)
-     * @return el huésped existente o recién creado
+     * @return el huésped existente (actualizado) o recién creado
      * @throws BusinessException si el documento de identidad ya está registrado
      */
     @Transactional
@@ -66,8 +66,23 @@ public class GuestService {
 
         return guestRepository.findByEmail(request.email())
                 .map(existingGuest -> {
-                    log.info("✅ Huésped encontrado: {} (ID: {})",
-                            existingGuest.getFullName(), existingGuest.getId());
+                    log.info("✅ Huésped encontrado: {} (ID: {})", existingGuest.getFullName(), existingGuest.getId());
+
+                    // 🆕 Actualizar preferencias y alergias si se proporcionan nuevos datos en esta reserva
+                    boolean updated = false;
+                    if (request.preferences() != null && !request.preferences().isBlank()) {
+                        existingGuest.setPreferences(request.preferences().trim());
+                        updated = true;
+                    }
+                    if (request.allergies() != null && !request.allergies().isEmpty()) {
+                        existingGuest.setAllergies(request.allergies());
+                        updated = true;
+                    }
+
+                    // Solo guardamos en la BD si hubo cambios para optimizar rendimiento
+                    if (updated) {
+                        return guestRepository.save(existingGuest);
+                    }
                     return existingGuest;
                 })
                 .orElseGet(() -> {
@@ -81,20 +96,28 @@ public class GuestService {
                                 });
                     }
 
-                    // 2. Crear nuevo huésped con datos normalizados
+                    // 2. Normalizar datos de nombre y apellido
+                    String firstName = request.firstName() != null ? request.firstName().trim() : "";
+                    String lastName = request.lastName() != null ? request.lastName().trim() : "";
+
+                    // ✅ CORRECCIÓN CRÍTICA: Concatenar nombre y apellido para cumplir con la restricción NOT NULL en BD
+                    String fullName = (firstName + " " + lastName).trim();
+
+                    // 3. Crear nuevo huésped con datos normalizados (🆕 incluyendo preferencias y alergias)
                     Guest newGuest = Guest.builder()
-                            .firstName(request.firstName().trim())
-                            .lastName(request.lastName().trim())
+                            .firstName(firstName)
+                            .lastName(lastName)
+                            .fullName(fullName) // ✅ Asignación obligatoria del nombre completo
                             .email(request.email().trim().toLowerCase())
                             .phone(request.phone() != null ? request.phone().trim() : null)
-                            .documentNumber(request.documentNumber() != null ?
-                                    request.documentNumber().trim() : null)
+                            .documentNumber(request.documentNumber() != null ? request.documentNumber().trim() : null)
+                            .preferences(request.preferences() != null && !request.preferences().isBlank() ? request.preferences().trim() : null) // 🆕
+                            .allergies(request.allergies()) // 🆕 (Hibernate persiste esto automáticamente en guest_allergies)
                             .active(true)
                             .build();
 
                     Guest savedGuest = guestRepository.save(newGuest);
-                    log.info("✅ Nuevo huésped creado: {} (ID: {})",
-                            savedGuest.getFullName(), savedGuest.getId());
+                    log.info("✅ Nuevo huésped creado: {} (ID: {})", savedGuest.getFullName(), savedGuest.getId());
                     return savedGuest;
                 });
     }
@@ -229,7 +252,7 @@ public class GuestService {
         GuestPaymentMethod method = getPaymentMethod(guestId, methodId);
 
         // Si era el predeterminado, limpiar el flag para mantener la integridad
-        if (method.isDefault()) {
+        if (Boolean.TRUE.equals(method.isDefault())) {
             paymentMethodRepository.clearDefaultForGuest(guestId);
         }
 

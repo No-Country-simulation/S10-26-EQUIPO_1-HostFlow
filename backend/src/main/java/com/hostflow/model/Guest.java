@@ -17,7 +17,7 @@ import java.util.List;
  * <ul>
  *   <li>Un huésped puede tener múltiples reservas en diferentes alojamientos.</li>
  *   <li>Se identifica de forma única por su correo electrónico.</li>
- *   <li>Almacena información de contacto y documento de identidad para verificación.</li>
+ *   <li>Almacena información de contacto, documento de identidad, preferencias y alergias.</li>
  *   <li>Mantiene un historial completo de reservas y métodos de pago asociados.</li>
  * </ul>
  *
@@ -25,11 +25,11 @@ import java.util.List;
  * <ul>
  *   <li>El correo electrónico debe ser único en todo el sistema.</li>
  *   <li>El documento de identidad (DNI/CC) debe ser único si se proporciona.</li>
- *   <li>Nombre y apellido son obligatorios.</li>
+ *   <li>Nombre, apellido y nombre completo son obligatorios.</li>
  * </ul>
  *
  * @author HostFlow Team
- * @version 2.0.0
+ * @version 3.1.0
  * @see Reservation
  * @see GuestPaymentMethod
  */
@@ -50,6 +50,10 @@ import java.util.List;
 @Builder
 public class Guest {
 
+    // =========================================================================
+    // IDENTIFICADOR
+    // =========================================================================
+
     /**
      * Identificador único del huésped (clave primaria).
      * Se utiliza {@link GenerationType#IDENTITY} para delegar la generación
@@ -59,78 +63,83 @@ public class Guest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // =========================================================================
+    // INFORMACIÓN PERSONAL Y DE CONTACTO
+    // =========================================================================
+
     /**
      * Nombre del huésped.
-     *
-     * <p>Restricciones:</p>
-     * <ul>
-     *   <li>No puede ser nulo.</li>
-     *   <li>Longitud máxima: 100 caracteres.</li>
-     * </ul>
      */
     @Column(name = "first_name", nullable = false, length = 100)
     private String firstName;
 
     /**
      * Apellido del huésped.
-     *
-     * <p>Restricciones:</p>
-     * <ul>
-     *   <li>No puede ser nulo.</li>
-     *   <li>Longitud máxima: 100 caracteres.</li>
-     * </ul>
      */
     @Column(name = "last_name", nullable = false, length = 100)
     private String lastName;
 
     /**
-     * Correo electrónico del huésped.
-     * Debe ser único y se utiliza como identificador principal
-     * para notificaciones, recuperación de reservas y autenticación.
+     * ✅ CORRECCIÓN CRÍTICA: Nombre completo del huésped.
+     *
+     * <p>Se persiste en la base de datos para cumplir con la restricción NOT NULL
+     * de la tabla y optimizar las consultas que requieren el nombre completo
+     * sin tener que concatenar columnas en tiempo de ejecución.</p>
      *
      * <p>Restricciones:</p>
      * <ul>
      *   <li>No puede ser nulo.</li>
-     *   <li>Debe ser único en la tabla.</li>
-     *   <li>Longitud máxima: 150 caracteres.</li>
+     *   <li>Longitud máxima: 200 caracteres.</li>
      * </ul>
+     */
+    @Column(name = "full_name", nullable = false, length = 200)
+    private String fullName;
+
+    /**
+     * Correo electrónico del huésped.
+     * Se utiliza como identificador principal para notificaciones y recuperación.
      */
     @Column(name = "email", nullable = false, unique = true, length = 150)
     private String email;
 
     /**
      * Número de teléfono del huésped (opcional).
-     * Utilizado para contacto de emergencia o confirmaciones de reserva.
-     *
-     * <p>Restricciones:</p>
-     * <ul>
-     *   <li>Puede ser nulo.</li>
-     *   <li>Longitud máxima: 40 caracteres.</li>
-     * </ul>
      */
     @Column(name = "phone", length = 40)
     private String phone;
 
     /**
-     * 🆕 Número de documento de identidad del huésped (DNI, CC, Pasaporte).
-     * Se almacena como String para soportar diferentes formatos internacionales,
-     * aunque la validación en el DTO restringe la entrada a solo números (5-12 dígitos).
-     *
-     * <p>Restricciones:</p>
-     * <ul>
-     *   <li>Puede ser nulo (campo opcional en el registro).</li>
-     *   <li>Debe ser único en el sistema si se proporciona (evita duplicados).</li>
-     *   <li>Longitud máxima: 20 caracteres.</li>
-     * </ul>
+     * Número de documento de identidad del huésped (DNI, CC, Pasaporte).
+     * Se almacena como String para soportar diferentes formatos internacionales.
      */
     @Column(name = "document_number", length = 20, unique = true)
     private String documentNumber;
 
     /**
+     * Preferencias especiales o solicitudes particulares del huésped.
+     * Ejemplos: "Cama king size", "Piso alto", "Cuna para bebé".
+     */
+    @Column(name = "preferences", length = 1000)
+    private String preferences;
+
+    /**
+     * Alergias, intolerancias o restricciones alimentarias del huésped.
+     * Se almacenan en una tabla separada ({@code guest_allergies}) vinculada
+     * al huésped mediante una relación implícita (ElementCollection).
+     */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "guest_allergies",
+            joinColumns = @JoinColumn(name = "guest_id")
+    )
+    @Column(name = "allergy_name", length = 100)
+    @Builder.Default
+    private List<String> allergies = new ArrayList<>();
+
+    /**
      * Indica si el huésped está activo en el sistema.
      * Un huésped inactivo no puede realizar nuevas reservas.
-     *
-     * <p>Valor por defecto: {@code true}</p>
+     * Valor por defecto: {@code true}
      */
     @Column(name = "is_active", nullable = false)
     @Builder.Default
@@ -143,13 +152,6 @@ public class Guest {
     /**
      * Lista de reservas realizadas por este huésped.
      * Relación bidireccional con {@link Reservation}.
-     *
-     * <p>Configuración:</p>
-     * <ul>
-     *   <li>Cascade: ALL (operaciones en cascada).</li>
-     *   <li>OrphanRemoval: true (eliminar reservas huérfanas).</li>
-     *   <li>Fetch: LAZY (carga diferida para optimizar rendimiento).</li>
-     * </ul>
      */
     @OneToMany(mappedBy = "guest", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
@@ -158,9 +160,6 @@ public class Guest {
     /**
      * Lista de métodos de pago registrados por este huésped.
      * Relación bidireccional con {@link GuestPaymentMethod}.
-     *
-     * <p>Un huésped puede tener múltiples métodos de pago
-     * (tarjetas, transferencias, billeteras digitales, etc.)</p>
      */
     @OneToMany(mappedBy = "guest", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
@@ -172,7 +171,6 @@ public class Guest {
 
     /**
      * Fecha y hora de creación del registro.
-     * Se establece automáticamente mediante {@link CreationTimestamp}.
      */
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -180,27 +178,16 @@ public class Guest {
 
     /**
      * Fecha y hora de la última modificación.
-     * Se actualiza automáticamente mediante {@link UpdateTimestamp}.
      */
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
     // =========================================================================
-    // MÉTODOS AUXILIARES
+    // NOTA SOBRE getFullName():
+    // El método manual getFullName() ha sido eliminado intencionalmente.
+    // La anotación @Getter de Lombok genera automáticamente getFullName(),
+    // el cual ahora devolverá el valor persistente de la columna 'full_name',
+    // evitando código duplicado y mejorando el rendimiento al no concatenar en memoria.
     // =========================================================================
-
-    /**
-     * Obtiene el nombre completo del huésped concatenando nombre y apellido.
-     *
-     * <p>Este método se proporciona para mantener la compatibilidad con
-     * cualquier parte del sistema (logs, emails, DTOs) que espere un
-     * método {@code getFullName()} en lugar de acceder a los campos por separado.</p>
-     *
-     * @return Nombre completo formateado (ej: "Juan Carlos Pérez")
-     */
-    public String getFullName() {
-        return (this.firstName != null ? this.firstName : "") + " " +
-                (this.lastName != null ? this.lastName : "");
-    }
 }
