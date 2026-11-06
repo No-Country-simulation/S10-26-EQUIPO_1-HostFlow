@@ -61,21 +61,6 @@ import java.time.LocalDateTime;
  *   <li>Solo el propietario del alojamiento puede crear/modificar su desactivación.</li>
  * </ul>
  *
- * <p><strong>Relaciones:</strong></p>
- * <ul>
- *   <li>Relación ManyToOne implícita con {@link Owner} a través del campo
- *       {@code ownerId} (no se usa relación JPA directa para mantener
- *       independencia y permitir consultas eficientes).</li>
- * </ul>
- *
- * <p><strong>Índices de base de datos:</strong></p>
- * <ul>
- *   <li>{@code idx_owner_active}: Optimiza consultas para verificar si un
- *       propietario tiene desactivación activa.</li>
- *   <li>{@code idx_disable_dates}: Optimiza consultas de disponibilidad
- *       en rangos de fechas.</li>
- * </ul>
- *
  * @author HostFlow Team
  * @version 2.0.0
  * @see com.hostflow.service.AccommodationTemporaryDisableService
@@ -86,30 +71,9 @@ import java.time.LocalDateTime;
 @Table(
         name = "accommodation_temporary_disables",
         indexes = {
-                /**
-                 * Índice compuesto para consultas frecuentes de estado activo por propietario.
-                 * Optimiza: findByOwnerIdAndIsActiveTrue()
-                 */
-                @Index(
-                        name = "idx_owner_active",
-                        columnList = "owner_id, is_active"
-                ),
-                /**
-                 * Índice para consultas de disponibilidad en rangos de fechas.
-                 * Optimiza: findActiveDisableAtDate()
-                 */
-                @Index(
-                        name = "idx_disable_dates",
-                        columnList = "disabled_from, disabled_until"
-                ),
-                /**
-                 * Índice para consultas de historial ordenado por fecha de creación.
-                 * Optimiza: findByOwnerIdOrderByCreatedAtDesc()
-                 */
-                @Index(
-                        name = "idx_owner_created",
-                        columnList = "owner_id, created_at"
-                )
+                @Index(name = "idx_owner_active", columnList = "owner_id, is_active"),
+                @Index(name = "idx_disable_dates", columnList = "disabled_from, disabled_until"),
+                @Index(name = "idx_owner_created", columnList = "owner_id, created_at")
         }
 )
 @Getter
@@ -130,8 +94,6 @@ public class AccommodationTemporaryDisable {
      * del valor al motor de la base de datos (AUTO_INCREMENT en PostgreSQL),
      * lo cual es la práctica más eficiente y portable para claves primarias
      * secuenciales.</p>
-     *
-     * <p>Ejemplo: {@code 1}, {@code 2}, {@code 3}, ...</p>
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -161,10 +123,6 @@ public class AccommodationTemporaryDisable {
      *   <li>No puede ser nulo ({@code nullable = false})</li>
      *   <li>Debe corresponder a un ID válido en la tabla {@code owners}</li>
      * </ul>
-     *
-     * <p>Ejemplo: {@code 15} (ID del propietario Carlos Palacios)</p>
-     *
-     * @see Owner#getId()
      */
     @Column(name = "owner_id", nullable = false)
     private Long ownerId;
@@ -177,13 +135,7 @@ public class AccommodationTemporaryDisable {
      * Motivo o razón de la desactivación temporal del alojamiento.
      *
      * <p>Este campo es obligatorio y debe proporcionar información clara
-     * sobre por qué el alojamiento no estará disponible. La información
-     * puede ser utilizada para:</p>
-     * <ul>
-     *   <li>Notificar a huéspedes con reservas existentes</li>
-     *   <li>Generar reportes administrativos</li>
-     *   <li>Mantener historial operativo del alojamiento</li>
-     * </ul>
+     * sobre por qué el alojamiento no estará disponible.</p>
      *
      * <p><strong>Ejemplos de motivos válidos:</strong></p>
      * <ul>
@@ -192,7 +144,6 @@ public class AccommodationTemporaryDisable {
      *   <li>"Cierre por temporada baja - Noviembre a Marzo"</li>
      *   <li>"Vacaciones del propietario - Viaje familiar programado"</li>
      *   <li>"Daños por tormenta - Reparación de techo y ventanas"</li>
-     *   <li>"Actualización de mobiliario y equipamiento"</li>
      * </ul>
      *
      * <p><strong>Restricciones:</strong></p>
@@ -219,15 +170,12 @@ public class AccommodationTemporaryDisable {
      * <p><strong>Consideraciones importantes:</strong></p>
      * <ul>
      *   <li>Debe ser igual o posterior a la fecha/hora actual</li>
-     *   <li>Puede ser una fecha futura programada (ej. cerrar desde el
-     *       próximo mes)</li>
+     *   <li>Puede ser una fecha futura programada</li>
      *   <li>El sistema debe validar que no se superponga con otra
      *       desactivación activa del mismo propietario</li>
      * </ul>
      *
      * <p><strong>Formato:</strong> ISO-8601 (ej: {@code 2026-11-01T00:00:00})</p>
-     *
-     * <p>Ejemplo: {@code 2026-11-01T00:00:00} (1 de noviembre de 2026, medianoche)</p>
      */
     @Column(name = "disabled_from", nullable = false)
     private LocalDateTime disabledFrom;
@@ -237,7 +185,7 @@ public class AccommodationTemporaryDisable {
      *
      * <p>Representa el momento en que se prevé que el alojamiento volverá
      * a estar disponible. Este campo es <strong>opcional</strong> para
-     * accommodating casos donde la duración es indeterminada.</p>
+     * casos donde la duración es indeterminada.</p>
      *
      * <p><strong>Casos de uso:</strong></p>
      * <ul>
@@ -254,10 +202,6 @@ public class AccommodationTemporaryDisable {
      *   <li>Si se especifica, debe ser posterior a {@code disabledFrom}</li>
      *   <li>El propietario puede modificar esta fecha si las condiciones cambian</li>
      * </ul>
-     *
-     * <p><strong>Formato:</strong> ISO-8601 (ej: {@code 2026-11-15T23:59:59})</p>
-     *
-     * <p>Ejemplo: {@code 2026-11-15T23:59:59} (15 de noviembre de 2026, final del día)</p>
      */
     @Column(name = "disabled_until")
     private LocalDateTime disabledUntil;
@@ -269,17 +213,13 @@ public class AccommodationTemporaryDisable {
     /**
      * Indicador de si la desactivación temporal está actualmente vigente.
      *
-     * <p>Este campo controla el estado activo/inactivo del registro y es
-     * fundamental para las consultas de disponibilidad del alojamiento.</p>
-     *
      * <p><strong>Ciclo de vida del estado:</strong></p>
      * <ol>
      *   <li><strong>Creación:</strong> {@code isActive = true} (desactivación activa)</li>
      *   <li><strong>Reactivación manual:</strong> El propietario marca como
      *       {@code isActive = false} antes de la fecha estimada</li>
      *   <li><strong>Finalización automática:</strong> El sistema puede marcar
-     *       como {@code isActive = false} cuando se alcanza {@code disabledUntil}
-     *       (lógica a implementar en servicio programado)</li>
+     *       como {@code isActive = false} cuando se alcanza {@code disabledUntil}</li>
      * </ol>
      *
      * <p><strong>Impacto en consultas:</strong></p>
@@ -295,8 +235,6 @@ public class AccommodationTemporaryDisable {
      *   <li>No puede ser nulo ({@code nullable = false})</li>
      *   <li>Valor por defecto: {@code true}</li>
      * </ul>
-     *
-     * <p>Ejemplo: {@code true} (alojamiento actualmente desactivado)</p>
      */
     @Column(name = "is_active", nullable = false)
     @Builder.Default
@@ -309,27 +247,8 @@ public class AccommodationTemporaryDisable {
     /**
      * Fecha y hora de creación del registro de desactivación.
      *
-     * <p>Se establece automáticamente mediante la anotación
-     * {@link CreationTimestamp} de Hibernate en el momento de persistir
-     * la entidad por primera vez.</p>
-     *
-     * <p><strong>Propósito:</strong></p>
-     * <ul>
-     *   <li>Auditoría: saber cuándo se solicitó la desactivación</li>
-     *   <li>Ordenamiento: mostrar historial cronológico</li>
-     *   <li>Reportes: análisis de frecuencia de desactivaciones</li>
-     * </ul>
-     *
-     * <p><strong>Restricciones:</strong></p>
-     * <ul>
-     *   <li>No puede ser nulo ({@code nullable = false})</li>
-     *   <li>No es actualizable ({@code updatable = false})</li>
-     *   <li>Se establece automáticamente (no requiere asignación manual)</li>
-     * </ul>
-     *
-     * <p><strong>Formato:</strong> ISO-8601 con zona horaria del servidor</p>
-     *
-     * <p>Ejemplo: {@code 2026-10-22T10:30:00}</p>
+     * <p>Se establece automáticamente mediante {@link CreationTimestamp}
+     * y no es actualizable.</p>
      */
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -338,46 +257,21 @@ public class AccommodationTemporaryDisable {
     /**
      * Fecha y hora de la última modificación del registro.
      *
-     * <p>Se actualiza automáticamente mediante la anotación
-     * {@link UpdateTimestamp} de Hibernate cada vez que se modifica
-     * cualquier campo de la entidad.</p>
-     *
-     * <p><strong>Casos de actualización:</strong></p>
-     * <ul>
-     *   <li>Cambio en el motivo de desactivación</li>
-     *   <li>Modificación de fechas (inicio o fin)</li>
-     *   <li>Cambio de estado ({@code isActive})</li>
-     * </ul>
-     *
-     * <p><strong>Propósito:</strong></p>
-     * <ul>
-     *   <li>Auditoría: rastrear cambios en la desactivación</li>
-     *   <li>Sincronización: detectar registros modificados</li>
-     *   <li>Debugging: entender secuencia de eventos</li>
-     * </ul>
-     *
-     * <p><strong>Restricciones:</strong></p>
-     * <ul>
-     *   <li>Puede ser {@code null} inicialmente (antes de la primera modificación)</li>
-     *   <li>Se actualiza automáticamente en cada operación de update</li>
-     * </ul>
-     *
-     * <p><strong>Formato:</strong> ISO-8601 con zona horaria del servidor</p>
-     *
-     * <p>Ejemplo: {@code 2026-10-22T15:45:00} (modificado a las 3:45 PM)</p>
+     * <p>Se actualiza automáticamente mediante {@link UpdateTimestamp}
+     * en cada operación de actualización.</p>
      */
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     // =========================================================================
-    // MÉTODOS AUXILIARES (Opcional pero recomendado)
+    // MÉTODOS AUXILIARES DE NEGOCIO
     // =========================================================================
 
     /**
      * Verifica si la desactivación está vigente en una fecha específica.
      *
-     * <p>Este método es útil para determinar si el alojamiento debería
+     * <p>Este método es fundamental para determinar si el alojamiento debe
      * estar bloqueado en un momento dado, considerando el rango temporal
      * y el estado activo.</p>
      *
@@ -390,12 +284,10 @@ public class AccommodationTemporaryDisable {
             return false;
         }
 
-        // Verificar que la fecha de consulta sea posterior o igual al inicio
         if (fechaConsulta.isBefore(disabledFrom)) {
             return false;
         }
 
-        // Si hay fecha de fin, verificar que no la haya superado
         if (disabledUntil != null && fechaConsulta.isAfter(disabledUntil)) {
             return false;
         }

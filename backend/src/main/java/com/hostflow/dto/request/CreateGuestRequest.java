@@ -6,11 +6,13 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.util.List; // 🆕 Import necesario para la lista de alergias
+
 /**
  * DTO para crear un nuevo huésped en el sistema.
  *
- * <p>Se utiliza en el endpoint {@code POST /public/guests} para permitir
- * que los huéspedes se registren antes de realizar una reserva.</p>
+ * <p>Se utiliza en el endpoint {@code POST /public/guests} o durante la creación
+ * de una reserva para permitir que los huéspedes se registren o actualicen sus datos.</p>
  *
  * <p><strong>Validaciones:</strong></p>
  * <ul>
@@ -18,12 +20,13 @@ import jakarta.validation.constraints.Size;
  *   <li>El correo electrónico debe ser válido y único.</li>
  *   <li>El teléfono es opcional (máximo 40 caracteres).</li>
  *   <li>El documento de identidad es opcional (solo números, 5-12 dígitos).</li>
+ *   <li>Las preferencias y alergias son opcionales.</li>
  * </ul>
  *
  * @author HostFlow Team
- * @version 2.0.0
+ * @version 2.1.0 (Agregado soporte para preferencias y alergias)
  */
-@Schema(description = "Datos para crear un nuevo huésped en el sistema")
+@Schema(description = "Datos para crear o actualizar un huésped en el sistema")
 public record CreateGuestRequest(
 
         /**
@@ -82,24 +85,16 @@ public record CreateGuestRequest(
          *   <li>{@code @Size}: Longitud máxima de 40 caracteres.</li>
          *   <li>Campo opcional (puede ser null o vacío).</li>
          * </ul>
-         *
-         * <p>Formatos aceptados:</p>
-         * <ul>
-         *   <li>+54 11 5555 5555 (internacional)</li>
-         *   <li>11 5555 5555 (nacional)</li>
-         *   <li>+1 234 567 8900 (EE.UU.)</li>
-         * </ul>
          */
         @Size(max = 40, message = "El teléfono no puede superar los 40 caracteres")
         @Schema(description = "Teléfono de contacto", example = "+54 11 5555 5555", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         String phone,
 
         /**
-         *  Número de documento de identidad del huésped (DNI, CC, Pasaporte, etc.).
+         * Número de documento de identidad del huésped (DNI, CC, Pasaporte, etc.).
          *
          * <p>Se utiliza para identificación oficial del huésped durante el proceso
-         * de reserva y check-in. Es obligatorio en algunos países por regulaciones
-         * de hotelería y turismo.</p>
+         * de reserva y check-in.</p>
          *
          * <p><strong>Validaciones:</strong></p>
          * <ul>
@@ -107,18 +102,6 @@ public record CreateGuestRequest(
          *   <li>{@code @Size}: Longitud entre 5 y 12 dígitos.</li>
          *   <li>Campo opcional (puede ser null o vacío).</li>
          * </ul>
-         *
-         * <p><strong>Ejemplos válidos:</strong></p>
-         * <ul>
-         *   <li>12345678 (DNI argentino - 8 dígitos)</li>
-         *   <li>1234567890 (CC colombiana - 10 dígitos)</li>
-         *   <li>123456789 (DNI peruano - 8 dígitos)</li>
-         *   <li>A1234567 (Pasaporte - puede incluir letras, pero aquí solo números)</li>
-         * </ul>
-         *
-         * <p><strong>Nota:</strong> Aunque el campo acepta solo números, diferentes
-         * países tienen diferentes formatos de documento. Se recomienda validar
-         * el formato específico según el país del huésped en una versión futura.</p>
          */
         @Pattern(regexp = "^[0-9]{5,12}$", message = "El documento debe contener solo números y tener entre 5 y 12 dígitos")
         @Size(min = 5, max = 12, message = "El documento debe tener entre 5 y 12 dígitos")
@@ -127,5 +110,46 @@ public record CreateGuestRequest(
                 example = "12345678",
                 requiredMode = Schema.RequiredMode.NOT_REQUIRED
         )
-        String documentNumber
+        String documentNumber,
+
+        // =========================================================================
+        // 🆕 CAMPOS AGREGADOS: PREFERENCIAS Y ALERGIAS
+        // =========================================================================
+
+        /**
+         * Preferencias o solicitudes especiales del huésped (texto libre).
+         *
+         * <p><strong>Validaciones:</strong></p>
+         * <ul>
+         *   <li>{@code @Size}: Longitud máxima de 1000 caracteres.</li>
+         *   <li>Campo opcional (puede ser null o vacío).</li>
+         * </ul>
+         */
+        @Size(max = 1000, message = "Las preferencias no pueden superar los 1000 caracteres")
+        @Schema(
+                description = "Preferencias o solicitudes especiales del huésped",
+                example = "Prefiere habitación en piso bajo, lejos del elevador y con vista al jardín",
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED
+        )
+        String preferences,
+
+        /**
+         * Lista de alergias o restricciones alimentarias del huésped.
+         *
+         * <p>Se recibe como un array de cadenas de texto desde el frontend,
+         * permitiendo combinar opciones predefinidas (ej: "Gluten") con texto
+         * libre ingresado por el cliente (ej: "Alergia al látex").</p>
+         *
+         * <p><strong>Validaciones:</strong></p>
+         * <ul>
+         *   <li>Campo opcional (puede ser null o una lista vacía).</li>
+         * </ul>
+         */
+        @Schema(
+                description = "Lista de alergias o restricciones alimentarias",
+                example = "[\"Gluten\", \"Mariscos\", \"Alergia al látex\"]",
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED
+        )
+        List<String> allergies
+
 ) {}

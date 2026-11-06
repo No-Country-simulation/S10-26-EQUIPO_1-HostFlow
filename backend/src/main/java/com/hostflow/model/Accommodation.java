@@ -30,7 +30,6 @@ public class Accommodation {
     @Column(name = "bathroom_count") private Integer bathroomCount;
     @Column(name = "guest_capacity") private Integer guestCapacity;
 
-    @Column(name = "base_price", precision = 12, scale = 2) private BigDecimal basePrice;
 
     // =========================================================================
     // 🆕 CONFIGURACIÓN MULTIMONEDA (Agregado aquí por cercanía lógica con basePrice)

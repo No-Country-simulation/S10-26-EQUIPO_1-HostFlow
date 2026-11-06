@@ -14,26 +14,56 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
+/**
+ * Pruebas unitarias para {@link AccommodationPaymentMethodService}.
+ *
+ * <p>Esta clase valida la lógica de negocio relacionada con la creación,
+ * actualización y validación de métodos de pago para un alojamiento.</p>
+ *
+ * <p><strong>Casos de prueba cubiertos:</strong></p>
+ * <ul>
+ *   <li>Creación de métodos de pago genéricos y específicos (Transferencia, Billetera).</li>
+ *   <li>Validación de campos obligatorios y formatos (ej. correos electrónicos).</li>
+ *   <li>Actualizaciones parciales (PATCH) conservando datos existentes.</li>
+ *   <li>Rechazo de operaciones inválidas o con datos incompletos.</li>
+ * </ul>
+ *
+ * @author HostFlow Team
+ * @version 2.0.0
+ */
 class AccommodationPaymentMethodServiceTest {
 
+    // =========================================================================
+    // MOCKS E INICIALIZACIÓN
+    // =========================================================================
+
     private final AccommodationRepository accommodationRepository = mock(AccommodationRepository.class);
-    private final AccommodationPaymentMethodRepository paymentMethodRepository =
-            mock(AccommodationPaymentMethodRepository.class);
+    private final AccommodationPaymentMethodRepository paymentMethodRepository = mock(AccommodationPaymentMethodRepository.class);
+    private final EmailService emailService = mock(EmailService.class); // ✅ Agregado para resolver el error de constructor
+
     private final AccommodationPaymentMethodService service =
-            new AccommodationPaymentMethodService(accommodationRepository, paymentMethodRepository);
+            new AccommodationPaymentMethodService(accommodationRepository, paymentMethodRepository, emailService);
 
     private final Accommodation accommodation = new Accommodation();
 
     @BeforeEach
     void setUp() {
+        // Configuración base del alojamiento de prueba
         accommodation.setId(10L);
+
+        // Comportamiento por defecto de los repositorios mockeados
         when(accommodationRepository.findByOwner_Id(1L)).thenReturn(Optional.of(accommodation));
         when(paymentMethodRepository.existsByAccommodation_IdAndDefaultMethodTrue(10L)).thenReturn(true);
         when(paymentMethodRepository.save(any(AccommodationPaymentMethod.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
+
+    // =========================================================================
+    // PRUEBAS DE CREACIÓN (CREATE)
+    // =========================================================================
 
     @Test
     void creaMetodosGenericosSinCamposEspecificos() {
@@ -61,18 +91,6 @@ class AccommodationPaymentMethodServiceTest {
     }
 
     @Test
-    void rechazaTransferenciaBancariaSinUnCampoObligatorio() {
-        AccommodationPaymentMethodRequest request = bankRequest();
-        request.setAlias(" ");
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service.create(1L, request));
-
-        assertTrue(error.getMessage().contains("alias"));
-        verify(paymentMethodRepository, never()).save(any());
-    }
-
-    @Test
     void creaBilleteraDigitalConTodosLosCamposObligatorios() {
         AccommodationPaymentMethod result = service.create(1L, walletRequest());
 
@@ -80,6 +98,22 @@ class AccommodationPaymentMethodServiceTest {
         assertEquals("usuario.123", result.getUserIdentifier());
         assertEquals("+5491112345678", result.getWalletPhone());
         assertEquals("usuario@example.com", result.getWalletEmail());
+    }
+
+    // =========================================================================
+    // PRUEBAS DE VALIDACIÓN Y RECHAZO (CREATE)
+    // =========================================================================
+
+    @Test
+    void rechazaTransferenciaBancariaSinUnCampoObligatorio() {
+        AccommodationPaymentMethodRequest request = bankRequest();
+        request.setAlias(" "); // Campo inválido
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.create(1L, request));
+
+        assertTrue(error.getMessage().contains("alias"));
+        verify(paymentMethodRepository, never()).save(any());
     }
 
     @Test
@@ -94,6 +128,10 @@ class AccommodationPaymentMethodServiceTest {
         verify(paymentMethodRepository, never()).save(any());
     }
 
+    // =========================================================================
+    // PRUEBAS DE ACTUALIZACIÓN PARCIAL (PATCH)
+    // =========================================================================
+
     @Test
     void patchParcialActualizaSoloElCampoEnviadoYConservaLosDemas() {
         AccommodationPaymentMethod existing = bankMethod();
@@ -106,11 +144,13 @@ class AccommodationPaymentMethodServiceTest {
         AccommodationPaymentMethod result = service.update(1L, 50L, patch);
 
         assertEquals("nuevo.alias", result.getAlias());
+        // Verificar que los datos originales se conservan
         assertEquals("Banco Nación", result.getBankName());
         assertEquals("Titular de prueba", result.getAccountHolder());
         assertEquals("Caja de ahorro", result.getAccountType());
         assertEquals("123456", result.getAccountNumber());
         assertEquals("0000003100000000000001", result.getCbuCvu());
+
         verify(paymentMethodRepository).save(existing);
     }
 
@@ -135,8 +175,8 @@ class AccommodationPaymentMethodServiceTest {
         existing.setAccountType("Caja de ahorro");
         existing.setAccountNumber("123456");
         existing.setCbuCvu("0000003100000000000001");
-        // Simula un registro antiguo que todavía no tiene alias.
-        existing.setAlias(null);
+        existing.setAlias(null); // Simula un registro antiguo sin alias
+
         when(paymentMethodRepository.findByIdAndAccommodation_Id(50L, 10L))
                 .thenReturn(Optional.of(existing));
 
@@ -196,6 +236,10 @@ class AccommodationPaymentMethodServiceTest {
         assertTrue(error.getMessage().contains("userIdentifier"));
         verify(paymentMethodRepository, never()).save(any());
     }
+
+    // =========================================================================
+    // MÉTODOS AUXILIARES (DATA BUILDERS)
+    // =========================================================================
 
     private AccommodationPaymentMethodRequest request(PaymentMethodType type, String name) {
         AccommodationPaymentMethodRequest request = new AccommodationPaymentMethodRequest();

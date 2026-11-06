@@ -3,6 +3,7 @@ package com.hostflow.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
+import java.util.List; // 🆕 Import necesario para la lista de alergias
 
 /**
  * DTO para solicitar la creación de una nueva reserva.
@@ -16,10 +17,11 @@ import java.time.LocalDateTime;
  *   <li>Correo electrónico debe ser válido.</li>
  *   <li>Fechas de check-in y check-out deben ser futuras.</li>
  *   <li>Check-out debe ser posterior a check-in.</li>
+ *   <li>Preferencias y alergias son opcionales, pero cruciales para la experiencia del huésped.</li>
  * </ul>
  *
  * @author HostFlow Team
- * @version 1.0.0
+ * @version 1.1.0 (Agregado soporte para preferencias y alergias del huésped)
  */
 @Schema(description = "Datos necesarios para crear una nueva reserva")
 public record CreateReservationRequest(
@@ -97,7 +99,29 @@ public record CreateReservationRequest(
         @Max(value = 168, message = "La validez máxima es de 168 horas (7 días)")
         @Schema(description = "Horas de validez del enlace de confirmación (default: 24)",
                 example = "24")
-        Integer linkExpirationHours
+        Integer linkExpirationHours,
+
+        // =========================================================================
+        // 🆕 CAMPOS AGREGADOS: PREFERENCIAS Y ALERGIAS
+        // =========================================================================
+
+        /**
+         * Preferencias o solicitudes especiales del huésped (texto libre).
+         * Se utiliza para mostrar información relevante al propietario y personalizar la estadía.
+         */
+        @Size(max = 1000, message = "Las preferencias no pueden superar los 1000 caracteres")
+        @Schema(description = "Preferencias del huésped",
+                example = "Prefiere habitación en piso bajo, lejos del elevador")
+        String guestPreferences,
+
+        /**
+         * Lista de alergias o restricciones alimentarias del huésped.
+         * Se envía como un array de strings desde el frontend (ej: ["Gluten", "Mariscos"]).
+         */
+        @Schema(description = "Lista de alergias o restricciones alimentarias",
+                example = "[\"Gluten\", \"Mariscos\", \"Látex\"]")
+        List<String> guestAllergies
+
 ) {
     /**
      * Obtiene las horas de validez del enlace, con valor por defecto de 24.

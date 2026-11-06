@@ -1,9 +1,6 @@
 package com.hostflow.controller;
 
-<<<<<<< HEAD
 import com.hostflow.dto.request.AccommodationImageRequest;
-=======
->>>>>>> 093e86dea5265b3004d369880a4959870dec2e5c
 import com.hostflow.dto.request.AccommodationProfileRequest;
 import com.hostflow.dto.response.AccommodationImageResponse;
 import com.hostflow.dto.response.AccommodationProfileResponse;
