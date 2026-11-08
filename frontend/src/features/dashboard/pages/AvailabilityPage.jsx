@@ -16,14 +16,21 @@ import { useBlockedDays, useBookings, useBrand } from "@lib/api/hooks";
 import { useSession } from "@features/auth/context/SessionContext";
 import { useTheme } from "@lib/theme/ThemeContext";
 import { DEMO_MODE } from "@lib/config/env";
-import { mixHex, normalizeHex, readableOn, visibleOn } from "@utils/color";
+import { colorDistance, hexToRgb, mixHex, normalizeHex, readableOn, visibleOn } from "@utils/color";
 import { addDays, cn, formatDateShort, plural, toISODate, weekdayShort } from "@utils/format";
 
 const WEEK = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
 
-// Máximo 4 tonos del MISMO color de marca para diferenciar reservas en el
-// calendario: la diferencia se da por OPACIDAD, nunca por tonos distintos.
-const TONES = [0.26, 0.44, 0.62, 0.8];
+// Máximo 4 tonos para diferenciar reservas en el calendario, armados con los
+// colores que eligió el propietario (principal y secundario) variando la
+// OPACIDAD: 2 colores × 2 opacidades. Si solo hay un color usable, se usan sus
+// 4 opacidades.
+const OPACITIES_DUAL = [0.34, 0.7];
+const OPACITIES_SINGLE = [0.26, 0.44, 0.62, 0.8];
+
+// Mismo umbral que el editor de marca (Perfil del alojamiento): por debajo de
+// esta distancia dos colores se perciben casi iguales.
+const MIN_COLOR_DISTANCE = 60;
 
 // Fondos reales de cada tema (styles/globals.css: --color-paper).
 const PAPER = { light: "#ffffff", dark: "#101518" };
@@ -71,6 +78,28 @@ export default function AvailabilityPage() {
     };
   }, [actions]);
 
+  // Colores elegidos por el propietario en su marca: el principal ("Marca") y
+  // el secundario ("Acción"). El secundario solo entra si de verdad se
+  // distingue del principal; si no, los tonos salen todos del principal.
+  // En modo oscuro cada uno se aclara hasta distinguirse del papel, igual que
+  // hace LodgingTheme con la identidad del alojamiento.
+  const paper = PAPER[isDark ? "dark" : "light"];
+  const brandPrimary = normalizeHex(brand?.primary, "#0fa3a3");
+  const brandSecondary = hexToRgb(brand?.accent) ? normalizeHex(brand.accent, brandPrimary) : null;
+  const secondaryUsable =
+    Boolean(brandSecondary) &&
+    colorDistance(hexToRgb(brandPrimary), hexToRgb(brandSecondary)) >= MIN_COLOR_DISTANCE;
+
+  // Paleta del calendario: hasta 4 tonos (color de marca + opacidad).
+  const tones = useMemo(() => {
+    const bases = secondaryUsable ? [brandPrimary, brandSecondary] : [brandPrimary];
+    const ops = bases.length > 1 ? OPACITIES_DUAL : OPACITIES_SINGLE;
+    return bases.flatMap((base) => {
+      const color = isDark ? visibleOn(base, paper, 2.9) : base;
+      return ops.map((opacity) => ({ color, opacity }));
+    });
+  }, [brandPrimary, brandSecondary, secondaryUsable, isDark, paper]);
+
   // Reservas activas en orden estable (llegada y luego id): de ese orden sale
   // el tono de cada una dentro del tope de 4.
   const activeBookings = useMemo(
@@ -81,26 +110,20 @@ export default function AvailabilityPage() {
     [bookings],
   );
 
-  // Tono (0-1 de opacidad del color de marca) por reserva.
+  // Tono (color + opacidad) por reserva.
   const toneByBooking = useMemo(() => {
     const map = new Map();
     activeBookings.forEach((booking, index) => {
-      map.set(String(booking.id), TONES[index % TONES.length]);
+      map.set(String(booking.id), tones[index % tones.length]);
     });
     return map;
-  }, [activeBookings]);
+  }, [activeBookings, tones]);
 
-  // Color de marca del alojamiento: el "principal" (Marca) es el que pinta las
-  // reservas; en modo oscuro se aclara hasta distinguirse del fondo, igual que
-  // hace LodgingTheme con la identidad del alojamiento.
-  const brandPrimary = normalizeHex(brand?.primary, "#0fa3a3");
-  const bookingColor = isDark ? visibleOn(brandPrimary, PAPER.dark, 2.9) : brandPrimary;
-
-  // Pintura de una reserva: mismo color, distinta opacidad, mezclado sobre el
-  // papel del tema. El texto se elige por contraste real sobre ese resultado.
+  // Pintura de una reserva: su tono de marca mezclado sobre el papel del tema.
+  // El texto se elige por contraste real sobre ese resultado.
   const skinFor = (booking) => {
-    const tone = toneByBooking.get(String(booking.id)) ?? TONES[0];
-    const bg = mixHex(PAPER[isDark ? "dark" : "light"], bookingColor, tone);
+    const tone = toneByBooking.get(String(booking.id)) ?? tones[0];
+    const bg = mixHex(paper, tone.color, tone.opacity);
     return { backgroundColor: bg, color: readableOn(bg) };
   };
 
@@ -164,10 +187,7 @@ export default function AvailabilityPage() {
   const detail = useMemo(() => (bookings || []).find((b) => b.id === detailId) || null, [bookings, detailId]);
 
   // Muestra de los 4 tonos para la leyenda.
-  const legendTones = TONES.map((tone) => {
-    const bg = mixHex(PAPER[isDark ? "dark" : "light"], bookingColor, tone);
-    return bg;
-  });
+  const legendTones = tones.map(({ color, opacity }) => mixHex(paper, color, opacity));
 
   return (
     <div className="grid gap-6">
@@ -282,7 +302,8 @@ export default function AvailabilityPage() {
                 );
               }
 
-              // Ocupado por reserva: color de marca en uno de sus 4 tonos.
+              // Ocupado por reserva: color de marca del propietario en uno de
+              // sus hasta 4 tonos (color + opacidad).
               if (hasBooking) {
                 return (
                   <button
@@ -347,7 +368,7 @@ export default function AvailabilityPage() {
                   <span key={index} className="size-3.5" style={{ backgroundColor: bg }} />
                 ))}
               </span>
-              <span>Reserva · 4 tonos de tu color</span>
+              <span>Reserva · hasta 4 tonos de tu marca</span>
             </span>
             <span className="flex items-center gap-2">
               <span className="size-3.5 rounded-md border border-dashed border-pink-strong bg-pink/45 shrink-0" />
