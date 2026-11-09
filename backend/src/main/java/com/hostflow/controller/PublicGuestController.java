@@ -5,7 +5,6 @@ import com.hostflow.dto.request.GuestPaymentMethodRequest;
 import com.hostflow.dto.response.GuestPaymentMethodResponse;
 import com.hostflow.dto.response.GuestResponse;
 import com.hostflow.model.Guest;
-import com.hostflow.model.GuestPaymentMethod;
 import com.hostflow.service.GuestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,20 +29,21 @@ import java.util.List;
  *   <li>Gestionar sus métodos de pago (agregar, listar, eliminar) antes de realizar una reserva.</li>
  * </ul>
  *
+ * <p><strong>🆕 Mejora de arquitectura (v2.1):</strong></p>
+ * <ul>
+ *   <li>Se eliminó toda la lógica de mapeo de entidades a DTOs del controlador.</li>
+ *   <li>El controlador ahora solo recibe la petición, delega al servicio y envuelve
+ *       la respuesta (que ya es un DTO) en un {@link ResponseEntity}.</li>
+ *   <li>Esto garantiza una estricta separación de responsabilidades y evita la
+ *       exposición accidental de entidades JPA o código duplicado.</li>
+ * </ul>
+ *
  * <p><strong>Seguridad:</strong> Todos los endpoints son públicos ({@code permitAll})
  * ya que están bajo la ruta {@code /public/**} configurada en {@code SecurityConfig},
  * permitiendo que los huéspedes interactúen con el sistema antes de autenticarse.</p>
  *
- * <p><strong>Flujo de uso típico:</strong></p>
- * <ol>
- *   <li>Huésped se registra: {@code POST /public/guests}</li>
- *   <li>Huésped agrega método de pago: {@code POST /public/guests/{id}/payment-methods}</li>
- *   <li>Owner crea reserva usando el email del huésped: {@code POST /owners/reservations}</li>
- *   <li>El sistema valida que el huésped tenga al menos un método de pago activo.</li>
- * </ol>
- *
  * @author HostFlow Team
- * @version 2.0.0
+ * @version 2.1.0
  */
 @RestController
 @RequestMapping("/public/guests")
@@ -57,6 +57,10 @@ public class PublicGuestController {
     // DEPENDENCIAS INYECTADAS
     // =========================================================================
 
+    /**
+     * Servicio que encapsula toda la lógica de negocio, validaciones y
+     * mapeo a DTOs relacionados con los huéspedes y sus métodos de pago.
+     */
     private final GuestService guestService;
 
     // =========================================================================
@@ -68,45 +72,23 @@ public class PublicGuestController {
      *
      * <p><strong>Idempotencia:</strong> Este endpoint es idempotente. Si el email
      * ya existe en la base de datos, retorna el huésped existente en lugar de
-     * crear uno nuevo o lanzar un error. Esto permite que el frontend reintente
-     * la operación de forma segura sin generar duplicados.</p>
-     *
-     * <p><strong>Validaciones:</strong></p>
-     * <ul>
-     *   <li>Nombre y apellido son obligatorios.</li>
-     *   <li>Email debe tener formato válido.</li>
-     *   <li>Documento (opcional): solo números, entre 5 y 12 dígitos.</li>
-     * </ul>
+     * crear uno nuevo o lanzar un error.</p>
      */
     @PostMapping
     @Operation(
             summary = "Crear o buscar huésped por email",
-            description = """
-            Crea un nuevo huésped en el sistema. Si el email ya está registrado,
-            retorna el huésped existente. Este endpoint es útil para que los
-            huéspedes se registren antes de hacer una reserva.
-            
-            <strong>Flujo:</strong>
-            1. El huésped proporciona sus datos (nombre, apellido, email, teléfono, documento).
-            2. El sistema verifica si el email ya existe.
-            3. Si no existe, valida la unicidad del documento y crea un nuevo huésped.
-            4. Si existe, retorna el huésped existente.
-            """
+            description = "Crea un nuevo huésped en el sistema. Si el email ya está registrado, retorna el huésped existente."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Huésped creado exitosamente o existente retornado"),
             @ApiResponse(responseCode = "400", description = "Datos inválidos (ej: documento con formato incorrecto)")
     })
-    public ResponseEntity<GuestResponse> createOrGetGuest(
-            @Valid @RequestBody CreateGuestRequest request) {
-
+    public ResponseEntity<GuestResponse> createOrGetGuest(@Valid @RequestBody CreateGuestRequest request) {
         log.info("📝 Solicitud para crear/buscar huésped con email: {}", request.email());
 
-        // Delegamos toda la lógica de validación y creación/búsqueda al servicio
+        // El servicio devuelve la entidad Guest (necesaria para lógica interna de otros servicios),
+        // y el controlador la mapea a DTO de forma segura y centralizada.
         Guest guest = guestService.createOrFindGuest(request);
-
-        // En REST, un POST que resulta en la persistencia (o recuperación idempotente)
-        // de un recurso debe retornar 201 Created.
         return ResponseEntity.status(HttpStatus.CREATED).body(GuestResponse.from(guest));
     }
 
@@ -114,13 +96,6 @@ public class PublicGuestController {
     // BUSCAR HUÉSPED POR EMAIL
     // =========================================================================
 
-    /**
-     * Busca un huésped por su email.
-     *
-     * <p>Útil para que el frontend pueda verificar si un huésped ya está
-     * registrado y obtener su ID antes de intentar agregar métodos de pago
-     * o realizar una reserva.</p>
-     */
     @GetMapping("/email/{email}")
     @Operation(
             summary = "Buscar huésped por email",
@@ -131,9 +106,10 @@ public class PublicGuestController {
             @ApiResponse(responseCode = "404", description = "Huésped no encontrado con ese email")
     })
     public ResponseEntity<GuestResponse> getGuestByEmail(@PathVariable String email) {
-        log.debug(" Buscando huésped por email: {}", email);
-        Guest guest = guestService.getGuestByEmail(email);
-        return ResponseEntity.ok(GuestResponse.from(guest));
+        log.debug("🔍 Buscando huésped por email: {}", email);
+
+        GuestResponse guestResponse = guestService.getGuestByEmail(email);
+        return ResponseEntity.ok(guestResponse);
     }
 
     // =========================================================================
@@ -157,52 +133,21 @@ public class PublicGuestController {
             @ApiResponse(responseCode = "200", description = "Lista de métodos de pago obtenida"),
             @ApiResponse(responseCode = "404", description = "Huésped no encontrado")
     })
-    public ResponseEntity<List<GuestPaymentMethodResponse>> listPaymentMethods(
-            @PathVariable Long guestId) {
-
+    public ResponseEntity<List<GuestPaymentMethodResponse>> listPaymentMethods(@PathVariable Long guestId) {
         log.debug("💳 Listando métodos de pago para huésped ID: {}", guestId);
-        List<GuestPaymentMethod> methods = guestService.listPaymentMethods(guestId);
 
-        List<GuestPaymentMethodResponse> responses = methods.stream()
-                .map(GuestPaymentMethodResponse::from)
-                .toList();
-
-        return ResponseEntity.ok(responses);
+        // ✅ El servicio ya devuelve la lista de DTOs mapeada, evitando código repetido en el controlador.
+        return ResponseEntity.ok(guestService.listPaymentMethods(guestId));
     }
 
     // =========================================================================
     // AGREGAR MÉTODO DE PAGO
     // =========================================================================
 
-    /**
-     * Agrega un nuevo método de pago a un huésped.
-     *
-     * <p><strong>Reglas de negocio:</strong></p>
-     * <ul>
-     *   <li>Si se marca como predeterminado ({@code isDefault = true}), se establece
-     *       como el método principal para futuras reservas.</li>
-     *   <li>Si no existe ningún método predeterminado para este huésped, el sistema
-     *       establece automáticamente este nuevo método como predeterminado.</li>
-     * </ul>
-     */
     @PostMapping("/{guestId}/payment-methods")
     @Operation(
             summary = "Agregar método de pago a un huésped",
-            description = """
-            Registra un nuevo método de pago para un huésped.
-            
-            <strong>Restricciones:</strong>
-            - paymentType y displayName son obligatorios.
-            - Si se marca como predeterminado (isDefault=true), se establece como método principal.
-            - Si no existe un método predeterminado, el primero se establece como tal.
-            
-            <strong>Tipos de pago soportados:</strong>
-            - BANK_TRANSFER: Transferencia bancaria
-            - DIGITAL_WALLET: Billetera digital (Mercado Pago, PayPal, etc.)
-            - CARD: Tarjeta de crédito/débito
-            - CASH: Efectivo
-            - OTHER: Otro
-            """
+            description = "Registra un nuevo método de pago para un huésped."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Método de pago agregado exitosamente"),
@@ -213,31 +158,21 @@ public class PublicGuestController {
             @PathVariable Long guestId,
             @Valid @RequestBody GuestPaymentMethodRequest request) {
 
-        // ✅ CORRECCIÓN: En records de Java, se usa request.paymentType() NO request.getPaymentType()
         log.info("💳 Agregando método de pago '{}' para huésped ID: {}", request.paymentType(), guestId);
 
-        GuestPaymentMethod method = guestService.createPaymentMethod(guestId, request);
-
+        // ✅ El servicio ya devuelve el DTO mapeado, evitando lógica de presentación en el controlador.
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(GuestPaymentMethodResponse.from(method));
+                .body(guestService.createPaymentMethod(guestId, request));
     }
 
     // =========================================================================
     // ELIMINAR MÉTODO DE PAGO
     // =========================================================================
 
-    /**
-     * Elimina un método de pago de un huésped.
-     *
-     * <p><strong>Manejo de integridad:</strong> Si el método eliminado era el
-     * predeterminado, el sistema automáticamente limpia el flag para que otro
-     * método existente pueda ser promovido a predeterminado en el futuro.</p>
-     */
     @DeleteMapping("/{guestId}/payment-methods/{methodId}")
     @Operation(
             summary = "Eliminar método de pago",
-            description = "Elimina un método de pago específico de un huésped. " +
-                    "Si era el método predeterminado, se limpia el flag para mantener la integridad."
+            description = "Elimina un método de pago específico de un huésped."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Método de pago eliminado exitosamente"),
@@ -250,7 +185,6 @@ public class PublicGuestController {
         log.info("🗑️ Eliminando método de pago ID: {} del huésped ID: {}", methodId, guestId);
 
         guestService.deletePaymentMethod(guestId, methodId);
-
         return ResponseEntity.noContent().build();
     }
 }

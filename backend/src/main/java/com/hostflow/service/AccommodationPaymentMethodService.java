@@ -1,6 +1,7 @@
 package com.hostflow.service;
 
 import com.hostflow.dto.request.AccommodationPaymentMethodRequest;
+import com.hostflow.dto.response.AccommodationPaymentMethodResponse;
 import com.hostflow.enums.PaymentMethodType;
 import com.hostflow.exception.BusinessException;
 import com.hostflow.exception.ResourceNotFoundException;
@@ -9,6 +10,7 @@ import com.hostflow.model.AccommodationPaymentMethod;
 import com.hostflow.model.Owner;
 import com.hostflow.repository.AccommodationPaymentMethodRepository;
 import com.hostflow.repository.AccommodationRepository;
+import com.hostflow.repository.OwnerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,59 +25,117 @@ import java.util.List;
  * que recibirán los pagos de los huéspedes (transferencias bancarias,
  * billeteras digitales, efectivo, tarjetas, etc.).</p>
  *
- * <p><strong>Características:</strong></p>
+ * <p><strong>🆕 Mejora de arquitectura (v2.3):</strong></p>
  * <ul>
- *   <li>Soporte para múltiples métodos de pago por alojamiento.</li>
- *   <li>Un método puede marcarse como predeterminado.</li>
- *   <li>Al eliminar el método predeterminado, se asigna automáticamente otro.</li>
- *   <li>Envía email de confirmación al propietario al crear un nuevo método.</li>
+ *   <li>Todos los métodos de lectura y escritura ahora retornan DTOs
+ *       ({@link AccommodationPaymentMethodResponse}) en lugar de entidades JPA,
+ *       garantizando que las colecciones se carguen correctamente dentro de la transacción
+ *       y evitando {@code LazyInitializationException}.</li>
+ *   <li>Se agregaron métodos que aceptan el {@code ownerEmail} en lugar del {@code ownerId},
+ *       delegando la resolución del Owner al servicio y eliminando la necesidad de que
+ *       los controladores inyecten repositorios directamente.</li>
  * </ul>
  *
  * @author HostFlow Team
- * @version 2.2.0
+ * @version 2.3.0
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AccommodationPaymentMethodService {
 
+    // =========================================================================
+    // DEPENDENCIAS INYECTADAS
+    // =========================================================================
     private final AccommodationRepository accommodationRepository;
     private final AccommodationPaymentMethodRepository paymentMethodRepository;
-    private final EmailService emailService; // Servicio de envío de correos
+    private final OwnerRepository ownerRepository;
+    private final EmailService emailService;
 
     // =========================================================================
-    // LISTAR MÉTODOS DE PAGO
+    // 🆕 MÉTODOS PÚBLICOS QUE ACEPTAN EMAIL (Para controladores refactorizados)
     // =========================================================================
 
     /**
-     * Lista todos los métodos de pago del alojamiento del propietario,
-     * ordenados con el predeterminado primero.
+     * Lista todos los métodos de pago del alojamiento del propietario.
      *
-     * @param ownerId el identificador único del propietario autenticado
-     * @return lista de métodos de pago del alojamiento
+     * @param ownerEmail el email del propietario autenticado
+     * @return lista de DTOs de métodos de pago del alojamiento
      */
     @Transactional(readOnly = true)
-    public List<AccommodationPaymentMethod> list(Long ownerId) {
-        Accommodation accommodation = getAccommodation(ownerId);
-        return paymentMethodRepository.findAllByAccommodation_IdOrderByDefaultMethodDescCreatedAtAscIdAsc(
-                accommodation.getId());
+    public List<AccommodationPaymentMethodResponse> listByEmail(String ownerEmail) {
+        Long ownerId = getAccommodationByEmail(ownerEmail).getOwner().getId();
+        return list(ownerId);
+    }
+
+    /**
+     * Crea un nuevo método de pago para el alojamiento del propietario.
+     *
+     * @param ownerEmail el email del propietario autenticado
+     * @param request los datos del método de pago a crear
+     * @return el DTO del método de pago creado
+     */
+    @Transactional
+    public AccommodationPaymentMethodResponse createByEmail(String ownerEmail, AccommodationPaymentMethodRequest request) {
+        Long ownerId = getAccommodationByEmail(ownerEmail).getOwner().getId();
+        return create(ownerId, request);
+    }
+
+    /**
+     * Actualiza parcialmente un método de pago existente.
+     *
+     * @param ownerEmail el email del propietario autenticado
+     * @param methodId el identificador del método de pago a actualizar
+     * @param request los datos a actualizar
+     * @return el DTO del método de pago actualizado
+     */
+    @Transactional
+    public AccommodationPaymentMethodResponse updateByEmail(String ownerEmail, Long methodId, AccommodationPaymentMethodRequest request) {
+        Long ownerId = getAccommodationByEmail(ownerEmail).getOwner().getId();
+        return update(ownerId, methodId, request);
+    }
+
+    /**
+     * Elimina un método de pago del alojamiento.
+     *
+     * @param ownerEmail el email del propietario autenticado
+     * @param methodId el identificador del método de pago a eliminar
+     */
+    @Transactional
+    public void deleteByEmail(String ownerEmail, Long methodId) {
+        Long ownerId = getAccommodationByEmail(ownerEmail).getOwner().getId();
+        delete(ownerId, methodId);
     }
 
     // =========================================================================
-    // CREAR MÉTODO DE PAGO (con envío de email)
+    // MÉTODOS ORIGINALES (Se mantienen para compatibilidad con tests y retornan DTOs)
     // =========================================================================
 
     /**
-     * Crea un nuevo método de pago para el alojamiento del propietario
-     * y envía un correo electrónico de confirmación.
+     * Lista todos los métodos de pago del alojamiento del propietario.
+     *
+     * @param ownerId el identificador único del propietario autenticado
+     * @return lista de DTOs de métodos de pago del alojamiento
+     */
+    @Transactional(readOnly = true)
+    public List<AccommodationPaymentMethodResponse> list(Long ownerId) {
+        Accommodation accommodation = getAccommodation(ownerId);
+        return paymentMethodRepository.findAllByAccommodation_IdOrderByDefaultMethodDescCreatedAtAscIdAsc(
+                        accommodation.getId()).stream()
+                .map(AccommodationPaymentMethodResponse::from)
+                .toList();
+    }
+
+    /**
+     * Crea un nuevo método de pago para el alojamiento del propietario.
      *
      * @param ownerId el identificador único del propietario autenticado
      * @param request los datos del método de pago a crear
-     * @return el método de pago creado
+     * @return el DTO del método de pago creado
      * @throws BusinessException si faltan datos obligatorios
      */
     @Transactional
-    public AccommodationPaymentMethod create(Long ownerId, AccommodationPaymentMethodRequest request) {
+    public AccommodationPaymentMethodResponse create(Long ownerId, AccommodationPaymentMethodRequest request) {
         // 1. Validación de campos obligatorios básicos
         if (request.getPaymentType() == null || request.getDisplayName() == null || request.getDisplayName().isBlank()) {
             throw new BusinessException("paymentType y displayName son obligatorios.");
@@ -93,7 +153,7 @@ public class AccommodationPaymentMethodService {
             paymentMethodRepository.clearDefaultForAccommodation(accommodation.getId());
         }
 
-        // 5. Construir y persistir el nuevo método de pago
+        // 5. Construir y configurar el nuevo método de pago
         AccommodationPaymentMethod method = new AccommodationPaymentMethod();
         method.setAccommodation(accommodation);
         method.setPaymentType(request.getPaymentType());
@@ -102,35 +162,35 @@ public class AccommodationPaymentMethodService {
         method.setDefault(makeDefault);
         method.setActive(request.getIsActive() == null || request.getIsActive());
 
+        // 6. Validar campos obligatorios específicos por tipo de pago
+        validateRequiredFieldsByType(method);
+
+        // 7. Persistir en la base de datos
         AccommodationPaymentMethod saved = paymentMethodRepository.save(method);
 
         log.info("💳 Método de pago creado: '{}' ({}) para alojamiento '{}' (ID: {})",
                 saved.getDisplayName(), saved.getPaymentType(),
                 accommodation.getName(), accommodation.getId());
 
-        // 6. Enviar email de confirmación al propietario
+        // 8. Enviar email de confirmación al propietario (Política de resiliencia)
         sendPaymentMethodCreatedEmail(accommodation, saved);
 
-        return saved;
+        // 9. Retornar DTO mapeado dentro de la transacción
+        return AccommodationPaymentMethodResponse.from(saved);
     }
-
-    // =========================================================================
-    // ACTUALIZAR MÉTODO DE PAGO (PATCH)
-    // =========================================================================
 
     /**
      * Actualiza parcialmente un método de pago existente.
-     * Solo modifica los campos enviados en la solicitud (PATCH).
      *
      * @param ownerId  el identificador único del propietario autenticado
      * @param methodId el identificador del método de pago a actualizar
      * @param request  los datos a actualizar (solo campos no nulos)
-     * @return el método de pago actualizado
+     * @return el DTO del método de pago actualizado
      * @throws BusinessException si la solicitud está vacía o displayName es vacío
      * @throws ResourceNotFoundException si el método no existe o no pertenece al alojamiento
      */
     @Transactional
-    public AccommodationPaymentMethod update(Long ownerId, Long methodId, AccommodationPaymentMethodRequest request) {
+    public AccommodationPaymentMethodResponse update(Long ownerId, Long methodId, AccommodationPaymentMethodRequest request) {
         if (isEmptyPatch(request)) {
             throw new BusinessException("Debe enviar al menos un campo para actualizar.");
         }
@@ -171,17 +231,14 @@ public class AccommodationPaymentMethodService {
         // Validar que el estado final cumpla con las reglas del tipo de pago
         validateRequiredFieldsByType(method);
 
-        return paymentMethodRepository.save(method);
-    }
+        AccommodationPaymentMethod saved = paymentMethodRepository.save(method);
 
-    // =========================================================================
-    // ELIMINAR MÉTODO DE PAGO
-    // =========================================================================
+        // Retornar DTO mapeado dentro de la transacción
+        return AccommodationPaymentMethodResponse.from(saved);
+    }
 
     /**
      * Elimina un método de pago del alojamiento.
-     * Si el método eliminado era el predeterminado, se asigna automáticamente
-     * el método más antiguo restante como nuevo predeterminado.
      *
      * @param ownerId  el identificador único del propietario autenticado
      * @param methodId el identificador del método de pago a eliminar
@@ -221,6 +278,10 @@ public class AccommodationPaymentMethodService {
     /**
      * Envía el correo electrónico de confirmación al propietario
      * cuando se crea un nuevo método de pago.
+     *
+     * <p><strong>Política de resiliencia:</strong> Si falla el envío del email,
+     * solo se registra el error en los logs, pero NO se revierte la creación
+     * del método de pago (la transacción ya está comprometida).</p>
      */
     private void sendPaymentMethodCreatedEmail(Accommodation accommodation, AccommodationPaymentMethod method) {
         try {
@@ -235,14 +296,28 @@ public class AccommodationPaymentMethodService {
             );
             log.info("📧 Email de confirmación de método de pago enviado a: {}", owner.getEmail());
         } catch (Exception e) {
-            // Si falla el envío del email, solo registramos el error en los logs
-            // pero NO revertimos la creación del método de pago (transacción ya comprometida)
             log.error("⚠️ No se pudo enviar el email de confirmación de método de pago: {}", e.getMessage(), e);
         }
     }
 
     /**
-     * Obtiene el alojamiento asociado al propietario o lanza una excepción si no existe.
+     * Obtiene el alojamiento asociado al email del propietario.
+     *
+     * <p>Este método centraliza la lógica de búsqueda del Owner y su Accommodation,
+     * evitando duplicación en los controladores.</p>
+     */
+    private Accommodation getAccommodationByEmail(String ownerEmail) {
+        Owner owner = ownerRepository.findByEmail(ownerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No se encontró el propietario con email: " + ownerEmail));
+
+        return accommodationRepository.findByOwner_Id(owner.getId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Registra primero los datos generales del alojamiento."));
+    }
+
+    /**
+     * Obtiene el alojamiento asociado al ID del propietario.
      */
     private Accommodation getAccommodation(Long ownerId) {
         return accommodationRepository.findByOwner_Id(ownerId)

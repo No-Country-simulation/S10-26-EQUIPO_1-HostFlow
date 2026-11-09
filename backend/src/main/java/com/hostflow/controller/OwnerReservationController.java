@@ -3,11 +3,6 @@ package com.hostflow.controller;
 import com.hostflow.dto.request.CreateReservationRequest;
 import com.hostflow.dto.response.ReservationLinkResponse;
 import com.hostflow.dto.response.ReservationResponse;
-import com.hostflow.exception.ResourceNotFoundException;
-import com.hostflow.model.Accommodation;
-import com.hostflow.model.Owner;
-import com.hostflow.repository.AccommodationRepository;
-import com.hostflow.repository.OwnerRepository;
 import com.hostflow.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,20 +24,19 @@ import java.util.List;
 
 /**
  * Controlador REST para que los propietarios gestionen las reservas
- * de sus alojamientos en la plataforma HostFlow.
+ * de sus alojamientos en la protected plataforma HostFlow.
  *
- * <p>Permite a los owners:</p>
+ * <p><strong>🆕 Mejora de arquitectura y seguridad (v2.1):</strong></p>
  * <ul>
- *   <li>Crear nuevas reservas generando enlaces de confirmación.</li>
- *   <li>Consultar el estado y listado de sus reservas.</li>
- *   <li>Cancelar reservas existentes.</li>
- *   <li>Reactivar enlaces de confirmación expirados.</li>
- *   <li>Verificar la disponibilidad de fechas para un alojamiento.</li>
- *   <li>🆕 Marcar reservas como COMPLETADAS después del check-out para registrar ingresos en el dashboard.</li>
+ *   <li>Se eliminó la inyección directa de {@code OwnerRepository} y {@code AccommodationRepository}.</li>
+ *   <li>Se eliminó el método privado {@code getCurrentOwnerId()} que consultaba la BD.</li>
+ *   <li>🛡️ <strong>Corrección de seguridad (IDOR):</strong> Todos los endpoints ahora validan estrictamente
+ *       que la reserva o la consulta de disponibilidad pertenezca al alojamiento del propietario autenticado,
+ *       evitando que un owner manipule datos de otros alojamientos.</li>
  * </ul>
  *
  * @author HostFlow Team
- * @version 1.2.0 (Agregado endpoint para completar reservas y registrar ingresos)
+ * @version 2.1.0
  */
 @RestController
 @RequestMapping("/owners/reservations")
@@ -58,9 +52,12 @@ public class OwnerReservationController {
     // DEPENDENCIAS INYECTADAS
     // =========================================================================
 
+    /**
+     * Servicio que encapsula toda la lógica de negocio de las reservas.
+     * Se encarga de validar que el propietario tenga derecho a operar
+     * sobre la reserva o alojamiento solicitado.
+     */
     private final ReservationService reservationService;
-    private final OwnerRepository ownerRepository;
-    private final AccommodationRepository accommodationRepository;
 
     // =========================================================================
     // 1. CREAR RESERVA
@@ -77,27 +74,23 @@ public class OwnerReservationController {
             2. Verifica que el huésped tenga al menos un método de pago activo.
             3. Genera un enlace único de confirmación válido por 24 horas (configurable).
             4. El enlace debe ser enviado al huésped por email.
-            
-            Validaciones:
-            - No se permiten reservas overlapping (doble booking).
-            - El huésped debe tener métodos de pago activos.
-            - Las fechas deben ser futuras y válidas.
             """
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Reserva creada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Fechas inválidas o alojamiento no disponible"),
+            @ApiResponse(responseCode = "400", description = "Fechas inválidas, huésped sin método de pago o alojamiento no disponible"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
             @ApiResponse(responseCode = "403", description = "Sin permisos de owner"),
-            @ApiResponse(responseCode = "404", description = "Owner no encontrado")
+            @ApiResponse(responseCode = "404", description = "El owner no tiene un alojamiento registrado")
     })
     public ResponseEntity<ReservationResponse> createReservation(
             @Valid @RequestBody CreateReservationRequest request,
             Authentication authentication) {
 
-        Long ownerId = getCurrentOwnerId(authentication);
-        ReservationResponse response = reservationService.createReservation(ownerId, request);
+        String ownerEmail = authentication.getName();
+        log.info("🏨 Creando nueva reserva para owner email: {}", ownerEmail);
 
+        ReservationResponse response = reservationService.createReservationByEmail(ownerEmail, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -117,166 +110,139 @@ public class OwnerReservationController {
             @ApiResponse(responseCode = "404", description = "El owner no tiene un alojamiento registrado")
     })
     public ResponseEntity<List<ReservationResponse>> listMyReservations(Authentication authentication) {
-        Long ownerId = getCurrentOwnerId(authentication);
+        String ownerEmail = authentication.getName();
+        log.debug("📋 Listando reservas para owner email: {}", ownerEmail);
 
-        // Obtener el alojamiento del owner
-        Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No tienes un alojamiento registrado. Registra los datos de tu alojamiento primero."));
-
-        // Listar todas las reservas del alojamiento
-        List<ReservationResponse> responses = reservationService.listReservationsByAccommodation(accommodation.getId());
-
+        List<ReservationResponse> responses = reservationService.listMyReservationsByEmail(ownerEmail);
         return ResponseEntity.ok(responses);
     }
 
     // =========================================================================
-    // 3. OBTENER RESERVA POR ID
+    // 3. OBTENER RESERVA POR ID (CON VALIDACIÓN DE PROPIEDAD)
     // =========================================================================
 
     @GetMapping("/{reservationId}")
     @Operation(
             summary = "Obtener reserva por ID",
-            description = "Obtiene los detalles de una reserva específica."
+            description = "Obtiene los detalles de una reserva específica, validando que pertenezca al alojamiento del owner."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Reserva obtenida exitosamente"),
-            @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
+            @ApiResponse(responseCode = "404", description = "Reserva no encontrada o no pertenece a tu alojamiento")
     })
-    public ResponseEntity<ReservationResponse> getReservation(@PathVariable Long reservationId) {
-        ReservationResponse response = reservationService.getReservationById(reservationId);
+    public ResponseEntity<ReservationResponse> getReservation(
+            @PathVariable Long reservationId,
+            Authentication authentication) {
+
+        String ownerEmail = authentication.getName();
+        log.debug("🔍 Obteniendo reserva ID: {} para owner email: {}", reservationId, ownerEmail);
+
+        ReservationResponse response = reservationService.getReservationByIdAndOwner(reservationId, ownerEmail);
         return ResponseEntity.ok(response);
     }
 
     // =========================================================================
-    // 4. CANCELAR RESERVA
+    // 4. CANCELAR RESERVA (CON VALIDACIÓN DE PROPIEDAD)
     // =========================================================================
 
     @PostMapping("/{reservationId}/cancel")
     @Operation(
             summary = "Cancelar reserva",
-            description = "Cancela una reserva existente. Solo se pueden cancelar reservas en estado PENDING o CONFIRMED."
+            description = "Cancela una reserva existente, validando que pertenezca al alojamiento del owner."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Reserva cancelada exitosamente"),
             @ApiResponse(responseCode = "400", description = "La reserva no se puede cancelar (ya está completada o cancelada)"),
-            @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
+            @ApiResponse(responseCode = "404", description = "Reserva no encontrada o no pertenece a tu alojamiento")
     })
     public ResponseEntity<ReservationResponse> cancelReservation(
             @PathVariable Long reservationId,
-            @RequestParam(required = false) String reason) {
+            @RequestParam(required = false) String reason,
+            Authentication authentication) {
 
-        ReservationResponse response = reservationService.cancelReservation(reservationId, reason);
+        String ownerEmail = authentication.getName();
+        log.info("❌ Cancelando reserva ID: {} para owner email: {}", reservationId, ownerEmail);
+
+        ReservationResponse response = reservationService.cancelReservationByIdAndOwner(reservationId, reason, ownerEmail);
         return ResponseEntity.ok(response);
     }
 
     // =========================================================================
-    // 5. REACTIVAR ENLACE
+    // 5. REACTIVAR ENLACE (CON VALIDACIÓN DE PROPIEDAD)
     // =========================================================================
 
     @PostMapping("/{reservationId}/reactivate-link")
     @Operation(
             summary = "Reactivar enlace de confirmación",
-            description = """
-            Reactiva un enlace de confirmación que ha expirado.
-            Genera un nuevo token y extiende la validez por las horas especificadas.
-            """
+            description = "Reactiva un enlace de confirmación que ha expirado, validando la propiedad de la reserva."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Enlace reactivado exitosamente"),
             @ApiResponse(responseCode = "400", description = "La reserva no está en estado PENDING"),
-            @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
+            @ApiResponse(responseCode = "404", description = "Reserva no encontrada o no pertenece a tu alojamiento")
     })
     public ResponseEntity<ReservationLinkResponse> reactivateLink(
             @PathVariable Long reservationId,
-            @RequestParam(defaultValue = "24") int expirationHours) {
+            @RequestParam(defaultValue = "24") int expirationHours,
+            Authentication authentication) {
 
-        ReservationLinkResponse response = reservationService.reactivateLink(reservationId, expirationHours);
+        String ownerEmail = authentication.getName();
+        log.info("🔄 Reactivando enlace para reserva ID: {} de owner email: {}", reservationId, ownerEmail);
+
+        ReservationLinkResponse response = reservationService.reactivateLinkByIdAndOwner(reservationId, expirationHours, ownerEmail);
         return ResponseEntity.ok(response);
     }
 
     // =========================================================================
-    // 6. VERIFICAR DISPONIBILIDAD
+    // 6. VERIFICAR DISPONIBILIDAD (CORREGIDO: SIN accommodationId EN LA URL)
     // =========================================================================
 
     @GetMapping("/check-availability")
     @Operation(
-            summary = "Verificar disponibilidad",
-            description = "Verifica si el alojamiento está disponible en las fechas especificadas (sin solapamientos)."
+            summary = "Verificar disponibilidad de mi alojamiento",
+            description = "Verifica si el alojamiento del owner autenticado está disponible en las fechas especificadas. " +
+                    "Ya no requiere accommodationId en la URL para prevenir consultas a alojamientos ajenos."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Disponibilidad verificada (true/false)"),
-            @ApiResponse(responseCode = "400", description = "Fechas inválidas")
+            @ApiResponse(responseCode = "400", description = "Fechas inválidas"),
+            @ApiResponse(responseCode = "404", description = "El owner no tiene un alojamiento registrado")
     })
     public ResponseEntity<Boolean> checkAvailability(
-            @RequestParam Long accommodationId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime checkIn,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime checkOut,
+            Authentication authentication) {
 
-            // ✅ CORRECCIÓN: @DateTimeFormat le indica a Spring cómo parsear el formato ISO 8601 con 'Z'
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime checkIn,
+        String ownerEmail = authentication.getName();
+        log.debug("📅 Verificando disponibilidad para owner email: {} entre {} y {}", ownerEmail, checkIn, checkOut);
 
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime checkOut) {
-
-        boolean available = reservationService.isAccommodationAvailable(accommodationId, checkIn, checkOut);
+        // 🛡️ SEGURIDAD: El servicio deriva el accommodationId internamente desde el ownerEmail.
+        boolean available = reservationService.checkAvailabilityByEmail(ownerEmail, checkIn, checkOut);
         return ResponseEntity.ok(available);
     }
 
     // =========================================================================
-    // 7. 🆕 COMPLETAR RESERVA (REGISTRO DE INGRESOS)
+    // 7. COMPLETAR RESERVA (CON VALIDACIÓN DE PROPIEDAD)
     // =========================================================================
 
     @PostMapping("/{reservationId}/complete")
     @Operation(
             summary = "Completar reserva",
-            description = """
-            Marca una reserva como COMPLETADA después del check-out del huésped.
-            
-            Esta acción es irreversible y es la que permite que los ingresos de esta 
-            reserva se reflejen en las métricas del dashboard del propietario 
-            (incomeLastMonth y accumulatedIncome).
-            
-            Validaciones:
-            - La reserva debe estar en estado CONFIRMED.
-            - La fecha de check-out ya debe haber pasado.
-            """
+            description = "Marca una reserva como COMPLETADA después del check-out, validando que pertenezca al owner."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Reserva completada exitosamente"),
             @ApiResponse(responseCode = "400", description = "La reserva no puede ser completada (no está CONFIRMED o el check-out no ha pasado)"),
-            @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
+            @ApiResponse(responseCode = "404", description = "Reserva no encontrada o no pertenece a tu alojamiento")
     })
     public ResponseEntity<ReservationResponse> completeReservation(
-            @PathVariable Long reservationId) {
+            @PathVariable Long reservationId,
+            Authentication authentication) {
 
-        ReservationResponse response = reservationService.completeReservation(reservationId);
+        String ownerEmail = authentication.getName();
+        log.info("✅ Completando reserva ID: {} para owner email: {}", reservationId, ownerEmail);
+
+        ReservationResponse response = reservationService.completeReservationByIdAndOwner(reservationId, ownerEmail);
         return ResponseEntity.ok(response);
-    }
-
-    // =========================================================================
-    // MÉTODOS AUXILIARES PRIVADOS
-    // =========================================================================
-
-    /**
-     * Obtiene el ID del owner actualmente autenticado a partir del contexto de seguridad.
-     *
-     * @param authentication el contexto de autenticación de Spring Security
-     * @return el ID del owner autenticado
-     * @throws org.springframework.security.authentication.AuthenticationCredentialsNotFoundException si no hay autenticación
-     * @throws ResourceNotFoundException si el owner no existe en la base de datos
-     */
-    private Long getCurrentOwnerId(Authentication authentication) {
-        if (authentication == null || authentication.getName() == null) {
-            throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException(
-                    "Se requiere autenticación válida.");
-        }
-
-        Owner owner = ownerRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No se encontró el propietario autenticado con el email: " + authentication.getName()));
-
-        return owner.getId();
     }
 }

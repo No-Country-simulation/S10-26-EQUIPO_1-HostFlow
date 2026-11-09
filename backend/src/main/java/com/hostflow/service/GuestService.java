@@ -2,6 +2,8 @@ package com.hostflow.service;
 
 import com.hostflow.dto.request.CreateGuestRequest;
 import com.hostflow.dto.request.GuestPaymentMethodRequest;
+import com.hostflow.dto.response.GuestPaymentMethodResponse;
+import com.hostflow.dto.response.GuestResponse;
 import com.hostflow.exception.BusinessException;
 import com.hostflow.exception.ResourceNotFoundException;
 import com.hostflow.model.Guest;
@@ -16,14 +18,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * Servicio para gestionar huéspedes (clientes) y sus métodos de pago en HostFlow.
+ * Servicio central para la gestión de huéspedes (clientes) y sus métodos de pago en HostFlow.
  *
- * <p>Responsabilidades principales:</p>
+ * <p><strong>🆕 Mejora de arquitectura (v2.6.0):</strong></p>
  * <ul>
- *   <li>Crear o buscar huéspedes por correo electrónico, validando unicidad de documentos.</li>
- *   <li>Persistir y actualizar preferencias y alergias del huésped.</li>
- *   <li>Registrar, listar y eliminar métodos de pago asociados a un huésped.</li>
- *   <li>Validar que existan métodos de pago activos antes de permitir una reserva.</li>
+ *   <li>Los métodos de lectura retornan DTOs ({@link GuestResponse} y {@link GuestPaymentMethodResponse})
+ *       en lugar de entidades JPA, evitando {@code LazyInitializationException}.</li>
+ *   <li>Se han creado métodos auxiliares públicos (ej. {@code getPaymentMethodEntity}) que retornan
+ *       la entidad directamente (lanzando excepción si no existe). Esto permite que otros servicios
+ *       (como {@code ReservationService}) accedan a ellas de forma limpia y segura.</li>
+ *   <li>Se eliminó el uso innecesario de {@code Optional} en métodos de servicio a servicio,
+ *       centralizando la validación de existencia y propiedad en un solo lugar (Principio DRY).</li>
  * </ul>
  *
  * <p><strong>Política de transacciones:</strong> Los métodos de escritura usan
@@ -31,12 +36,16 @@ import java.util.List;
  * usan {@code @Transactional(readOnly = true)} para optimizar el rendimiento.</p>
  *
  * @author HostFlow Team
- * @version 2.3.0 (Agregado soporte para persistencia de preferencias y alergias)
+ * @version 2.6.0
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class GuestService {
+
+    // =========================================================================
+    // DEPENDENCIAS INYECTADAS
+    // =========================================================================
 
     private final GuestRepository guestRepository;
     private final GuestPaymentMethodRepository paymentMethodRepository;
@@ -48,16 +57,13 @@ public class GuestService {
     /**
      * Crea un nuevo huésped o retorna uno existente por su correo electrónico.
      *
-     * <p><strong>Flujo del proceso:</strong></p>
-     * <ol>
-     *   <li>Busca si ya existe un huésped con el email proporcionado.</li>
-     *   <li>Si existe, actualiza sus preferencias y alergias si se proporcionan nuevos datos (idempotencia segura).</li>
-     *   <li>Si no existe, valida que el número de documento (si se proporciona) no esté ya registrado.</li>
-     *   <li>Crea y persiste el nuevo huésped con los datos normalizados (incluyendo preferencias y alergias).</li>
-     * </ol>
+     * <p><strong>⚠️ Excepción de Diseño:</strong> Este método retorna la entidad {@link Guest}
+     * (no un DTO) porque es utilizado internamente por {@code ReservationService} para
+     * asociar el huésped a una nueva reserva ({@code reservation.setGuest(guest)}).
+     * Para la capa web (Controladores), utilice {@link #getGuestById} o {@link #getGuestByEmail}.</p>
      *
-     * @param request los datos del huésped a crear o buscar (usando record)
-     * @return el huésped existente (actualizado) o recién creado
+     * @param request los datos del huésped a crear o buscar
+     * @return la entidad Guest existente (actualizada) o recién creada
      * @throws BusinessException si el documento de identidad ya está registrado
      */
     @Transactional
@@ -68,7 +74,6 @@ public class GuestService {
                 .map(existingGuest -> {
                     log.info("✅ Huésped encontrado: {} (ID: {})", existingGuest.getFullName(), existingGuest.getId());
 
-                    // 🆕 Actualizar preferencias y alergias si se proporcionan nuevos datos en esta reserva
                     boolean updated = false;
                     if (request.preferences() != null && !request.preferences().isBlank()) {
                         existingGuest.setPreferences(request.preferences().trim());
@@ -79,14 +84,12 @@ public class GuestService {
                         updated = true;
                     }
 
-                    // Solo guardamos en la BD si hubo cambios para optimizar rendimiento
                     if (updated) {
                         return guestRepository.save(existingGuest);
                     }
                     return existingGuest;
                 })
                 .orElseGet(() -> {
-                    // 1. Validar que el documento no exista si fue proporcionado
                     if (request.documentNumber() != null && !request.documentNumber().isBlank()) {
                         String normalizedDoc = request.documentNumber().trim();
                         guestRepository.findByDocumentNumber(normalizedDoc)
@@ -96,23 +99,19 @@ public class GuestService {
                                 });
                     }
 
-                    // 2. Normalizar datos de nombre y apellido
                     String firstName = request.firstName() != null ? request.firstName().trim() : "";
                     String lastName = request.lastName() != null ? request.lastName().trim() : "";
-
-                    // ✅ CORRECCIÓN CRÍTICA: Concatenar nombre y apellido para cumplir con la restricción NOT NULL en BD
                     String fullName = (firstName + " " + lastName).trim();
 
-                    // 3. Crear nuevo huésped con datos normalizados (🆕 incluyendo preferencias y alergias)
                     Guest newGuest = Guest.builder()
                             .firstName(firstName)
                             .lastName(lastName)
-                            .fullName(fullName) // ✅ Asignación obligatoria del nombre completo
+                            .fullName(fullName)
                             .email(request.email().trim().toLowerCase())
                             .phone(request.phone() != null ? request.phone().trim() : null)
                             .documentNumber(request.documentNumber() != null ? request.documentNumber().trim() : null)
-                            .preferences(request.preferences() != null && !request.preferences().isBlank() ? request.preferences().trim() : null) // 🆕
-                            .allergies(request.allergies()) // 🆕 (Hibernate persiste esto automáticamente en guest_allergies)
+                            .preferences(request.preferences() != null && !request.preferences().isBlank() ? request.preferences().trim() : null)
+                            .allergies(request.allergies())
                             .active(true)
                             .build();
 
@@ -122,30 +121,18 @@ public class GuestService {
                 });
     }
 
-    /**
-     * Busca un huésped por su identificador único.
-     *
-     * @param guestId ID del huésped
-     * @return el huésped encontrado
-     * @throws ResourceNotFoundException si no existe
-     */
     @Transactional(readOnly = true)
-    public Guest getGuestById(Long guestId) {
+    public GuestResponse getGuestById(Long guestId) {
         return guestRepository.findById(guestId)
+                .map(GuestResponse::from)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No se encontró el huésped con ID: " + guestId));
     }
 
-    /**
-     * Busca un huésped por su correo electrónico.
-     *
-     * @param email correo electrónico del huésped
-     * @return el huésped encontrado
-     * @throws ResourceNotFoundException si no existe
-     */
     @Transactional(readOnly = true)
-    public Guest getGuestByEmail(String email) {
+    public GuestResponse getGuestByEmail(String email) {
         return guestRepository.findByEmail(email.trim().toLowerCase())
+                .map(GuestResponse::from)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No se encontró el huésped con email: " + email));
     }
@@ -154,26 +141,13 @@ public class GuestService {
     // GESTIÓN DE MÉTODOS DE PAGO
     // =========================================================================
 
-    /**
-     * Crea un nuevo método de pago para un huésped.
-     *
-     * <p><strong>Regla de negocio:</strong> Si no existe un método predeterminado
-     * para este huésped, o si se solicita explícitamente, este nuevo método se
-     * marcará como predeterminado, limpiando el flag de los métodos anteriores.</p>
-     *
-     * @param guestId ID del huésped propietario del método
-     * @param request datos del método de pago a registrar
-     * @return el método de pago creado y persistido
-     */
     @Transactional
-    public GuestPaymentMethod createPaymentMethod(Long guestId, GuestPaymentMethodRequest request) {
-        Guest guest = getGuestById(guestId);
+    public GuestPaymentMethodResponse createPaymentMethod(Long guestId, GuestPaymentMethodRequest request) {
+        Guest guest = getGuestEntityById(guestId);
 
-        // Determinar si debe ser el método predeterminado
         boolean makeDefault = Boolean.TRUE.equals(request.isDefault())
                 || !paymentMethodRepository.existsByGuest_IdAndDefaultMethodTrue(guestId);
 
-        // Si será predeterminado, limpiar el flag de los métodos existentes
         if (makeDefault) {
             paymentMethodRepository.clearDefaultForGuest(guestId);
         }
@@ -192,66 +166,36 @@ public class GuestService {
 
         GuestPaymentMethod saved = paymentMethodRepository.save(method);
         log.info("💳 Método de pago creado para huésped {}: {}", guestId, saved.getDisplayName());
-        return saved;
+
+        return GuestPaymentMethodResponse.from(saved);
     }
 
-    /**
-     * Lista todos los métodos de pago de un huésped.
-     *
-     * <p>La lista se ordena colocando primero el método predeterminado,
-     * y luego el resto ordenado por fecha de creación.</p>
-     *
-     * @param guestId ID del huésped
-     * @return lista de métodos de pago ordenados
-     */
     @Transactional(readOnly = true)
-    public List<GuestPaymentMethod> listPaymentMethods(Long guestId) {
-        return paymentMethodRepository.findAllByGuest_IdOrderByDefaultMethodDescCreatedAtAsc(guestId);
+    public List<GuestPaymentMethodResponse> listPaymentMethods(Long guestId) {
+        return paymentMethodRepository.findAllByGuest_IdOrderByDefaultMethodDescCreatedAtAsc(guestId)
+                .stream()
+                .map(GuestPaymentMethodResponse::from)
+                .toList();
     }
 
-    /**
-     * Obtiene el método de pago predeterminado de un huésped.
-     *
-     * @param guestId ID del huésped
-     * @return el método de pago marcado como predeterminado
-     * @throws BusinessException si el huésped no tiene un método predeterminado configurado
-     */
     @Transactional(readOnly = true)
-    public GuestPaymentMethod getDefaultPaymentMethod(Long guestId) {
+    public GuestPaymentMethodResponse getDefaultPaymentMethod(Long guestId) {
         return paymentMethodRepository.findByGuest_IdAndDefaultMethodTrue(guestId)
+                .map(GuestPaymentMethodResponse::from)
                 .orElseThrow(() -> new BusinessException(
                         "El huésped no tiene un método de pago predeterminado configurado."));
     }
 
-    /**
-     * Verifica si un huésped tiene al menos un método de pago activo.
-     *
-     * <p>Esta validación es crítica antes de permitir la creación de una reserva.</p>
-     *
-     * @param guestId ID del huésped
-     * @return {@code true} si tiene al menos un método activo, {@code false} en caso contrario
-     */
     @Transactional(readOnly = true)
     public boolean hasActivePaymentMethod(Long guestId) {
         return paymentMethodRepository.existsByGuest_IdAndActiveTrue(guestId);
     }
 
-    /**
-     * Elimina un método de pago de un huésped.
-     *
-     * <p><strong>Regla de negocio:</strong> Si el método eliminado era el predeterminado,
-     * se limpia el flag en la base de datos para que el sistema pueda asignar
-     * automáticamente otro método como predeterminado en el futuro.</p>
-     *
-     * @param guestId  ID del huésped
-     * @param methodId ID del método de pago a eliminar
-     * @throws ResourceNotFoundException si el método no existe o no pertenece al huésped
-     */
     @Transactional
     public void deletePaymentMethod(Long guestId, Long methodId) {
-        GuestPaymentMethod method = getPaymentMethod(guestId, methodId);
+        // ✅ El método getPaymentMethodEntity ya lanza la excepción si no existe, simplificando el código.
+        GuestPaymentMethod method = getPaymentMethodEntity(guestId, methodId);
 
-        // Si era el predeterminado, limpiar el flag para mantener la integridad
         if (Boolean.TRUE.equals(method.isDefault())) {
             paymentMethodRepository.clearDefaultForGuest(guestId);
         }
@@ -260,21 +204,49 @@ public class GuestService {
         log.info("🗑️ Método de pago eliminado para huésped {}: {}", guestId, method.getDisplayName());
     }
 
+    @Transactional(readOnly = true)
+    public GuestPaymentMethodResponse getPaymentMethod(Long guestId, Long methodId) {
+        // ✅ Obtenemos la entidad directamente (la validación de existencia está centralizada)
+        GuestPaymentMethod method = getPaymentMethodEntity(guestId, methodId);
+        return GuestPaymentMethodResponse.from(method);
+    }
+
+    // =========================================================================
+    // 🆕 MÉTODOS PÚBLICOS DE ENTIDAD (Para uso entre servicios)
+    // =========================================================================
+
     /**
-     * Busca un método de pago por su ID, validando estrictamente que pertenezca al huésped indicado.
+     * Obtiene la entidad Guest por su ID.
      *
-     * <p>Esta validación de propiedad es crucial para evitar que un huésped
-     * utilice o elimine métodos de pago de otro usuario.</p>
+     * <p><strong>🆕 Método público:</strong> Permite que otros servicios (como
+     * {@code ReservationService}) accedan a la entidad para operaciones de
+     * escritura o asociación (ej. {@code reservation.setGuest(guest)}).</p>
+     */
+    @Transactional(readOnly = true)
+    public Guest getGuestEntityById(Long guestId) {
+        return guestRepository.findById(guestId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No se encontró el huésped con ID: " + guestId));
+    }
+
+    /**
+     * Obtiene la entidad GuestPaymentMethod por su ID, validando que pertenezca al huésped.
+     *
+     * <p><strong>🆕 Método público:</strong> Permite que otros servicios (como
+     * {@code ReservationService}) accedan a la entidad para operaciones de
+     * escritura o validación (ej. {@code reservation.setPaymentMethod(paymentMethod)}).
+     * Retorna la entidad directamente, lanzando excepción si no existe, para evitar
+     * el manejo redundante de {@code Optional} en los servicios consumidores.</p>
      *
      * @param guestId  ID del huésped propietario
      * @param methodId ID del método de pago
-     * @return el método de pago encontrado
+     * @return la entidad GuestPaymentMethod
      * @throws ResourceNotFoundException si no existe o no pertenece al huésped especificado
      */
     @Transactional(readOnly = true)
-    public GuestPaymentMethod getPaymentMethod(Long guestId, Long methodId) {
+    public GuestPaymentMethod getPaymentMethodEntity(Long guestId, Long methodId) {
         return paymentMethodRepository.findById(methodId)
-                .filter(m -> m.getGuest().getId().equals(guestId))
+                .filter(method -> method.getGuest().getId().equals(guestId))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No se encontró el método de pago con ID: " + methodId +
                                 " o no pertenece al huésped especificado."));

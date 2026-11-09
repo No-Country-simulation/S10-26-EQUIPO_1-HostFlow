@@ -3,11 +3,6 @@ package com.hostflow.controller;
 import com.hostflow.dto.request.AdditionalServiceRequest;
 import com.hostflow.dto.response.AdditionalServiceImageResponse;
 import com.hostflow.dto.response.AdditionalServiceResponse;
-import com.hostflow.exception.ResourceNotFoundException;
-import com.hostflow.model.Accommodation;
-import com.hostflow.model.Owner;
-import com.hostflow.repository.AccommodationRepository;
-import com.hostflow.repository.OwnerRepository;
 import com.hostflow.service.AdditionalServiceImageService;
 import com.hostflow.service.AdditionalServiceService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,32 +30,24 @@ import java.util.List;
  * Controlador REST para que el propietario (Owner) gestione los servicios
  * adicionales de su alojamiento, incluyendo la gestión de sus imágenes.
  *
- * <p>Los servicios adicionales son extras que el alojamiento ofrece a los huéspedes
- * más allá del alojamiento base, tales como:</p>
+ * <p><strong>🆕 Mejora de arquitectura (v2.1):</strong></p>
  * <ul>
- *   <li>Desayuno buffet</li>
- *   <li>Transfer al aeropuerto</li>
- *   <li>Spa / masajes</li>
- *   <li>Estacionamiento</li>
- *   <li>Mascotas</li>
- *   <li>Early check-in / Late check-out</li>
+ *   <li>Se eliminó la inyección directa de {@code OwnerRepository} y {@code AccommodationRepository}.</li>
+ *   <li>Se eliminaron los métodos privados {@code currentOwnerId()} y {@code getAccommodation()}.</li>
+ *   <li>El controlador ahora solo extrae el email del usuario autenticado y lo delega
+ *       al servicio, manteniendo la estricta separación de responsabilidades (Controller -> Service).</li>
  * </ul>
  *
  * <p><strong>Características clave:</strong></p>
  * <ul>
  *   <li>Los precios se almacenan en la moneda base del alojamiento (ARS).</li>
- *   <li>Al consultarlos, se convierten automáticamente a todas las monedas
- *       habilitadas (USD, EUR) mediante {@code CurrencyConversionService}.</li>
+ *   <li>Al consultarlos, se convierten automáticamente a todas las monedas habilitadas.</li>
  *   <li>Cada servicio puede tener hasta 3 imágenes, almacenadas en Cloudinary.</li>
- *   <li>Solo el propietario del alojamiento puede crear, modificar o eliminar
- *       sus propios servicios adicionales y sus imágenes.</li>
+ *   <li>Solo el propietario del alojamiento puede gestionar sus propios servicios.</li>
  * </ul>
  *
- * <p><strong>Seguridad:</strong> Todos los endpoints requieren autenticación
- * y el rol {@code ROLE_OWNER}.</p>
- *
  * @author HostFlow Team
- * @version 2.0.0
+ * @version 2.1.0
  */
 @RestController
 @RequestMapping("/owners/accommodation/additional-services")
@@ -78,27 +65,15 @@ public class AdditionalServiceController {
 
     /**
      * Servicio que encapsula la lógica de negocio de los servicios adicionales.
-     * Se utiliza en lugar de acceder directamente al repositorio para mantener
-     * la separación de responsabilidades y aplicar reglas de negocio.
+     * Se encarga de validar la pertenencia del alojamiento al propietario.
      */
     private final AdditionalServiceService serviceService;
 
     /**
-     * 🆕 Servicio que encapsula la lógica de negocio para la gestión de imágenes
-     * de los servicios adicionales (subida a Cloudinary, validaciones de tamaño,
-     * límite de 3 imágenes, etc.).
+     * Servicio que encapsula la lógica de negocio para la gestión de imágenes
+     * de los servicios adicionales (subida a Cloudinary, validaciones, etc.).
      */
     private final AdditionalServiceImageService imageService;
-
-    /**
-     * Repositorio para obtener el alojamiento del propietario autenticado.
-     */
-    private final AccommodationRepository accommodationRepository;
-
-    /**
-     * Repositorio para obtener el ID del propietario a partir del email del token JWT.
-     */
-    private final OwnerRepository ownerRepository;
 
     // =========================================================================
     // CRUD DE SERVICIOS ADICIONALES
@@ -108,8 +83,7 @@ public class AdditionalServiceController {
     @Operation(
             summary = "Listar servicios adicionales con precios convertidos e imágenes",
             description = "Devuelve todos los servicios adicionales del alojamiento del owner, " +
-                    "incluyendo sus precios convertidos a todas las monedas habilitadas (ARS, USD, EUR) " +
-                    "y la lista de imágenes asociadas (máximo 3 por servicio)."
+                    "incluyendo sus precios convertidos y la lista de imágenes asociadas."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de servicios obtenida exitosamente"),
@@ -118,17 +92,19 @@ public class AdditionalServiceController {
             @ApiResponse(responseCode = "404", description = "El owner aún no ha registrado su alojamiento")
     })
     public ResponseEntity<List<AdditionalServiceResponse>> list(Authentication auth) {
-        Long ownerId = currentOwnerId(auth);
-        List<AdditionalServiceResponse> responses = serviceService.listWithConvertedPrices(ownerId);
+        // ✅ Extraemos solo el email y delegamos la resolución al servicio
+        String ownerEmail = auth.getName();
+        log.debug("📋 Listando servicios adicionales para owner email: {}", ownerEmail);
+
+        List<AdditionalServiceResponse> responses = serviceService.listWithConvertedPricesByEmail(ownerEmail);
         return ResponseEntity.ok(responses);
     }
 
     @PostMapping
     @Operation(
             summary = "Crear un servicio adicional",
-            description = "Registra un nuevo servicio adicional para el alojamiento del owner. " +
-                    "El precio se almacena en la moneda base (ARS) y se convierte automáticamente " +
-                    "a las demás monedas habilitadas al consultarlo. Las imágenes se agregan posteriormente."
+            description = "Registra un nuevo servicio adicional. El precio se almacena en la moneda base " +
+                    "y se convierte automáticamente. Las imágenes se agregan posteriormente."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Servicio creado exitosamente"),
@@ -141,11 +117,13 @@ public class AdditionalServiceController {
             @Valid @RequestBody AdditionalServiceRequest request,
             Authentication auth) {
 
-        Long ownerId = currentOwnerId(auth);
-        AdditionalServiceResponse created = serviceService.createWithConvertedPrices(ownerId, request);
+        String ownerEmail = auth.getName();
+        log.info("✅ Creando servicio adicional para owner email: {}", ownerEmail);
+
+        AdditionalServiceResponse created = serviceService.createWithConvertedPricesByEmail(ownerEmail, request);
 
         log.info("✅ Servicio adicional creado: '{}' ({} ARS, {}) para owner {}",
-                request.name(), request.basePrice(), request.priceType(), ownerId);
+                request.name(), request.basePrice(), request.priceType(), ownerEmail);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -153,9 +131,7 @@ public class AdditionalServiceController {
     @PatchMapping("/{serviceId}")
     @Operation(
             summary = "Actualizar parcialmente un servicio adicional",
-            description = "Modifica únicamente los campos enviados en la solicitud. " +
-                    "Los campos omitidos o null permanecen sin cambios. " +
-                    "Solo se pueden modificar servicios del alojamiento propio."
+            description = "Modifica únicamente los campos enviados. Los campos omitidos permanecen sin cambios."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Servicio actualizado exitosamente"),
@@ -169,10 +145,10 @@ public class AdditionalServiceController {
             @Valid @RequestBody AdditionalServiceRequest request,
             Authentication auth) {
 
-        Long ownerId = currentOwnerId(auth);
-        AdditionalServiceResponse updated = serviceService.updateWithConvertedPrices(ownerId, serviceId, request);
+        String ownerEmail = auth.getName();
+        log.info("✏️ Actualizando servicio adicional ID: {} para owner email: {}", serviceId, ownerEmail);
 
-        log.info("✏️ Servicio adicional actualizado: ID={} para owner {}", serviceId, ownerId);
+        AdditionalServiceResponse updated = serviceService.updateWithConvertedPricesByEmail(ownerEmail, serviceId, request);
 
         return ResponseEntity.ok(updated);
     }
@@ -180,8 +156,7 @@ public class AdditionalServiceController {
     @DeleteMapping("/{serviceId}")
     @Operation(
             summary = "Eliminar un servicio adicional",
-            description = "Elimina permanentemente un servicio adicional del alojamiento. " +
-                    "Esto también elimina automáticamente todas las imágenes asociadas en Cloudinary y la base de datos."
+            description = "Elimina permanentemente un servicio adicional y todas sus imágenes asociadas."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Servicio eliminado exitosamente"),
@@ -193,23 +168,22 @@ public class AdditionalServiceController {
             @PathVariable Long serviceId,
             Authentication auth) {
 
-        Long ownerId = currentOwnerId(auth);
-        serviceService.delete(ownerId, serviceId);
+        String ownerEmail = auth.getName();
+        log.info("🗑️ Eliminando servicio adicional ID: {} para owner email: {}", serviceId, ownerEmail);
 
-        log.info("🗑️ Servicio adicional eliminado: ID={} para owner {}", serviceId, ownerId);
+        serviceService.deleteByEmail(ownerEmail, serviceId);
 
         return ResponseEntity.noContent().build();
     }
 
     // =========================================================================
-    // 🆕 GESTIÓN DE IMÁGENES DE SERVICIOS ADICIONALES
+    // GESTIÓN DE IMÁGENES DE SERVICIOS ADICIONALES
     // =========================================================================
 
     @GetMapping("/{serviceId}/images")
     @Operation(
             summary = "Listar imágenes de un servicio adicional",
-            description = "Devuelve hasta 3 imágenes asociadas al servicio adicional especificado, " +
-                    "ordenadas por su índice de visualización."
+            description = "Devuelve hasta 3 imágenes asociadas al servicio, ordenadas por índice."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Imágenes obtenidas exitosamente"),
@@ -221,31 +195,25 @@ public class AdditionalServiceController {
             @PathVariable Long serviceId,
             Authentication auth) {
 
-        Long ownerId = currentOwnerId(auth);
-        List<AdditionalServiceImageResponse> images = imageService.listImages(ownerId, serviceId);
+        String ownerEmail = auth.getName();
+        log.debug("🖼️ Listando imágenes del servicio ID: {} para owner email: {}", serviceId, ownerEmail);
+
+        List<AdditionalServiceImageResponse> images = imageService.listImagesByEmail(ownerEmail, serviceId);
         return ResponseEntity.ok(images);
     }
 
     @PostMapping(value = "/{serviceId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
             summary = "Subir una imagen a un servicio adicional",
-            description = """
-                    Sube una imagen a Cloudinary y la asocia al servicio adicional.
-                    Restricciones:
-                    - Máximo 3 imágenes por servicio.
-                    - Tamaño mínimo: 500 KB.
-                    - Tamaño máximo: 2 MB.
-                    - Solo archivos de imagen (JPEG, PNG, WEBP, etc.).
-                    La imagen se almacena en la carpeta: hostflow/additional-services/{serviceId}
-                    """
+            description = "Sube una imagen a Cloudinary. Restricciones: Máx 3 imágenes, 500 KB - 2 MB, tipo image/*."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Imagen subida exitosamente",
                     content = @Content(schema = @Schema(implementation = AdditionalServiceImageResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Archivo inválido o se excedió el límite de 3 imágenes"),
+            @ApiResponse(responseCode = "400", description = "Archivo inválido o se excedió el límite"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
             @ApiResponse(responseCode = "403", description = "Sin permisos de owner"),
-            @ApiResponse(responseCode = "404", description = "Servicio no encontrado o no pertenece al alojamiento"),
+            @ApiResponse(responseCode = "404", description = "Servicio no encontrado"),
             @ApiResponse(responseCode = "502", description = "Error al subir la imagen a Cloudinary")
     })
     public ResponseEntity<AdditionalServiceImageResponse> uploadImage(
@@ -254,10 +222,10 @@ public class AdditionalServiceController {
             @RequestParam("file") MultipartFile file,
             Authentication auth) {
 
-        Long ownerId = currentOwnerId(auth);
-        AdditionalServiceImageResponse response = imageService.uploadImage(ownerId, serviceId, file);
+        String ownerEmail = auth.getName();
+        log.info("⬆️ Subiendo imagen para servicio ID: {} por owner email: {}", serviceId, ownerEmail);
 
-        log.info("🖼️ Imagen subida para servicio ID={} por owner {}", serviceId, ownerId);
+        AdditionalServiceImageResponse response = imageService.uploadImageByEmail(ownerEmail, serviceId, file);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -265,8 +233,7 @@ public class AdditionalServiceController {
     @DeleteMapping("/{serviceId}/images/{imageId}")
     @Operation(
             summary = "Eliminar una imagen de un servicio adicional",
-            description = "Elimina la imagen de Cloudinary y de la base de datos. " +
-                    "Las imágenes restantes se reordenan automáticamente."
+            description = "Elimina la imagen de Cloudinary y de la base de datos. Las restantes se reordenan."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Imagen eliminada exitosamente"),
@@ -280,54 +247,11 @@ public class AdditionalServiceController {
             @PathVariable Long imageId,
             Authentication auth) {
 
-        Long ownerId = currentOwnerId(auth);
-        imageService.deleteImage(ownerId, serviceId, imageId);
+        String ownerEmail = auth.getName();
+        log.info("🗑️ Eliminando imagen ID: {} del servicio ID: {} por owner email: {}", imageId, serviceId, ownerEmail);
 
-        log.info("🗑️ Imagen ID={} eliminada del servicio ID={} por owner {}", imageId, serviceId, ownerId);
+        imageService.deleteImageByEmail(ownerEmail, serviceId, imageId);
 
         return ResponseEntity.noContent().build();
-    }
-
-    // =========================================================================
-    // MÉTODOS AUXILIARES PRIVADOS
-    // =========================================================================
-
-    /**
-     * Obtiene el alojamiento asociado al propietario autenticado.
-     *
-     * <p>Valida que el propietario haya registrado previamente los datos
-     * generales de su alojamiento antes de permitir operaciones sobre
-     * servicios adicionales.</p>
-     *
-     * @param auth el contexto de autenticación de Spring Security
-     * @return la entidad Accommodation del propietario
-     * @throws ResourceNotFoundException si el propietario no tiene alojamiento registrado
-     */
-    private Accommodation getAccommodation(Authentication auth) {
-        Long ownerId = currentOwnerId(auth);
-        return accommodationRepository.findByOwner_Id(ownerId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Registra primero los datos generales del alojamiento antes de gestionar servicios adicionales."));
-    }
-
-    /**
-     * Obtiene el ID del propietario actualmente autenticado a partir del token JWT.
-     *
-     * <p>El email del usuario se extrae del token JWT (campo "sub") y se busca
-     * en la base de datos para obtener su ID.</p>
-     *
-     * @param auth el contexto de autenticación de Spring Security
-     * @return el ID del propietario autenticado
-     * @throws ResourceNotFoundException si no se encuentra el propietario
-     */
-    private Long currentOwnerId(Authentication auth) {
-        if (auth == null || auth.getName() == null) {
-            throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException(
-                    "Se requiere autenticación.");
-        }
-        Owner owner = ownerRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No se encontró el propietario autenticado."));
-        return owner.getId();
     }
 }

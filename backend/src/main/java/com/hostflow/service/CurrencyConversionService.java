@@ -1,29 +1,34 @@
 package com.hostflow.service;
 
-
 import com.hostflow.enums.Currency;
 import com.hostflow.exception.BusinessException;
+import com.hostflow.exception.ResourceNotFoundException;
 import com.hostflow.model.AcceptedCurrency;
+import com.hostflow.model.Accommodation;
 import com.hostflow.model.ExchangeRateCache;
+import com.hostflow.model.Owner;
 import com.hostflow.repository.AcceptedCurrencyRepository;
+import com.hostflow.repository.AccommodationRepository;
 import com.hostflow.repository.ExchangeRateCacheRepository;
+import com.hostflow.repository.OwnerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 /**
- * Servicio central para conversión de monedas en HostFlow.
+ * Servicio central para la conversión de monedas en HostFlow.
  *
  * <p><strong>Estrategia de resolución de tasas:</strong></p>
  * <ol>
  *   <li>Si la moneda destino es igual a la base → retorna el valor tal cual.</li>
  *   <li>Si la moneda tiene {@code useAutomaticRate=true} → usa la tasa cacheada
- *       obtenida desde la API externa (DolarAPI para USD, Frankfurter para EUR).</li>
+ *       obtenida desde la API externa (DolarAPI para USD, open.er-api para EUR).</li>
  *   <li>Si la moneda tiene {@code useAutomaticRate=false} → usa el {@code manualRate}
  *       configurado por el propietario.</li>
  *   <li>Si no hay tasa disponible → lanza {@link BusinessException}.</li>
@@ -33,7 +38,7 @@ import java.time.LocalDateTime;
  * propietario (blue, oficial, MEP, etc.) almacenado en {@code AcceptedCurrency.usdRateType}.</p>
  *
  * @author HostFlow Team
- * @version 1.0.0
+ * @version 2.1.0 (Agregado resolveEffectiveRateByEmail para evitar inyección de repositorios en controladores)
  */
 @Service
 @RequiredArgsConstructor
@@ -45,8 +50,20 @@ public class CurrencyConversionService {
     /** Una tasa automática se considera obsoleta después de este número de horas. */
     private static final long RATE_MAX_AGE_HOURS = 4;
 
+    // =========================================================================
+    // DEPENDENCIAS INYECTADAS
+    // =========================================================================
+
     private final AcceptedCurrencyRepository acceptedCurrencyRepository;
     private final ExchangeRateCacheRepository exchangeRateCacheRepository;
+
+    // 🆕 Repositorios agregados para resolver el alojamiento a partir del email del propietario
+    private final OwnerRepository ownerRepository;
+    private final AccommodationRepository accommodationRepository;
+
+    // =========================================================================
+    // CONVERSIÓN DE MONTOS
+    // =========================================================================
 
     /**
      * Convierte un monto desde la moneda base del alojamiento a la moneda destino.
@@ -60,7 +77,9 @@ public class CurrencyConversionService {
      */
     @Transactional(readOnly = true)
     public BigDecimal convert(Long accommodationId, BigDecimal amount, Currency targetCurrency) {
-        if (amount == null) return null;
+        if (amount == null) {
+            return null;
+        }
         if (amount.compareTo(BigDecimal.ZERO) < 0) {
             throw new BusinessException("El monto no puede ser negativo.");
         }
@@ -84,6 +103,10 @@ public class CurrencyConversionService {
         return targetCurrency.scale(amount.multiply(rate, MC));
     }
 
+    // =========================================================================
+    // RESOLUCIÓN DE TASAS (POR ID DE ALOJAMIENTO)
+    // =========================================================================
+
     /**
      * Devuelve la tasa efectiva (automática o manual) para una moneda destino.
      *
@@ -98,7 +121,11 @@ public class CurrencyConversionService {
         AcceptedCurrency cfg = acceptedCurrencyRepository
                 .findByAccommodation_IdAndCurrency(accommodationId, targetCurrency)
                 .orElse(null);
-        if (cfg == null) return null;
+
+        if (cfg == null) {
+            return null;
+        }
+
         try {
             return resolveRate(cfg, targetCurrency);
         } catch (RuntimeException e) {
@@ -108,11 +135,54 @@ public class CurrencyConversionService {
     }
 
     /**
+     * 🆕 Devuelve la tasa efectiva usando el email del propietario.
+     *
+     * <p>Este método permite a los controladores obtener la tasa efectiva
+     * sin necesidad de inyectar repositorios para resolver el ID del alojamiento,
+     * manteniendo la estricta separación de responsabilidades (Controller -> Service).</p>
+     *
+     * @param ownerEmail     email del propietario autenticado (extraído del JWT)
+     * @param targetCurrency moneda destino
+     * @return la tasa efectiva, o {@code null} si no se puede resolver
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal resolveEffectiveRateByEmail(String ownerEmail, Currency targetCurrency) {
+        try {
+            // 1. Buscar el propietario
+            Owner owner = ownerRepository.findByEmail(ownerEmail)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Propietario no encontrado con email: " + ownerEmail));
+
+            // 2. Buscar su alojamiento
+            Accommodation acc = accommodationRepository.findByOwner_Id(owner.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "El propietario aún no ha registrado los datos de su alojamiento."));
+
+            // 3. Delegar a la lógica existente que usa el ID del alojamiento
+            return resolveEffectiveRate(acc.getId(), targetCurrency);
+
+        } catch (RuntimeException e) {
+            log.warn("No se pudo resolver la tasa para {} (owner: {}): {}",
+                    targetCurrency, ownerEmail, e.getMessage());
+            return null;
+        }
+    }
+
+    // =========================================================================
+    // LÓGICA INTERNA DE RESOLUCIÓN DE TASAS
+    // =========================================================================
+
+    /**
      * Resuelve la tasa a aplicar según la configuración de la moneda.
      *
      * <p>Para USD, utiliza el tipo de cotización (blue, oficial, etc.) configurado
      * en {@code AcceptedCurrency.usdRateType}. Para EUR y otras monedas, busca
      * la tasa genérica sin tipo de dólar.</p>
+     *
+     * @param cfg            configuración de la moneda para el alojamiento
+     * @param targetCurrency moneda destino
+     * @return la tasa de conversión válida
+     * @throws BusinessException si no hay tasa disponible o es inválida
      */
     private BigDecimal resolveRate(AcceptedCurrency cfg, Currency targetCurrency) {
         // Caso 1: Tasa manual configurada por el propietario
@@ -141,7 +211,7 @@ public class CurrencyConversionService {
                             "No hay tasa de cambio disponible para " + targetCurrency + ". Actualice las tasas o use tasa manual."));
         }
 
-        // Advertencia si la tasa está desactualizada (pero se usa igual)
+        // Advertencia si la tasa está desactualizada (pero se usa igual para no bloquear la operación)
         if (cached.getFetchedAt().isBefore(LocalDateTime.now().minusHours(RATE_MAX_AGE_HOURS))) {
             log.warn("⚠️ Tasa de cambio para {} expirada (obtenida el {}). Usando valor cacheado.",
                     targetCurrency, cached.getFetchedAt());

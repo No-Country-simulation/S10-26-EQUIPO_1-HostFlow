@@ -18,15 +18,136 @@ import java.util.List;
  * Servicio para gestionar la desactivación temporal de alojamientos
  * por parte de sus propietarios.
  *
+ * <p><strong>🆕 Mejora de arquitectura (v2.1):</strong></p>
+ * <p>Se agregaron métodos que aceptan el email del propietario autenticado
+ * en lugar del ownerId, delegando la resolución del Owner al servicio
+ * y eliminando la necesidad de que los controladores inyecten repositorios.</p>
+ *
  * @author HostFlow Team
+ * @version 2.1.0
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AccommodationTemporaryDisableService {
 
+    // =========================================================================
+    // DEPENDENCIAS INYECTADAS
+    // =========================================================================
+
     private final AccommodationTemporaryDisableRepository disableRepository;
     private final OwnerRepository ownerRepository;
+
+    // =========================================================================
+    // 🆕 MÉTODOS PÚBLICOS QUE ACEPTAN EMAIL (Para controladores refactorizados)
+    // =========================================================================
+
+    /**
+     * Desactiva temporalmente el alojamiento del propietario autenticado.
+     *
+     * <p>Este método resuelve internamente el Owner a partir del email,
+     * evitando que el controlador necesite inyectar repositorios.</p>
+     *
+     * @param ownerEmail   el email del propietario autenticado (extraído del JWT)
+     * @param reason       el motivo de la desactivación
+     * @param disabledFrom fecha de inicio de la desactivación
+     * @param disabledUntil fecha estimada de reactivación (puede ser null)
+     * @return el registro de desactivación creado
+     * @throws ResourceNotFoundException si no se encuentra el propietario
+     * @throws BusinessException si ya existe una desactivación activa o las fechas son inválidas
+     */
+    @Transactional
+    public AccommodationTemporaryDisable disableAccommodationByEmail(
+            String ownerEmail, String reason, LocalDateTime disabledFrom, LocalDateTime disabledUntil) {
+
+        Owner owner = getOwnerByEmail(ownerEmail);
+        return disableAccommodation(owner.getId(), reason, disabledFrom, disabledUntil);
+    }
+
+    /**
+     * Reactiva el alojamiento del propietario autenticado.
+     *
+     * @param ownerEmail el email del propietario autenticado
+     * @return el registro de desactivación actualizado
+     * @throws BusinessException si no hay una desactivación activa
+     */
+    @Transactional
+    public AccommodationTemporaryDisable enableAccommodationByEmail(String ownerEmail) {
+        Long ownerId = getOwnerIdByEmail(ownerEmail);
+        return enableAccommodation(ownerId);
+    }
+
+    /**
+     * Obtiene el estado actual de desactivación del alojamiento.
+     *
+     * @param ownerEmail el email del propietario autenticado
+     * @return la desactivación activa actual, o null si no hay ninguna
+     */
+    @Transactional(readOnly = true)
+    public AccommodationTemporaryDisable getActiveDisableByEmail(String ownerEmail) {
+        Long ownerId = getOwnerIdByEmail(ownerEmail);
+        return getActiveDisable(ownerId);
+    }
+
+    /**
+     * Obtiene el historial de desactivaciones del propietario.
+     *
+     * @param ownerEmail el email del propietario autenticado
+     * @return lista de desactivaciones ordenadas por fecha (más reciente primero)
+     */
+    @Transactional(readOnly = true)
+    public List<AccommodationTemporaryDisable> getDisableHistoryByEmail(String ownerEmail) {
+        Long ownerId = getOwnerIdByEmail(ownerEmail);
+        return getDisableHistory(ownerId);
+    }
+
+    /**
+     * Verifica si el alojamiento está disponible en una fecha específica.
+     *
+     * @param ownerEmail el email del propietario autenticado
+     * @param date la fecha a consultar
+     * @return true si el alojamiento está disponible, false si está desactivado
+     */
+    @Transactional(readOnly = true)
+    public boolean isAccommodationAvailableByEmail(String ownerEmail, LocalDateTime date) {
+        Long ownerId = getOwnerIdByEmail(ownerEmail);
+        return isAccommodationAvailable(ownerId, date);
+    }
+
+    // =========================================================================
+    // MÉTODOS AUXILIARES PRIVADOS - RESOLUCIÓN DE OWNER
+    // =========================================================================
+
+    /**
+     * Obtiene el ID del propietario a partir de su email.
+     *
+     * <p>Este método centraliza la lógica de búsqueda del Owner,
+     * evitando duplicación en los controladores.</p>
+     *
+     * @param ownerEmail el email del propietario
+     * @return el ID del propietario
+     * @throws ResourceNotFoundException si no se encuentra el propietario
+     */
+    private Long getOwnerIdByEmail(String ownerEmail) {
+        return getOwnerByEmail(ownerEmail).getId();
+    }
+
+    /**
+     * Obtiene la entidad Owner completa a partir de su email.
+     *
+     * @param ownerEmail el email del propietario
+     * @return la entidad Owner
+     * @throws ResourceNotFoundException si no se encuentra el propietario
+     */
+    private Owner getOwnerByEmail(String ownerEmail) {
+        return ownerRepository.findByEmail(ownerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No se encontró el propietario con email: " + ownerEmail));
+    }
+
+    // =========================================================================
+    // MÉTODOS ORIGINALES (Se mantienen para compatibilidad)
+    // =========================================================================
 
     /**
      * Desactiva temporalmente el alojamiento de un owner.
@@ -58,7 +179,6 @@ public class AccommodationTemporaryDisableService {
             throw new BusinessException(
                     "La fecha de inicio de la desactivación no puede ser en el pasado.");
         }
-
         if (disabledUntil != null && disabledUntil.isBefore(disabledFrom)) {
             throw new BusinessException(
                     "La fecha de reactivación debe ser posterior a la fecha de desactivación.");
@@ -74,8 +194,7 @@ public class AccommodationTemporaryDisableService {
                 .build();
 
         AccommodationTemporaryDisable savedDisable = disableRepository.save(disable);
-
-        log.info(" Alojamiento desactivado temporalmente - Owner: {}, Motivo: {}, Desde: {}, Hasta: {}",
+        log.info("🚫 Alojamiento desactivado temporalmente - Owner: {}, Motivo: {}, Desde: {}, Hasta: {}",
                 owner.getEmail(), reason, disabledFrom, disabledUntil);
 
         return savedDisable;
@@ -97,7 +216,6 @@ public class AccommodationTemporaryDisableService {
         // Reactivar
         disable.setIsActive(false);
         disable.setUpdatedAt(LocalDateTime.now());
-
         AccommodationTemporaryDisable updatedDisable = disableRepository.save(disable);
 
         Owner owner = ownerRepository.findById(ownerId).orElse(null);

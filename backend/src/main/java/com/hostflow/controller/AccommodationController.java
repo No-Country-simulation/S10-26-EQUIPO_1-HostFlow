@@ -3,8 +3,6 @@ package com.hostflow.controller;
 import com.hostflow.dto.request.AccommodationDisableRequest;
 import com.hostflow.dto.response.AccommodationDisableResponse;
 import com.hostflow.model.AccommodationTemporaryDisable;
-import com.hostflow.model.Owner;
-import com.hostflow.repository.OwnerRepository;
 import com.hostflow.service.AccommodationTemporaryDisableService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -20,13 +18,20 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Controlador REST para la gestión de alojamientos por parte de los propietarios.
  *
  * <p>Permite a los dueños gestionar la disponibilidad temporal de su alojamiento
  * (desactivar por remodelación, mantenimiento, vacaciones, etc.).</p>
+ *
+ * <p><strong>🆕 Mejora de arquitectura (v2.0):</strong></p>
+ * <ul>
+ *   <li>Se eliminó la inyección directa de {@code OwnerRepository}.</li>
+ *   <li>El controlador ahora solo extrae el email del usuario autenticado
+ *       y lo delega al servicio, manteniendo la separación de responsabilidades.</li>
+ *   <li>Se eliminó el método privado {@code getCurrentOwnerId()} que consultaba la BD.</li>
+ * </ul>
  *
  * <p><strong>Seguridad:</strong> Todos los endpoints requieren autenticación
  * y el rol {@code ROLE_OWNER}. Cada owner solo puede gestionar SU PROPIO alojamiento.</p>
@@ -42,14 +47,26 @@ import java.util.stream.Collectors;
 @SecurityRequirement(name = "Bearer Authentication")
 public class AccommodationController {
 
+    // =========================================================================
+    // DEPENDENCIAS INYECTADAS
+    // =========================================================================
+
+    /**
+     * Servicio que encapsula toda la lógica de negocio relacionada con
+     * la desactivación temporal de alojamientos.
+     *
+     * <p>El servicio se encarga de resolver el Owner a partir del email,
+     * evitando que este controlador necesite inyectar repositorios directamente.</p>
+     */
     private final AccommodationTemporaryDisableService disableService;
 
-    /**  Repositorio para obtener el ID del owner autenticado */
-    private final OwnerRepository ownerRepository;
+    // =========================================================================
+    // ENDPOINTS
+    // =========================================================================
 
-    // =========================================================================
-    // DESACTIVAR ALOJAMIENTO
-    // =========================================================================
+    // --------------------------------------------------------------------------
+    // 1. DESACTIVAR ALOJAMIENTO
+    // --------------------------------------------------------------------------
 
     /**
      * Desactiva temporalmente el alojamiento del owner autenticado.
@@ -68,7 +85,6 @@ public class AccommodationController {
                     - Mantenimiento
                     - Vacaciones
                     - Cierre temporal
-                    
                     El alojamiento no estará disponible para reservas durante el período especificado.
                     Solo afecta al alojamiento del owner autenticado.
                     """
@@ -84,10 +100,13 @@ public class AccommodationController {
             @Valid @RequestBody AccommodationDisableRequest request,
             Authentication authentication) {
 
-        Long ownerId = getCurrentOwnerId(authentication);
+        // ✅ Extraer email del usuario autenticado (sin consultar BD)
+        String ownerEmail = authentication.getName();
+        log.debug("🔒 Solicitando desactivación de alojamiento para email: {}", ownerEmail);
 
-        AccommodationTemporaryDisable disable = disableService.disableAccommodation(
-                ownerId,
+        // ✅ Delegar toda la lógica al servicio
+        AccommodationTemporaryDisable disable = disableService.disableAccommodationByEmail(
+                ownerEmail,
                 request.getReason(),
                 request.getDisabledFrom(),
                 request.getDisabledUntil()
@@ -96,9 +115,9 @@ public class AccommodationController {
         return ResponseEntity.status(201).body(mapToResponse(disable));
     }
 
-    // =========================================================================
-    // REACTIVAR ALOJAMIENTO
-    // =========================================================================
+    // --------------------------------------------------------------------------
+    // 2. REACTIVAR ALOJAMIENTO
+    // --------------------------------------------------------------------------
 
     /**
      * Reactiva el alojamiento del owner autenticado.
@@ -116,16 +135,17 @@ public class AccommodationController {
             @ApiResponse(responseCode = "403", description = "Sin permisos de owner")
     })
     public ResponseEntity<AccommodationDisableResponse> enableAccommodation(Authentication authentication) {
-        Long ownerId = getCurrentOwnerId(authentication);
 
-        AccommodationTemporaryDisable disable = disableService.enableAccommodation(ownerId);
+        String ownerEmail = authentication.getName();
+        log.debug("🔓 Solicitando reactivación de alojamiento para email: {}", ownerEmail);
 
+        AccommodationTemporaryDisable disable = disableService.enableAccommodationByEmail(ownerEmail);
         return ResponseEntity.ok(mapToResponse(disable));
     }
 
-    // =========================================================================
-    // CONSULTAR ESTADO
-    // =========================================================================
+    // --------------------------------------------------------------------------
+    // 3. CONSULTAR ESTADO
+    // --------------------------------------------------------------------------
 
     /**
      * Obtiene el estado actual de desactivación del alojamiento.
@@ -142,20 +162,20 @@ public class AccommodationController {
             @ApiResponse(responseCode = "403", description = "Sin permisos de owner")
     })
     public ResponseEntity<AccommodationDisableResponse> getAccommodationStatus(Authentication authentication) {
-        Long ownerId = getCurrentOwnerId(authentication);
 
-        AccommodationTemporaryDisable disable = disableService.getActiveDisable(ownerId);
+        String ownerEmail = authentication.getName();
+        log.debug("📊 Consultando estado de alojamiento para email: {}", ownerEmail);
 
+        AccommodationTemporaryDisable disable = disableService.getActiveDisableByEmail(ownerEmail);
         if (disable == null) {
             return ResponseEntity.ok(null);
         }
-
         return ResponseEntity.ok(mapToResponse(disable));
     }
 
-    // =========================================================================
-    // HISTORIAL
-    // =========================================================================
+    // --------------------------------------------------------------------------
+    // 4. HISTORIAL
+    // --------------------------------------------------------------------------
 
     /**
      * Obtiene el historial de desactivaciones del alojamiento.
@@ -172,20 +192,21 @@ public class AccommodationController {
             @ApiResponse(responseCode = "403", description = "Sin permisos de owner")
     })
     public ResponseEntity<List<AccommodationDisableResponse>> getAccommodationHistory(Authentication authentication) {
-        Long ownerId = getCurrentOwnerId(authentication);
 
-        List<AccommodationTemporaryDisable> history = disableService.getDisableHistory(ownerId);
+        String ownerEmail = authentication.getName();
+        log.debug("📜 Obteniendo historial de desactivaciones para email: {}", ownerEmail);
 
+        List<AccommodationTemporaryDisable> history = disableService.getDisableHistoryByEmail(ownerEmail);
         List<AccommodationDisableResponse> responses = history.stream()
                 .map(this::mapToResponse)
-                .collect(Collectors.toList());
+                .toList();
 
         return ResponseEntity.ok(responses);
     }
 
-    // =========================================================================
-    // DISPONIBILIDAD EN FECHA
-    // =========================================================================
+    // --------------------------------------------------------------------------
+    // 5. DISPONIBILIDAD EN FECHA
+    // --------------------------------------------------------------------------
 
     /**
      * Verifica si el alojamiento está disponible en una fecha específica.
@@ -205,9 +226,10 @@ public class AccommodationController {
             @RequestParam java.time.LocalDateTime date,
             Authentication authentication) {
 
-        Long ownerId = getCurrentOwnerId(authentication);
-        boolean isAvailable = disableService.isAccommodationAvailable(ownerId, date);
+        String ownerEmail = authentication.getName();
+        log.debug("📅 Verificando disponibilidad para email: {} en fecha: {}", ownerEmail, date);
 
+        boolean isAvailable = disableService.isAccommodationAvailableByEmail(ownerEmail, date);
         return ResponseEntity.ok(isAvailable);
     }
 
@@ -216,41 +238,10 @@ public class AccommodationController {
     // =========================================================================
 
     /**
-     * 🆕 Obtiene el ID del owner actualmente autenticado.
+     * Mapea la entidad {@link AccommodationTemporaryDisable} a su DTO de respuesta.
      *
-     * <p>Extrae el email del usuario autenticado desde el contexto de seguridad
-     * de Spring Security (que proviene del token JWT) y busca el owner correspondiente
-     * en la base de datos.</p>
-     *
-     * <p><strong>Flujo:</strong></p>
-     * <ol>
-     *   <li>El token JWT contiene el email del usuario en el campo "sub" (subject)</li>
-     *   <li>Spring Security lo expone a través de {@code authentication.getName()}</li>
-     *   <li>Buscamos el owner por ese email en la base de datos</li>
-     *   <li>Retornamos su ID para usarlo en las operaciones</li>
-     * </ol>
-     *
-     * @param authentication el contexto de autenticación de Spring Security
-     * @return el ID del owner autenticado
-     * @throws RuntimeException si no se encuentra el owner (no debería ocurrir si está autenticado)
-     */
-    private Long getCurrentOwnerId(Authentication authentication) {
-        // El email del usuario autenticado (extraído del token JWT)
-        String email = authentication.getName();
-
-        log.debug("🔍 Obteniendo owner ID para email: {}", email);
-
-        Owner owner = ownerRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException(
-                        "No se encontró el owner asociado al email autenticado: " + email));
-
-        log.debug("✅ Owner ID obtenido: {} (email: {})", owner.getId(), email);
-
-        return owner.getId();
-    }
-
-    /**
-     * Mapea la entidad a DTO de respuesta.
+     * @param disable la entidad a mapear
+     * @return el DTO de respuesta
      */
     private AccommodationDisableResponse mapToResponse(AccommodationTemporaryDisable disable) {
         return AccommodationDisableResponse.builder()
