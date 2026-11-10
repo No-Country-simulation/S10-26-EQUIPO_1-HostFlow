@@ -303,36 +303,32 @@ public class AdditionalServiceService {
     // =========================================================================
 
     /**
-     * Construye el DTO de respuesta con precios convertidos a todas las monedas habilitadas.
+     * Construye el DTO de respuesta con precio en moneda base (siempre) y
+     * equivalencias informativas en otras monedas cuando hay tasa disponible.
      *
-     * <p><strong>Manejo tolerante a fallos:</strong> Si la conversión de una moneda falla,
-     * simplemente se omite esa moneda en lugar de lanzar una excepción que cause rollback.</p>
-     *
-     * @param acc el alojamiento al que pertenece el servicio
-     * @param s   el servicio adicional a mapear
-     * @return el DTO completo con precios convertidos e imágenes
+     * <p>Usa {@code convertIfAvailable} (no lanza ni marca rollback) en lugar de
+     * {@code convert}, para que un USD/EUR no configurado no rompa el listado.</p>
      */
     private AdditionalServiceResponse toResponse(Accommodation acc, AdditionalService s) {
         List<ConvertedPriceResponse> converted = new ArrayList<>();
 
-        // Precio en la moneda base (siempre incluido)
-        converted.add(ConvertedPriceResponse.of(acc.getBaseCurrency(), s.getBasePrice()));
+        // Siempre: precio en moneda base (ARS u otra configurada en el alojamiento)
+        Currency base = acc.getBaseCurrency() != null ? acc.getBaseCurrency() : Currency.ARS;
+        converted.add(ConvertedPriceResponse.of(base, s.getBasePrice()));
 
-        // Precios en las demás monedas habilitadas (USD, EUR)
+        // Equivalencias informativas: no exigen AcceptedCurrency del alojamiento
         for (Currency c : Currency.values()) {
-            if (c == acc.getBaseCurrency()) continue;
-
-            try {
-                BigDecimal convertedPrice = conversionService.convert(acc.getId(), s.getBasePrice(), c);
-                if (convertedPrice != null) {
-                    converted.add(ConvertedPriceResponse.of(c, convertedPrice));
-                }
-            } catch (RuntimeException e) {
-                log.debug("⚠️ No se pudo convertir a {}: {}", c, e.getMessage());
+            if (c == base) {
+                continue;
+            }
+            BigDecimal convertedPrice = conversionService.convertIfAvailable(
+                    acc.getId(), s.getBasePrice(), c);
+            if (convertedPrice != null) {
+                converted.add(ConvertedPriceResponse.of(c, convertedPrice));
             }
         }
 
-        return AdditionalServiceResponse.from(s, acc.getBaseCurrency(), converted);
+        return AdditionalServiceResponse.from(s, base, converted);
     }
 
     /**
