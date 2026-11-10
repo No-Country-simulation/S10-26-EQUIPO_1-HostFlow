@@ -178,7 +178,8 @@ public class SecurityConfig {
                 "http://localhost:4200",
                 "http://localhost:8080",      // Swagger UI
                 "http://127.0.0.1:3000",
-                "http://127.0.0.1:8080"
+                "http://127.0.0.1:8080",
+                "https://hostflow-deploy.vercel.app"
         ));
 
         // Métodos HTTP permitidos
@@ -200,7 +201,8 @@ public class SecurityConfig {
         // Headers expuestos al cliente en la respuesta
         configuration.setExposedHeaders(List.of(
                 "Access-Control-Allow-Origin",
-                "Access-Control-Allow-Credentials"
+                "Access-Control-Allow-Credentials",
+                "Authorization"
         ));
 
         // Permitir credenciales (cookies, tokens de autorización)
