@@ -1,39 +1,85 @@
 package com.hostflow.service;
 
 import com.hostflow.dto.request.AccommodationPaymentMethodRequest;
+import com.hostflow.dto.response.AccommodationPaymentMethodResponse;
+import com.hostflow.enums.PaymentMethodType;
 import com.hostflow.exception.BusinessException;
 import com.hostflow.exception.ResourceNotFoundException;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.AccommodationPaymentMethod;
-import com.hostflow.enums.PaymentMethodType;
+import com.hostflow.model.Owner;
 import com.hostflow.repository.AccommodationPaymentMethodRepository;
 import com.hostflow.repository.AccommodationRepository;
+import com.hostflow.repository.OwnerRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AccommodationPaymentMethodService {
+
     private final AccommodationRepository accommodationRepository;
     private final AccommodationPaymentMethodRepository paymentMethodRepository;
+    private final OwnerRepository ownerRepository;
+    private final EmailService emailService;
 
+    // =========================================================================
+    // MÉTODOS PÚBLICOS QUE ACEPTAN EMAIL
+    // =========================================================================
     @Transactional(readOnly = true)
-    public List<AccommodationPaymentMethod> list(Long ownerId) {
-        Accommodation accommodation = getAccommodation(ownerId);
-        return paymentMethodRepository.findAllByAccommodation_IdOrderByDefaultMethodDescCreatedAtAscIdAsc(accommodation.getId());
+    public List<AccommodationPaymentMethodResponse> listByEmail(String ownerEmail) {
+        Long ownerId = getAccommodationByEmail(ownerEmail).getOwner().getId();
+        return list(ownerId);
     }
 
     @Transactional
-    public AccommodationPaymentMethod create(Long ownerId, AccommodationPaymentMethodRequest request) {
+    public AccommodationPaymentMethodResponse createByEmail(String ownerEmail, AccommodationPaymentMethodRequest request) {
+        Long ownerId = getAccommodationByEmail(ownerEmail).getOwner().getId();
+        return create(ownerId, request);
+    }
+
+    @Transactional
+    public AccommodationPaymentMethodResponse updateByEmail(String ownerEmail, Long methodId, AccommodationPaymentMethodRequest request) {
+        Long ownerId = getAccommodationByEmail(ownerEmail).getOwner().getId();
+        return update(ownerId, methodId, request);
+    }
+
+    @Transactional
+    public void deleteByEmail(String ownerEmail, Long methodId) {
+        Long ownerId = getAccommodationByEmail(ownerEmail).getOwner().getId();
+        delete(ownerId, methodId);
+    }
+
+    // =========================================================================
+    // MÉTODOS ORIGINALES (Retornan DTOs)
+    // =========================================================================
+    @Transactional(readOnly = true)
+    public List<AccommodationPaymentMethodResponse> list(Long ownerId) {
+        Accommodation accommodation = getAccommodation(ownerId);
+        return paymentMethodRepository.findAllByAccommodation_IdOrderByDefaultMethodDescCreatedAtAscIdAsc(
+                        accommodation.getId()).stream()
+                .map(AccommodationPaymentMethodResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public AccommodationPaymentMethodResponse create(Long ownerId, AccommodationPaymentMethodRequest request) {
         if (request.getPaymentType() == null || request.getDisplayName() == null || request.getDisplayName().isBlank()) {
             throw new BusinessException("paymentType y displayName son obligatorios.");
         }
+
         Accommodation accommodation = getAccommodation(ownerId);
         boolean makeDefault = Boolean.TRUE.equals(request.getIsDefault())
                 || !paymentMethodRepository.existsByAccommodation_IdAndDefaultMethodTrue(accommodation.getId());
-        if (makeDefault) paymentMethodRepository.clearDefaultForAccommodation(accommodation.getId());
+
+        if (makeDefault) {
+            paymentMethodRepository.clearDefaultForAccommodation(accommodation.getId());
+        }
 
         AccommodationPaymentMethod method = new AccommodationPaymentMethod();
         method.setAccommodation(accommodation);
@@ -42,25 +88,38 @@ public class AccommodationPaymentMethodService {
         applyOptionalFields(method, request);
         method.setDefault(makeDefault);
         method.setActive(request.getIsActive() == null || request.getIsActive());
+
         validateRequiredFieldsByType(method);
-        return paymentMethodRepository.save(method);
+
+        AccommodationPaymentMethod saved = paymentMethodRepository.save(method);
+        log.info("💳 Método de pago creado: '{}' ({}) para alojamiento '{}' (ID: {})",
+                saved.getDisplayName(), saved.getPaymentType(), accommodation.getName(), accommodation.getId());
+
+        sendPaymentMethodCreatedEmail(accommodation, saved);
+        return AccommodationPaymentMethodResponse.from(saved);
     }
 
     @Transactional
-    public AccommodationPaymentMethod update(Long ownerId, Long methodId, AccommodationPaymentMethodRequest request) {
-        if (isEmptyPatch(request)) throw new BusinessException("Debe enviar al menos un campo para actualizar.");
+    public AccommodationPaymentMethodResponse update(Long ownerId, Long methodId, AccommodationPaymentMethodRequest request) {
+        if (isEmptyPatch(request)) {
+            throw new BusinessException("Debe enviar al menos un campo para actualizar.");
+        }
+
         Accommodation accommodation = getAccommodation(ownerId);
         AccommodationPaymentMethod method = paymentMethodRepository.findByIdAndAccommodation_Id(methodId, accommodation.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontró ese método de pago en tu alojamiento."));
+
         if (request.getDisplayName() != null && request.getDisplayName().isBlank()) {
             throw new BusinessException("displayName no puede estar vacío.");
         }
+
         if (Boolean.TRUE.equals(request.getIsDefault())) {
             paymentMethodRepository.clearDefaultForAccommodation(accommodation.getId());
             method.setDefault(true);
         } else if (Boolean.FALSE.equals(request.getIsDefault())) {
             method.setDefault(false);
         }
+
         if (request.getPaymentType() != null) method.setPaymentType(request.getPaymentType());
         if (request.getDisplayName() != null) method.setDisplayName(request.getDisplayName().trim());
         if (request.getProviderName() != null) method.setProviderName(blankToNull(request.getProviderName()));
@@ -76,8 +135,11 @@ public class AccommodationPaymentMethodService {
         if (request.getWalletEmail() != null) method.setWalletEmail(blankToNull(request.getWalletEmail()));
         if (request.getInstructions() != null) method.setInstructions(blankToNull(request.getInstructions()));
         if (request.getIsActive() != null) method.setActive(request.getIsActive());
+
         validateRequiredFieldsByType(method);
-        return paymentMethodRepository.save(method);
+
+        AccommodationPaymentMethod saved = paymentMethodRepository.save(method);
+        return AccommodationPaymentMethodResponse.from(saved);
     }
 
     @Transactional
@@ -85,8 +147,10 @@ public class AccommodationPaymentMethodService {
         Accommodation accommodation = getAccommodation(ownerId);
         AccommodationPaymentMethod method = paymentMethodRepository.findByIdAndAccommodation_Id(methodId, accommodation.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontró ese método de pago en tu alojamiento."));
+
         boolean wasDefault = method.isDefault();
         paymentMethodRepository.delete(method);
+
         if (wasDefault) {
             List<AccommodationPaymentMethod> remaining = paymentMethodRepository
                     .findAllByAccommodation_IdOrderByDefaultMethodDescCreatedAtAscIdAsc(accommodation.getId());
@@ -94,8 +158,32 @@ public class AccommodationPaymentMethodService {
                 AccommodationPaymentMethod nextDefault = remaining.get(0);
                 nextDefault.setDefault(true);
                 paymentMethodRepository.save(nextDefault);
+                log.info("🔄 Nuevo método predeterminado asignado: '{}' (ID: {})", nextDefault.getDisplayName(), nextDefault.getId());
             }
         }
+        log.info("🗑️ Método de pago eliminado: '{}' (ID: {}) del alojamiento '{}'", method.getDisplayName(), methodId, accommodation.getName());
+    }
+
+    // =========================================================================
+    // MÉTODOS AUXILIARES PRIVADOS
+    // =========================================================================
+    private void sendPaymentMethodCreatedEmail(Accommodation accommodation, AccommodationPaymentMethod method) {
+        try {
+            Owner owner = accommodation.getOwner();
+            emailService.sendPaymentMethodCreatedEmail(
+                    owner.getEmail(), owner.getFullName(), accommodation.getName(),
+                    method.getDisplayName(), method.getPaymentType().name(), method.isDefault()
+            );
+        } catch (Exception e) {
+            log.error("⚠️ No se pudo enviar el email de confirmación de método de pago: {}", e.getMessage(), e);
+        }
+    }
+
+    private Accommodation getAccommodationByEmail(String ownerEmail) {
+        Owner owner = ownerRepository.findByEmail(ownerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("No se encontró el propietario con email: " + ownerEmail));
+        return accommodationRepository.findByOwner_Id(owner.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Registra primero los datos generales del alojamiento."));
     }
 
     private Accommodation getAccommodation(Long ownerId) {
@@ -126,10 +214,6 @@ public class AccommodationPaymentMethodService {
         m.setInstructions(blankToNull(r.getInstructions()));
     }
 
-    /**
-     * Valida los datos obligatorios según el tipo del método de pago.
-     * Se ejecuta después de aplicar los campos para que PATCH valide el estado final.
-     */
     private void validateRequiredFieldsByType(AccommodationPaymentMethod method) {
         if (method.getPaymentType() == PaymentMethodType.BANK_TRANSFER) {
             requireField(method.getBankName(), "bankName", "BANK_TRANSFER");
@@ -159,5 +243,7 @@ public class AccommodationPaymentMethodService {
         return email != null && email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     }
 
-    private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
 }

@@ -18,6 +18,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Controlador REST para las operaciones de autenticación en HostFlow.
  *
@@ -32,6 +35,8 @@ import org.springframework.web.bind.annotation.*;
  *   <li>{@code POST /auth/login} - Inicio de sesión</li>
  *   <li>{@code POST /auth/forgot-password} - Solicitar código de recuperación</li>
  *   <li>{@code POST /auth/reset-password} - Restablecer contraseña con código</li>
+ *   <li>{@code GET /auth/verify-email} - Verificar correo electrónico</li>
+ *   <li>{@code POST /auth/resend-verification} - Reenviar enlace de verificación</li>
  * </ul>
  *
  * <p>Este controlador maneja todas las operaciones relacionadas con
@@ -39,7 +44,7 @@ import org.springframework.web.bind.annotation.*;
  * recuperación de acceso cuando el usuario olvida sus credenciales.</p>
  *
  * @author HostFlow Team
- * @version 1.1.0
+ * @version 1.2.0
  */
 @RestController
 @RequestMapping("/auth")
@@ -90,17 +95,15 @@ public class AuthController {
     @Operation(
             summary = "Registrar nuevo dueño de alojamiento",
             description = """
-            Registra un nuevo dueño de alojamiento en HostFlow.
-            
-            Los datos requeridos son:
-            - Nombre y apellido del dueño
-            - Nombre del alojamiento
-            - Correo electrónico (debe ser único)
-            - Contraseña (mínimo 8 caracteres)
-            - Aceptación de términos y política de privacidad
-            
-            Retorna un token JWT para autenticación en peticiones posteriores.
-            """
+                    Registra un nuevo dueño de alojamiento en HostFlow.
+                    Los datos requeridos son:
+                    - Nombre y apellido del dueño
+                    - Nombre del alojamiento
+                    - Correo electrónico (debe ser único)
+                    - Contraseña (mínimo 8 caracteres)
+                    - Aceptación de términos y política de privacidad
+                    Retorna un token JWT para autenticación en peticiones posteriores.
+                    """
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Registro exitoso"),
@@ -109,9 +112,7 @@ public class AuthController {
     })
     public ResponseEntity<AuthResponse> registerOwner(
             @Valid @RequestBody OwnerRegisterRequest request) {
-
         AuthResponse response = authService.registerOwner(request);
-
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -145,15 +146,13 @@ public class AuthController {
     @Operation(
             summary = "Iniciar sesión",
             description = """
-            Autentica a un usuario existente en HostFlow.
-            
-            Requiere:
-            - Correo electrónico registrado
-            - Contraseña válida
-            
-            Retorna un token JWT para autenticación en peticiones posteriores.
-            El token debe enviarse en el header: Authorization: Bearer <token>
-            """
+                    Autentica a un usuario existente en HostFlow.
+                    Requiere:
+                    - Correo electrónico registrado
+                    - Contraseña válida
+                    Retorna un token JWT para autenticación en peticiones posteriores.
+                    El token debe enviarse en el header: Authorization: Bearer <token>
+                    """
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Autenticación exitosa"),
@@ -163,9 +162,7 @@ public class AuthController {
     })
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest request) {
-
         AuthResponse response = authService.login(request);
-
         return ResponseEntity.ok(response);
     }
 
@@ -212,21 +209,18 @@ public class AuthController {
     @Operation(
             summary = "Solicitar recuperación de contraseña",
             description = """
-            Solicita el envío de un código de recuperación de contraseña.
-            
-            El código de 6 dígitos se enviará al correo electrónico proporcionado.
-            El código expira en 60 minutos y es de un solo uso.
-            
-            Por seguridad, siempre retorna éxito incluso si el email no está registrado.
-            Esto previene ataques de enumeración de usuarios.
-            
-            Flujo:
-            1. Usuario ingresa su correo electrónico
-            2. Sistema genera código de 6 dígitos
-            3. Código se envía por email
-            4. Usuario ingresa código en el frontend
-            5. Usuario establece nueva contraseña
-            """
+                    Solicita el envío de un código de recuperación de contraseña.
+                    El código de 6 dígitos se enviará al correo electrónico proporcionado.
+                    El código expira en 60 minutos y es de un solo uso.
+                    Por seguridad, siempre retorna éxito incluso si el email no está registrado.
+                    Esto previene ataques de enumeración de usuarios.
+                    Flujo:
+                    1. Usuario ingresa su correo electrónico
+                    2. Sistema genera código de 6 dígitos
+                    3. Código se envía por email
+                    4. Usuario ingresa código en el frontend
+                    5. Usuario establece nueva contraseña
+                    """
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Código enviado exitosamente (o email no registrado)"),
@@ -235,10 +229,8 @@ public class AuthController {
     })
     public ResponseEntity<PasswordResetService.PasswordResetRequestResponse> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
-
         PasswordResetService.PasswordResetRequestResponse response =
                 passwordResetService.forgotPassword(request);
-
         return ResponseEntity.ok(response);
     }
 
@@ -291,24 +283,21 @@ public class AuthController {
     @Operation(
             summary = "Restablecer contraseña con código de recuperación",
             description = """
-            Restablece la contraseña utilizando el código de recuperación recibido por email.
-            
-            Requiere:
-            - Correo electrónico registrado
-            - Código de recuperación de 6 dígitos (recibido por email)
-            - Nueva contraseña (mínimo 8 caracteres)
-            
-            El código es de un solo uso y expira en 60 minutos.
-            Después del restablecimiento exitoso, el usuario puede iniciar sesión
-            con la nueva contraseña.
-            
-            Flujo:
-            1. Usuario recibe código por email (6 dígitos)
-            2. Usuario ingresa código + nueva contraseña
-            3. Sistema valida código y actualiza contraseña
-            4. Usuario recibe confirmación por email
-            5. Usuario puede iniciar sesión con nueva contraseña
-            """
+                    Restablece la contraseña utilizando el código de recuperación recibido por email.
+                    Requiere:
+                    - Correo electrónico registrado
+                    - Código de recuperación de 6 dígitos (recibido por email)
+                    - Nueva contraseña (mínimo 8 caracteres)
+                    El código es de un solo uso y expira en 60 minutos.
+                    Después del restablecimiento exitoso, el usuario puede iniciar sesión
+                    con la nueva contraseña.
+                    Flujo:
+                    1. Usuario recibe código por email (6 dígitos)
+                    2. Usuario ingresa código + nueva contraseña
+                    3. Sistema valida código y actualiza contraseña
+                    4. Usuario recibe confirmación por email
+                    5. Usuario puede iniciar sesión con nueva contraseña
+                    """
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Contraseña actualizada exitosamente"),
@@ -318,8 +307,122 @@ public class AuthController {
     })
     public ResponseEntity<PasswordResetResponse> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
-
         PasswordResetResponse response = passwordResetService.resetPassword(request);
+        return ResponseEntity.ok(response);
+    }
+
+    // =========================================================================
+    // VERIFICACIÓN DE CORREO ELECTRÓNICO
+    // =========================================================================
+
+    /**
+     * Verifica el correo electrónico del usuario utilizando el token de verificación.
+     *
+     * <p>Este endpoint es público y no requiere autenticación.
+     * El usuario hace clic en el enlace recibido por email y es redirigido
+     * a este endpoint (o al frontend que llama a este endpoint).</p>
+     *
+     * <p>Flujo de verificación:</p>
+     * <ol>
+     *   <li>El usuario recibe el correo con el enlace de verificación.</li>
+     *   <li>Hace clic en el enlace (contiene el token como parámetro).</li>
+     *   <li>El frontend/backend llama a este endpoint con el token.</li>
+     *   <li>El sistema valida el token (existencia, expiración, uso único).</li>
+     *   <li>Si es válido, marca la cuenta como verificada.</li>
+     *   <li>Retorna mensaje de éxito o error según el caso.</li>
+     * </ol>
+     *
+     * <p>Ejemplo de uso:</p>
+     * <ul>
+     *   <li>URL: {@code /auth/verify-email?token=a1b2c3d4-e5f6-7890-abcd-ef1234567890}</li>
+     *   <li>Método: GET</li>
+     *   <li>Respuesta: Mensaje de confirmación o error</li>
+     * </ul>
+     *
+     * @param token el token UUID de verificación recibido por email
+     * @return respuesta HTTP 200 con mensaje de confirmación
+     */
+    @GetMapping("/verify-email")
+    @Operation(
+            summary = "Verificar correo electrónico",
+            description = """
+                    Verifica el correo electrónico del usuario utilizando el token de verificación.
+                    El token se recibe como parámetro en la URL (query parameter).
+                    
+                    Flujo:
+                    1. Usuario se registra en la plataforma
+                    2. Recibe correo con enlace de verificación
+                    3. Hace clic en el enlace (contiene el token)
+                    4. Sistema valida el token y activa la cuenta
+                    5. Usuario puede iniciar sesión
+                    
+                    El token es de un solo uso y expira en 1 hora.
+                    """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Correo verificado exitosamente"),
+            @ApiResponse(responseCode = "400", description = "Token inválido, expirado o ya utilizado"),
+            @ApiResponse(responseCode = "500", description = "Error interno del servidor")
+    })
+    public ResponseEntity<Map<String, String>> verifyEmail(@RequestParam String token) {
+        String message = authService.verifyEmail(token);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", message);
+        response.put("success", "true");
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Reenvía el enlace de verificación de correo electrónico.
+     *
+     * <p>Este endpoint es público y no requiere autenticación.
+     * Se utiliza cuando el usuario no recibió el correo original
+     * o el enlace expiró.</p>
+     *
+     * <p><strong>Nota de seguridad:</strong> Siempre retorna éxito incluso
+     * si el email no está registrado, para prevenir ataques de enumeración
+     * de usuarios.</p>
+     *
+     * <p>Flujo de reenvío:</p>
+     * <ol>
+     *   <li>Usuario ingresa su correo electrónico.</li>
+     *   <li>Sistema busca al usuario.</li>
+     *   <li>Si existe y no está verificado, invalida tokens anteriores.</li>
+     *   <li>Genera un nuevo token de verificación.</li>
+     *   <li>Envía nuevo correo con el enlace.</li>
+     *   <li>Retorna confirmación (genérica por seguridad).</li>
+     * </ol>
+     *
+     * @param email el correo electrónico del usuario
+     * @return respuesta HTTP 200 con confirmación
+     */
+    @PostMapping("/resend-verification")
+    @Operation(
+            summary = "Reenviar enlace de verificación",
+            description = """
+                    Reenvía el enlace de verificación de correo electrónico.
+                    Se utiliza cuando el usuario no recibió el correo original
+                    o el enlace expiró.
+                    
+                    Por seguridad, siempre retorna éxito incluso si el email
+                    no está registrado. Esto previene ataques de enumeración.
+                    
+                    El nuevo enlace expirará en 1 hora.
+                    """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Enlace reenviado exitosamente (o email no registrado)"),
+            @ApiResponse(responseCode = "400", description = "Email inválido o formato incorrecto"),
+            @ApiResponse(responseCode = "500", description = "Error interno del servidor")
+    })
+    public ResponseEntity<Map<String, String>> resendVerification(@RequestParam String email) {
+        String message = authService.resendEmailVerification(email);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", message);
+        response.put("success", "true");
 
         return ResponseEntity.ok(response);
     }

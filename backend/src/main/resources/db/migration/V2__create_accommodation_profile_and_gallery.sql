@@ -1,3 +1,6 @@
+-- HostFlow: perfil general del alojamiento y galería de imágenes.
+-- La tabla accommodations es independiente de accommodation_temporary_disables:
+-- editar datos del perfil no activa ni desactiva la disponibilidad.
 -- HostFlow: esquema base de propietarios, roles, perfil del alojamiento y galería.
 -- Las tablas owners/roles/owner_roles deben existir antes de crear la FK de accommodations.
 -- IF NOT EXISTS permite trabajar sobre una BD donde Hibernate ya creó estas tablas,

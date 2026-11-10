@@ -26,6 +26,30 @@ CREATE INDEX IF NOT EXISTS idx_payment_methods_accommodation
 CREATE UNIQUE INDEX IF NOT EXISTS uk_payment_methods_one_default_per_accommodation
     ON accommodation_payment_methods(accommodation_id) WHERE is_default = TRUE;
 
+/*-- Migra datos bancarios heredados a un método por alojamiento, si hay alguno informado.
+INSERT INTO accommodation_payment_methods (
+    accommodation_id, payment_type, display_name, provider_name, bank_name,
+    account_holder, account_number, cbu_cvu, alias, tax_id,
+    is_default, is_active, created_at, updated_at
+)
+SELECT a.id,
+       CASE WHEN a.bank_name ILIKE '%mercado pago%' OR a.bank_name ILIKE '%uala%'
+            THEN 'DIGITAL_WALLET' ELSE 'BANK_TRANSFER' END,
+       COALESCE(NULLIF(BTRIM(a.bank_name), ''), 'Cuenta bancaria'),
+       a.bank_name, a.bank_name, a.bank_account_holder, a.bank_account_number,
+       a.bank_cbu_cvu, a.bank_alias, a.bank_cuit,
+       TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM accommodations a
+WHERE a.bank_name IS NOT NULL OR a.bank_account_holder IS NOT NULL
+   OR a.bank_account_number IS NOT NULL OR a.bank_cbu_cvu IS NOT NULL
+   OR a.bank_alias IS NOT NULL OR a.bank_cuit IS NOT NULL;
+
+ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_name;
+ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_account_holder;
+ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_account_number;
+ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_cbu_cvu;
+ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_alias;
+ALTER TABLE accommodations DROP COLUMN IF EXISTS bank_cuit;*/
 -- La estructura heredada puede variar entre bases creadas con distintas versiones de JPA/SQL.
 -- Solo migramos y eliminamos las columnas bancarias cuando están presentes TODAS.
 -- Si el esquema es parcial, conservamos las columnas y sus datos para revisión manual.
