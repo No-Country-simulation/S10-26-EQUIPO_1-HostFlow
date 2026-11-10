@@ -9,10 +9,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * DTO de respuesta que representa una reserva completa con toda su información.
+ * DTO de respuesta con la información de una reserva.
+ *
+ * <p>El estado operativo y el estado de pago son independientes.
+ * No incluye método de pago del huésped (fuera de alcance).</p>
  *
  * @author HostFlow Team
- * @version 1.1.0 (Documentación alineada al contrato: pago separado del estado operativo)
+ * @version 2.0.0
  */
 @Schema(description = "Información completa de una reserva")
 public record ReservationResponse(
@@ -47,16 +50,16 @@ public record ReservationResponse(
         @Schema(description = "Número de noches", example = "3")
         Integer nights,
 
-        @Schema(description = "Precio por noche", example = "85000.00")
+        @Schema(description = "Precio por noche")
         BigDecimal pricePerNight,
 
-        @Schema(description = "Subtotal", example = "255000.00")
+        @Schema(description = "Subtotal (noches × precio)")
         BigDecimal subtotal,
 
-        @Schema(description = "Impuestos", example = "25500.00")
+        @Schema(description = "Impuestos (si aplica)", example = "0")
         BigDecimal taxes,
 
-        @Schema(description = "Monto total", example = "280500.00")
+        @Schema(description = "Importe total")
         BigDecimal totalAmount,
 
         @Schema(description = "Estado operativo de la reserva (independiente del pago). CONFIRMED = onboarding completado.", example = "PENDING")
@@ -74,10 +77,7 @@ public record ReservationResponse(
         @Schema(description = "Solicitudes especiales")
         String specialRequests,
 
-        @Schema(description = "Campo legado: siempre null. Los métodos de pago informados al huésped son los del alojamiento.", deprecated = true)
-        GuestPaymentMethodResponse paymentMethod,
-
-        @Schema(description = "Enlace de confirmación (solo si está pendiente)")
+        @Schema(description = "Enlace de onboarding (solo si aplica)")
         ReservationLinkResponse confirmationLink,
 
         @Schema(description = "Fecha de creación", example = "2026-10-29T10:30:00")
@@ -87,13 +87,6 @@ public record ReservationResponse(
         LocalDateTime updatedAt
 ) {
 
-    /**
-     * Factory method que construye el DTO desde la entidad Reservation.
-     *
-     * @param r la entidad Reservation
-     * @param link el enlace de confirmación asociado (puede ser null)
-     * @return el DTO de respuesta completo
-     */
     public static ReservationResponse from(Reservation r, ReservationLinkResponse link) {
         return new ReservationResponse(
                 r.getId(),
@@ -115,7 +108,6 @@ public record ReservationResponse(
                 r.getPaidAt(),
                 r.getGuestCount(),
                 r.getSpecialRequests(),
-                null,
                 link,
                 r.getCreatedAt(),
                 r.getUpdatedAt()

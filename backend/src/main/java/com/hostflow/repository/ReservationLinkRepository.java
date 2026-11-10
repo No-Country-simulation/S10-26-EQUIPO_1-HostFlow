@@ -41,13 +41,4 @@ public interface ReservationLinkRepository extends JpaRepository<ReservationLink
 
     Optional<ReservationLink> findFirstByReservation_IdOrderByCreatedAtDescIdDesc(Long reservationId);
 
-    /**
-     * Busca un enlace por token y valida que pertenezca a una reserva específica.
-     *
-     * @param token         el token del enlace
-     * @param reservationId ID de la reserva
-     * @return el enlace encontrado, o vacío si no coincide
-     */
-    Optional<ReservationLink> findByTokenAndReservation_Id(String token, Long reservationId);
-
 }

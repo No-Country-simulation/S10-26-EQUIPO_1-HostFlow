@@ -207,27 +207,6 @@ public class ReservationService {
     // 2. CONFIRMACIÓN DE RESERVA
     // =========================================================================
 
-    /**
-     * Confirma una reserva utilizando el enlace de confirmación recibido por el huésped.
-     * Envía notificaciones HTML personalizadas tanto al huésped como al propietario.
-     *
-     * @param token           el token del enlace de confirmación
-     * @param paymentMethodId ID del método de pago a utilizar
-     * @return la reserva confirmada
-     * @throws BusinessException si el enlace es inválido o el método de pago no es válido
-     */
-    /**
-     * Endpoint legado. La confirmación ahora requiere guardar primero los datos del onboarding,
-     * alergias, preferencias y servicios seleccionados; el antiguo contrato solo recibía un método
-     * de pago del huésped y no representa el flujo aprobado.
-     * Se conserva temporalmente la firma para no romper el controlador hasta adaptar el DTO público.
-     */
-    @Deprecated
-    @Transactional
-    public ReservationResponse confirmReservation(String token, Long paymentMethodId) {
-        throw new BusinessException("El endpoint antiguo de confirmación ya no es compatible. Debe completarse el onboarding con el nuevo contrato público.");
-    }
-
     // =========================================================================
     // 3. REACTIVACIÓN DE ENLACE
     // =========================================================================

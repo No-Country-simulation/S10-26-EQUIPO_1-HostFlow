@@ -18,7 +18,7 @@ import java.util.List;
  *   <li>Un huésped puede tener múltiples reservas en diferentes alojamientos.</li>
  *   <li>El correo es un dato de contacto y puede repetirse entre huéspedes.</li>
  *   <li>Almacena información de contacto, documento de identidad, preferencias y alergias.</li>
- *   <li>Mantiene un historial completo de reservas y métodos de pago asociados.</li>
+ *   <li>Mantiene un historial de reservas asociadas.</li>
  * </ul>
  *
  * <p><strong>Restricciones de negocio:</strong></p>
@@ -29,9 +29,8 @@ import java.util.List;
  * </ul>
  *
  * @author HostFlow Team
- * @version 3.1.0
+ * @version 3.2.0 (Sin métodos de pago del huésped — fuera de alcance)
  * @see Reservation
- * @see GuestPaymentMethod
  */
 @Entity
 @Table(name = "guests",
@@ -155,14 +154,6 @@ public class Guest {
     @OneToMany(mappedBy = "guest", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Reservation> reservations = new ArrayList<>();
-
-    /**
-     * Lista de métodos de pago registrados por este huésped.
-     * Relación bidireccional con {@link GuestPaymentMethod}.
-     */
-    @OneToMany(mappedBy = "guest", fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<GuestPaymentMethod> paymentMethods = new ArrayList<>();
 
     // =========================================================================
     // METADATOS DE AUDITORÍA

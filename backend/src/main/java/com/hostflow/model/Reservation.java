@@ -212,19 +212,4 @@ public class Reservation {
         additionalServices.add(service);
         service.setReservation(this);
     }
-
-    /*
-     * Compatibilidad temporal con consumidores existentes mientras se adapta la API.
-     * Estos campos NO se persisten y no forman parte del nuevo modelo de dominio.
-     * Deben eliminarse al actualizar ReservationService y ReservationResponse.
-     */
-    @Deprecated
-    @Transient
-    private GuestPaymentMethod paymentMethod;
-
-    @Deprecated
-    @Transient
-    public BigDecimal getTaxes() {
-        return BigDecimal.ZERO;
-    }
 }
