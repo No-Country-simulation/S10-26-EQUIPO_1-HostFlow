@@ -1,6 +1,7 @@
 package com.hostflow.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hostflow.exception.EmailDeliveryException;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.Reservation;
 import com.hostflow.enums.Currency;
@@ -34,15 +35,24 @@ import java.util.Map;
  * <ul>
  *   <li>🟢 <strong>Producción (Render):</strong> Usa la API de Brevo si la clave está configurada.</li>
  *   <li>🟡 <strong>Desarrollo (Local):</strong> Usa Gmail SMTP si Brevo no está configurado.</li>
- *   <li>🔴 <strong>Modo Fallback:</strong> Si ninguno está configurado, solo registra el contenido en los logs.</li>
+ *   <li>🔴 <strong>Modo Fallback:</strong> Si ninguno está configurado, solo registra el contenido en los logs
+ *       (modo tolerante) o falla (modo estricto).</li>
  * </ul>
  *
- * <p><strong>Política de resiliencia:</strong> Todos los métodos de envío están envueltos
- * en bloques {@code try-catch}. Si el envío de email falla, se registra el error en los logs
- * pero NO se lanza una excepción, evitando interrumpir el flujo principal de negocio.</p>
+ * <p><strong>Política de envío (Fase A — reservas):</strong></p>
+ * <ul>
+ *   <li><strong>Estricto:</strong> creación y renovación del enlace de onboarding. Si el proveedor
+ *       rechaza el mensaje o no hay proveedor configurado, se propaga
+ *       {@link com.hostflow.exception.EmailDeliveryException} para revertir la transacción.</li>
+ *   <li><strong>Tolerante:</strong> pago, cancelación, auth y métodos de pago. Los fallos se
+ *       registran en log y no interrumpen la operación de negocio.</li>
+ * </ul>
+ *
+ * <p>La aceptación del proveedor no garantiza entrega en bandeja de entrada; solo confirma
+ * que el proveedor aceptó el mensaje (Brevo HTTP 201 o SMTP sin excepción).</p>
  *
  * @author HostFlow Team
- * @version 4.3.0 (Corregido error de JSON en Brevo usando ObjectMapper de Jackson)
+ * @version 4.4.0 (Política dual estricto/tolerante para correos de reservas)
  */
 @Service
 @Slf4j
@@ -82,27 +92,57 @@ public class EmailService {
     // MOTOR HÍBRIDO DE ENVÍO DE CORREOS (NÚCLEO)
     // =========================================================================
 
+    /**
+     * Envío tolerante: fallos solo en log (comportamiento histórico para auth y notificaciones).
+     */
     private void sendHybridEmail(String to, String subject, String htmlContent, String plainTextContent) {
-        if (brevoApiKey != null && !brevoApiKey.trim().isEmpty() && brevoApiKey.startsWith("xkeysib-")) {
-            sendViaBrevo(to, subject, htmlContent != null ? htmlContent : plainTextContent);
-        } else if (mailSender != null) {
-            sendViaGmail(to, subject, htmlContent, plainTextContent);
-        } else {
-            log.warn("⚠️ MODO DESARROLLO: No se configuró ni Brevo ni Gmail. El correo NO se envió a {}", to);
-            log.info("🔗 Contenido simulado:\nAsunto: {}\n{}", subject, plainTextContent != null ? plainTextContent : htmlContent);
-        }
+        sendHybridEmail(to, subject, htmlContent, plainTextContent, false);
     }
 
     /**
-     * Implementación 1: Envío vía API REST de Brevo (Ideal para Render / Producción)
-     * ✅ Usa ObjectMapper para garantizar un JSON 100% válido, sin importar el contenido del HTML.
+     * @param strict si es true, propaga {@link EmailDeliveryException} cuando el proveedor
+     *               rechaza el mensaje o no hay proveedor configurado.
      */
-    private void sendViaBrevo(String to, String subject, String content) {
+    private void sendHybridEmail(String to, String subject, String htmlContent, String plainTextContent,
+                                 boolean strict) {
+        try {
+            if (isBrevoConfigured()) {
+                sendViaBrevo(to, subject, htmlContent != null ? htmlContent : plainTextContent, strict);
+            } else if (mailSender != null) {
+                sendViaGmail(to, subject, htmlContent, plainTextContent, strict);
+            } else {
+                log.warn("⚠️ No hay proveedor de correo configurado. El mensaje NO se envió a {}. Asunto: {}",
+                        to, subject);
+                log.info("🔗 Contenido simulado:\nAsunto: {}\n{}", subject,
+                        plainTextContent != null ? plainTextContent : htmlContent);
+                if (strict) {
+                    throw new EmailDeliveryException(
+                            "No hay proveedor de correo configurado. No se pudo enviar el enlace de la reserva.");
+                }
+            }
+        } catch (EmailDeliveryException ex) {
+            throw ex;
+        } catch (RuntimeException ex) {
+            if (strict) {
+                throw new EmailDeliveryException(
+                        "No se pudo enviar el correo a " + to + ": " + ex.getMessage(), ex);
+            }
+            log.error("❌ Error inesperado enviando correo a {}: {}", to, ex.getMessage(), ex);
+        }
+    }
+
+    private boolean isBrevoConfigured() {
+        return brevoApiKey != null && !brevoApiKey.trim().isEmpty() && brevoApiKey.startsWith("xkeysib-");
+    }
+
+    /**
+     * Envío vía API REST de Brevo. En modo estricto exige HTTP 201.
+     */
+    private void sendViaBrevo(String to, String subject, String content, boolean strict) {
         try {
             HttpClient client = HttpClient.newHttpClient();
             String senderEmail = (fromEmail != null && !fromEmail.isEmpty()) ? fromEmail : "noreply@hostflow.com";
 
-            // 🆕 Construcción segura del payload usando Map y ObjectMapper
             Map<String, Object> sender = Map.of("name", appName, "email", senderEmail);
             Map<String, Object> recipient = Map.of("email", to);
 
@@ -113,7 +153,6 @@ public class EmailService {
                     "htmlContent", content
             );
 
-            // ObjectMapper escapa automáticamente comillas, saltos de línea y caracteres especiales
             String jsonBody = objectMapper.writeValueAsString(requestBody);
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -127,19 +166,31 @@ public class EmailService {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 201) {
-                log.info("✅ Email enviado exitosamente vía Brevo a: {}", to);
+                log.info("✅ Email aceptado por Brevo para: {}", to);
             } else {
-                log.error("❌ Error enviando email vía Brevo. Status: {}, Respuesta: {}", response.statusCode(), response.body());
+                log.error("❌ Brevo rechazó el email. Status: {}, Respuesta: {}",
+                        response.statusCode(), response.body());
+                if (strict) {
+                    throw new EmailDeliveryException(
+                            "El proveedor de correo rechazó el mensaje (HTTP " + response.statusCode() + ").");
+                }
             }
+        } catch (EmailDeliveryException ex) {
+            throw ex;
         } catch (Exception e) {
             log.error("❌ Excepción enviando email vía Brevo a {}: {}", to, e.getMessage(), e);
+            if (strict) {
+                throw new EmailDeliveryException(
+                        "No se pudo enviar el correo mediante Brevo: " + e.getMessage(), e);
+            }
         }
     }
 
     /**
-     * Implementación 2: Envío vía Gmail SMTP (Ideal para Desarrollo Local)
+     * Envío vía Gmail SMTP. En modo estricto propaga fallos del servidor SMTP.
      */
-    private void sendViaGmail(String to, String subject, String htmlContent, String plainTextContent) {
+    private void sendViaGmail(String to, String subject, String htmlContent, String plainTextContent,
+                              boolean strict) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -157,6 +208,10 @@ public class EmailService {
             log.info("✅ Email enviado exitosamente vía Gmail SMTP a: {}", to);
         } catch (Exception e) {
             log.error("❌ Error enviando email vía Gmail a {}: {}", to, e.getMessage(), e);
+            if (strict) {
+                throw new EmailDeliveryException(
+                        "No se pudo enviar el correo mediante Gmail SMTP: " + e.getMessage(), e);
+            }
         }
     }
 
@@ -278,6 +333,11 @@ public class EmailService {
     // MÉTODOS: SISTEMA DE RESERVAS
     // =========================================================================
 
+    /**
+     * Envío del enlace de onboarding (creación o renovación).
+     * <p><strong>Modo estricto:</strong> si el proveedor falla, lanza
+     * {@link EmailDeliveryException} para que la transacción de negocio se revierta.</p>
+     */
     public void sendReservationConfirmationEmail(String toEmail, String guestName, String confirmationCode,
                                                  String confirmationUrl, Accommodation accommodation,
                                                  String accommodationName, LocalDate checkIn,
@@ -309,8 +369,9 @@ public class EmailService {
                         ? accommodation.getBaseCurrency().name() : Currency.ARS.name(),
                 confirmationUrl, expirationHours);
 
+        // Estricto: creación y renovación no deben confirmar éxito si el correo no salió.
         sendHybridEmail(toEmail, "🏡 " + accommodationName + " - Completa tu reserva " + confirmationCode,
-                htmlContent, plainText);
+                htmlContent, plainText, true);
     }
 
     public void sendReservationConfirmedGuestEmail(Reservation reservation, Accommodation accommodation,

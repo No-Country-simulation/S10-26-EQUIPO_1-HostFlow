@@ -147,14 +147,15 @@ public class ReservationService {
         ReservationLink link = createConfirmationLink(savedReservation, 24);
         savedReservation.addLink(link);
 
-        // Si falla el envío, la excepción revierte la transacción y no deja una reserva sin seguimiento.
+        // Modo estricto: si el proveedor rechaza el correo, EmailDeliveryException revierte la transacción
+        // y no queda una reserva sin enlace entregado al huésped.
         emailService.sendReservationConfirmationEmail(
                 savedReservation.getGuestEmail(), savedReservation.getGuestName(),
                 savedReservation.getConfirmationCode(), link.getConfirmationUrl(),
                 accommodation, accommodation.getName(), savedReservation.getCheckIn(), savedReservation.getCheckOut(),
                 savedReservation.getTotalAmount(), 24);
 
-        log.info("Reserva {} creada y enlace de onboarding enviado a {}",
+        log.info("Reserva {} creada; enlace de onboarding aceptado por el proveedor para {}",
                 savedReservation.getConfirmationCode(), savedReservation.getGuestEmail());
         return ReservationResponse.from(savedReservation, ReservationLinkResponse.from(link));
     }
@@ -253,6 +254,7 @@ public class ReservationService {
 
         ReservationLink newLink = createConfirmationLink(reservation, 24);
         reservation.addLink(newLink);
+        // Modo estricto: si falla el envío, se revierte la renovación y se conservan los enlaces anteriores.
         emailService.sendReservationConfirmationEmail(
                 reservation.getGuestEmail(), reservation.getGuestName(), reservation.getConfirmationCode(),
                 newLink.getConfirmationUrl(), reservation.getAccommodation(), reservation.getAccommodation().getName(),
@@ -515,14 +517,31 @@ public class ReservationService {
 
         log.info("✅ Reserva cancelada: {}", reservation.getConfirmationCode());
 
-        emailService.sendReservationCancelledEmail(
-                reservation.getGuest() != null ? reservation.getGuest().getEmail() : reservation.getGuestEmail(),
-                reservation.getGuest() != null ? reservation.getGuest().getFullName() : reservation.getGuestName(),
-                reservation.getConfirmationCode(),
-                reservation.getAccommodation().getName(),
-                reason
-        );
-        log.info("📧 Email de cancelación enviado exitosamente a: {}", reservation.getGuestEmail());
+        // Datos necesarios fuera de la sesión Hibernate para el afterCommit.
+        final String guestEmail = reservation.getGuest() != null
+                ? reservation.getGuest().getEmail()
+                : reservation.getGuestEmail();
+        final String guestName = reservation.getGuest() != null
+                ? reservation.getGuest().getFullName()
+                : reservation.getGuestName();
+        final String confirmationCode = reservation.getConfirmationCode();
+        final String accommodationName = reservation.getAccommodation().getName();
+        final String cancellationReason = reason;
+
+        // El correo de cancelación no debe revertir la cancelación ya persistida.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    emailService.sendReservationCancelledEmail(
+                            guestEmail, guestName, confirmationCode, accommodationName, cancellationReason);
+                    log.info("📧 Correo de cancelación aceptado por el proveedor para: {}", guestEmail);
+                } catch (RuntimeException ex) {
+                    log.error("Reserva {} cancelada, pero no se pudo notificar al huésped {}: {}",
+                            confirmationCode, guestEmail, ex.getMessage(), ex);
+                }
+            }
+        });
 
         return ReservationResponse.from(reservation, null);
     }
