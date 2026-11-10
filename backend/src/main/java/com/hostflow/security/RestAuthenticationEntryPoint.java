@@ -16,7 +16,10 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Devuelve una respuesta JSON uniforme cuando una petición protegida no está autenticada. */
+/**
+ * 401 Unauthorized en JSON cuando la petición a un recurso protegido no está autenticada
+ * (sin token, token ausente, inválido o expirado tras el filtro JWT).
+ */
 @Component
 @RequiredArgsConstructor
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -34,11 +37,12 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setCharacterEncoding("UTF-8");
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", LocalDateTime.now());
+        body.put("timestamp", LocalDateTime.now().toString());
         body.put("status", HttpStatus.UNAUTHORIZED.value());
         body.put("error", HttpStatus.UNAUTHORIZED.getReasonPhrase());
         body.put("message", "Debes autenticarte para acceder a este recurso.");
         body.put("errorCode", "UNAUTHORIZED");
+        body.put("path", request.getRequestURI());
 
         objectMapper.writeValue(response.getWriter(), body);
     }
