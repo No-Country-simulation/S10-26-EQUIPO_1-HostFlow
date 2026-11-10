@@ -43,6 +43,19 @@ import java.util.List;
  *
  * @author HostFlow Team
  * @version 1.2.0 (Agregado endpoint para completar reservas y registrar ingresos)
+ * de sus alojamientos en la protected plataforma HostFlow.
+ *
+ * <p><strong>🆕 Mejora de arquitectura y seguridad (v2.1):</strong></p>
+ * <ul>
+ *   <li>Se eliminó la inyección directa de {@code OwnerRepository} y {@code AccommodationRepository}.</li>
+ *   <li>Se eliminó el método privado {@code getCurrentOwnerId()} que consultaba la BD.</li>
+ *   <li>🛡️ <strong>Corrección de seguridad (IDOR):</strong> Todos los endpoints ahora validan estrictamente
+ *       que la reserva o la consulta de disponibilidad pertenezca al alojamiento del propietario autenticado,
+ *       evitando que un owner manipule datos de otros alojamientos.</li>
+ * </ul>
+ *
+ * @author HostFlow Team
+ * @version 2.1.0
  */
 @RestController
 @RequestMapping("/owners/reservations")
@@ -61,6 +74,12 @@ public class OwnerReservationController {
     private final ReservationService reservationService;
     private final OwnerRepository ownerRepository;
     private final AccommodationRepository accommodationRepository;
+    /**
+     * Servicio que encapsula toda la lógica de negocio de las reservas.
+     * Se encarga de validar que el propietario tenga derecho a operar
+     * sobre la reserva o alojamiento solicitado.
+     */
+    private final ReservationService reservationService;
 
     // =========================================================================
     // 1. CREAR RESERVA

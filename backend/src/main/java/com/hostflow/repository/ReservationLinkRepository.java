@@ -50,5 +50,4 @@ public interface ReservationLinkRepository extends JpaRepository<ReservationLink
      */
     Optional<ReservationLink> findByTokenAndReservation_Id(String token, Long reservationId);
 
-
 }

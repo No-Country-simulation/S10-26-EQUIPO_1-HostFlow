@@ -6,6 +6,7 @@ import com.hostflow.enums.PaymentMethodType;
 import com.hostflow.exception.BusinessException;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.AccommodationPaymentMethod;
+import com.hostflow.model.Owner;
 import com.hostflow.repository.AccommodationPaymentMethodRepository;
 import com.hostflow.repository.AccommodationRepository;
 import com.hostflow.repository.OwnerRepository;
@@ -22,6 +23,9 @@ import static org.mockito.Mockito.*;
 /** Pruebas unitarias de la lógica de métodos de pago del alojamiento. */
 class AccommodationPaymentMethodServiceTest {
 
+    // =========================================================================
+    // MOCKS E INICIALIZACIÓN
+    // =========================================================================
     private final AccommodationRepository accommodationRepository = mock(AccommodationRepository.class);
     private final AccommodationPaymentMethodRepository paymentMethodRepository = mock(AccommodationPaymentMethodRepository.class);
     private final OwnerRepository ownerRepository = mock(OwnerRepository.class);
@@ -31,10 +35,16 @@ class AccommodationPaymentMethodServiceTest {
             accommodationRepository, paymentMethodRepository, ownerRepository, emailService);
 
     private final Accommodation accommodation = new Accommodation();
+    private final Owner owner = new Owner();
 
     @BeforeEach
     void setUp() {
+        owner.setId(1L);
+        owner.setEmail("test@owner.com");
         accommodation.setId(10L);
+        accommodation.setOwner(owner);
+
+        when(ownerRepository.findByEmail("test@owner.com")).thenReturn(Optional.of(owner));
         when(accommodationRepository.findByOwner_Id(1L)).thenReturn(Optional.of(accommodation));
         when(paymentMethodRepository.existsByAccommodation_IdAndDefaultMethodTrue(10L)).thenReturn(true);
         when(paymentMethodRepository.save(any(AccommodationPaymentMethod.class)))
@@ -139,7 +149,6 @@ class AccommodationPaymentMethodServiceTest {
         request.setWalletEmail("correo-no-valido");
 
         BusinessException error = assertThrows(BusinessException.class, () -> service.create(1L, request));
-
         assertTrue(error.getMessage().contains("walletEmail"));
         verify(paymentMethodRepository, never()).save(any());
     }
@@ -180,7 +189,6 @@ class AccommodationPaymentMethodServiceTest {
         patch.setAlias("hostflow.pagos");
 
         AccommodationPaymentMethodResponse result = service.update(1L, 50L, patch);
-
         assertEquals("hostflow.pagos", result.alias());
     }
 
@@ -192,7 +200,6 @@ class AccommodationPaymentMethodServiceTest {
         patch.setPaymentType(PaymentMethodType.DIGITAL_WALLET);
 
         BusinessException error = assertThrows(BusinessException.class, () -> service.update(1L, 50L, patch));
-
         assertTrue(error.getMessage().contains("userIdentifier"));
         verify(paymentMethodRepository, never()).save(any());
     }
@@ -206,7 +213,6 @@ class AccommodationPaymentMethodServiceTest {
         patch.setWalletEmail("nuevo@example.com");
 
         AccommodationPaymentMethodResponse result = service.update(1L, 50L, patch);
-
         assertEquals("+5491198765432", result.walletPhone());
         assertEquals("nuevo@example.com", result.walletEmail());
         assertEquals("usuario.123", result.userIdentifier());
@@ -220,7 +226,6 @@ class AccommodationPaymentMethodServiceTest {
         patch.setUserIdentifier(" ");
 
         BusinessException error = assertThrows(BusinessException.class, () -> service.update(1L, 50L, patch));
-
         assertTrue(error.getMessage().contains("userIdentifier"));
         verify(paymentMethodRepository, never()).save(any());
     }

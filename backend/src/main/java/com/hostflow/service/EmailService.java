@@ -17,6 +17,7 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -57,6 +58,7 @@ public class EmailService {
     private final TemplateEngine templateEngine;
     private final CurrencyConversionService currencyConversionService;
     private final ObjectMapper objectMapper; // Para serializar JSON de forma segura
+    private final ExchangeRateProviderService exchangeRateService;
 
     @Value("${brevo.api.key:}")
     private String brevoApiKey;

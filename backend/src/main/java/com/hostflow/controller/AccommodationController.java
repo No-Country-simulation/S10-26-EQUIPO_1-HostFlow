@@ -89,6 +89,11 @@ public class AccommodationController {
                     Solo afecta al alojamiento del owner autenticado.
                     """
     )
+    private final AccommodationTemporaryDisableService disableService;
+
+    @PostMapping("/disable")
+    @PreAuthorize("hasRole('OWNER')")
+    @Operation(summary = "Desactivar temporalmente mi alojamiento")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Alojamiento desactivado exitosamente"),
             @ApiResponse(responseCode = "400", description = "Ya existe una desactivación activa o fechas inválidas"),
@@ -100,12 +105,11 @@ public class AccommodationController {
             @Valid @RequestBody AccommodationDisableRequest request,
             Authentication authentication) {
 
-        // ✅ Extraer email del usuario autenticado (sin consultar BD)
         String ownerEmail = authentication.getName();
         log.debug("🔒 Solicitando desactivación de alojamiento para email: {}", ownerEmail);
 
-        // ✅ Delegar toda la lógica al servicio
-        AccommodationTemporaryDisable disable = disableService.disableAccommodationByEmail(
+        // ✅ El servicio ya retorna el DTO mapeado
+        AccommodationDisableResponse response = disableService.disableAccommodationByEmail(
                 ownerEmail,
                 request.getReason(),
                 request.getDisabledFrom(),
@@ -128,6 +132,12 @@ public class AccommodationController {
             summary = "Reactivar mi alojamiento",
             description = "Reactiva el alojamiento del owner, haciéndolo disponible nuevamente para reservas."
     )
+        return ResponseEntity.status(201).body(response);
+    }
+
+    @PostMapping("/enable")
+    @PreAuthorize("hasRole('OWNER')")
+    @Operation(summary = "Reactivar mi alojamiento")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Alojamiento reactivado exitosamente"),
             @ApiResponse(responseCode = "400", description = "No hay desactivación activa"),
@@ -156,6 +166,17 @@ public class AccommodationController {
             summary = "Consultar estado de mi alojamiento",
             description = "Verifica si el alojamiento está actualmente desactivado temporalmente."
     )
+        String ownerEmail = authentication.getName();
+        log.debug("🔓 Solicitando reactivación de alojamiento para email: {}", ownerEmail);
+
+        // ✅ El servicio ya retorna el DTO mapeado
+        AccommodationDisableResponse response = disableService.enableAccommodationByEmail(ownerEmail);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/status")
+    @PreAuthorize("hasRole('OWNER')")
+    @Operation(summary = "Consultar estado de mi alojamiento")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Estado obtenido exitosamente"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
@@ -186,6 +207,17 @@ public class AccommodationController {
             summary = "Historial de desactivaciones de mi alojamiento",
             description = "Obtiene todas las desactivaciones temporales aplicadas al alojamiento del owner."
     )
+        String ownerEmail = authentication.getName();
+        log.debug("📊 Consultando estado de alojamiento para email: {}", ownerEmail);
+
+        // ✅ El servicio ya retorna el DTO mapeado (o null si no hay desactivación)
+        AccommodationDisableResponse response = disableService.getActiveDisableByEmail(ownerEmail);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/history")
+    @PreAuthorize("hasRole('OWNER')")
+    @Operation(summary = "Historial de desactivaciones de mi alojamiento")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Historial obtenido exitosamente"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
@@ -217,6 +249,17 @@ public class AccommodationController {
             summary = "Verificar disponibilidad en fecha específica",
             description = "Consulta si el alojamiento estará disponible en una fecha determinada."
     )
+        String ownerEmail = authentication.getName();
+        log.debug("📜 Obteniendo historial de desactivaciones para email: {}", ownerEmail);
+
+        // ✅ El servicio ya retorna la lista de DTOs mapeada
+        List<AccommodationDisableResponse> responses = disableService.getDisableHistoryByEmail(ownerEmail);
+        return ResponseEntity.ok(responses);
+    }
+
+    @GetMapping("/availability")
+    @PreAuthorize("hasRole('OWNER')")
+    @Operation(summary = "Verificar disponibilidad en fecha específica")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Disponibilidad consultada exitosamente"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),

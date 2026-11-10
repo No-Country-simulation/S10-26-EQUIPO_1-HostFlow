@@ -22,7 +22,7 @@ import java.util.List;
  * </ul>
  *
  * @author HostFlow Team
- * @version 2.0.0
+ * @version 2.1.0
  */
 @Schema(name = "AccommodationProfileResponse", description = "Perfil completo del alojamiento con su galería de imágenes y configuración visual.")
 public record AccommodationProfileResponse(
@@ -34,6 +34,7 @@ public record AccommodationProfileResponse(
         @Schema(description = "Capacidad máxima de huéspedes.", example = "20") Integer guestCapacity,
         @Schema(description = "Precio base por noche.", example = "85000.00") BigDecimal basePrice,
         @Schema(description = "URL HTTPS del logotipo del alojamiento.", example = "https://example.com/logo.png") String logoUrl,
+        @Schema(description = "ID público del logotipo en Cloudinary.", example = "hostflow/logos/accommodation-15") String logoPublicId,
         @Schema(description = "Color principal en formato hexadecimal.", example = "#0fa3a3") String primaryColor,
         @Schema(description = "Color de acento en formato hexadecimal.", example = "#d4f53c") String accentColor,
         @Schema(description = "Color terciario en formato hexadecimal.", example = "#f4b8c4") String tertiaryColor,
@@ -66,6 +67,7 @@ public record AccommodationProfileResponse(
                 accommodation.getGuestCapacity(),
                 accommodation.getBasePrice(),
                 accommodation.getLogoUrl(),
+                accommodation.getLogoPublicId(),
                 accommodation.getPrimaryColor(),
                 accommodation.getAccentColor(),
                 accommodation.getTertiaryColor(),

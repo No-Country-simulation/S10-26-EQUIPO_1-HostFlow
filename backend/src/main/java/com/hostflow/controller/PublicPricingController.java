@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 /**
@@ -37,6 +39,12 @@ import java.util.List;
  *
  * @author HostFlow Team
  * @version 1.1.0
+ * <p><strong>🆕 Mejora de arquitectura (v2.0):</strong></p>
+ * <ul>
+ *   <li>Se eliminó la inyección directa de repositorios, respetando la separación de capas.</li>
+ *   <li>Se eliminó el manejo de {@code @Transactional} en el controlador.</li>
+ *   <li>Toda la lógica de negocio se delega al servicio, manteniendo el controlador como un enrutador puro.</li>
+ * </ul>
  */
 @RestController
 @RequestMapping("/public/accommodations/{accommodationId}")
@@ -66,6 +74,17 @@ public class PublicPricingController {
                     "a todas las monedas habilitadas por el propietario (ARS, USD, EUR). " +
                     "Si una moneda no está configurada o la API de tasas está caída, " +
                     "se omite de la respuesta para no mostrar precios incorrectos."
+@Tag(name = "Precios públicos", description = "Consulta de precios del alojamiento en múltiples monedas (sin autenticación)")
+@Slf4j
+public class PublicPricingController {
+
+    // ✅ ÚNICA DEPENDENCIA: El servicio que contiene la lógica y la transacción
+    private final PublicPricingService pricingService;
+
+    @GetMapping("/base-price")
+    @Operation(
+            summary = "Precio base del alojamiento en todas las monedas habilitadas",
+            description = "Devuelve el precio base convertido a todas las monedas habilitadas."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Precios obtenidos exitosamente"),
@@ -109,6 +128,18 @@ public class PublicPricingController {
             description = "Devuelve los servicios adicionales activos del alojamiento, " +
                     "con sus precios convertidos a todas las monedas habilitadas. " +
                     "Solo se muestran los servicios marcados como activos por el propietario."
+    public ResponseEntity<List<ConvertedPriceResponse>> getBasePrice(@PathVariable Long accommodationId) {
+        log.debug("📊 Solicitud de precio base para alojamiento ID: {}", accommodationId);
+
+        // ✅ Delegamos toda la lógica y la transacción al servicio
+        List<ConvertedPriceResponse> result = pricingService.getBasePrice(accommodationId);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/additional-services")
+    @Operation(
+            summary = "Servicios adicionales con precios en todas las monedas habilitadas",
+            description = "Devuelve los servicios adicionales activos con sus precios convertidos."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Servicios obtenidos exitosamente"),
@@ -171,5 +202,12 @@ public class PublicPricingController {
 
         // ✅ PASAMOS acc.getBaseCurrency() explícitamente como segundo argumento
         return AdditionalServiceResponse.from(s, acc.getBaseCurrency(), converted);
+    }
+    public ResponseEntity<List<AdditionalServiceResponse>> getAdditionalServices(@PathVariable Long accommodationId) {
+        log.debug("🧾 Solicitud de servicios adicionales para alojamiento ID: {}", accommodationId);
+
+        // ✅ Delegamos toda la lógica y la transacción al servicio
+        List<AdditionalServiceResponse> responses = pricingService.getAdditionalServices(accommodationId);
+        return ResponseEntity.ok(responses);
     }
 }

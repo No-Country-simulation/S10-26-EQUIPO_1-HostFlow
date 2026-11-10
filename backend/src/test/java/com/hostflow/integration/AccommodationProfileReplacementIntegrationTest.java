@@ -1,11 +1,14 @@
-package com.hostflow.service;
+package com.hostflow.integration;
 
+import com.hostflow.dto.response.AccommodationProfileResponse;
 import com.hostflow.dto.response.CloudinaryUploadResult;
 import com.hostflow.dto.response.AccommodationProfileResponse;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.Owner;
 import com.hostflow.repository.AccommodationRepository;
 import com.hostflow.repository.OwnerRepository;
+import com.hostflow.service.AccommodationProfileService;
+import com.hostflow.service.CloudinaryImageService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +27,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Prueba de integración para la sustitución de logotipos en el perfil del alojamiento.
+ *
+ * <p><strong>🆕 Actualización v2.2:</strong> El servicio ahora retorna un DTO
+ * ({@link AccommodationProfileResponse}) en lugar de la entidad JPA {@link Accommodation}.
+ * Las aserciones se han actualizado para usar los accessors del record.</p>
+ *
+ * @author HostFlow Team
+ * @version 2.2.0
+ */
 @SpringBootTest
 @ActiveProfiles("test")
 class AccommodationProfileReplacementIntegrationTest {
@@ -35,13 +48,10 @@ class AccommodationProfileReplacementIntegrationTest {
 
     @Autowired
     private AccommodationProfileService accommodationProfileService;
-
     @Autowired
     private AccommodationRepository accommodationRepository;
-
     @Autowired
     private OwnerRepository ownerRepository;
-
     @MockBean
     private CloudinaryImageService cloudinaryImageService;
 
@@ -90,13 +100,9 @@ class AccommodationProfileReplacementIntegrationTest {
 
     @Test
     void uploadLogo_whenReplacementSucceeds_persistsNewLogoAndDeletesOldAssetAfterCommit() {
-        MockMultipartFile file = new MockMultipartFile(
-                "file", "new-logo.png", "image/png", new byte[]{1, 2, 3}
-        );
-        when(cloudinaryImageService.uploadImage(any()))
-                .thenReturn(new CloudinaryUploadResult(
-                        NEW_PUBLIC_ID, NEW_LOGO_URL, "png", 3L, "hostflow/test"
-                ));
+        MockMultipartFile file = new MockMultipartFile("file", "new-logo.png", "image/png", new byte[]{1, 2, 3});
+        when(cloudinaryImageService.uploadImage(any())).thenReturn(new CloudinaryUploadResult(
+                NEW_PUBLIC_ID, NEW_LOGO_URL, "png", 3L, "hostflow/test"));
 
         // La eliminación se ejecuta en afterCompletion(COMMITTED). Al consultar la BD
         // desde aquí, el nuevo logo debe estar ya confirmado y visible.

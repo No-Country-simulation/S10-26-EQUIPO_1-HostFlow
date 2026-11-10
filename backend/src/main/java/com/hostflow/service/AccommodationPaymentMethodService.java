@@ -62,6 +62,8 @@ public class AccommodationPaymentMethodService {
      * @param ownerEmail el email del propietario autenticado
      * @return lista de DTOs de métodos de pago del alojamiento
      */
+    // MÉTODOS PÚBLICOS QUE ACEPTAN EMAIL
+    // =========================================================================
     @Transactional(readOnly = true)
     public List<AccommodationPaymentMethodResponse> listByEmail(String ownerEmail) {
         Long ownerId = getAccommodationByEmail(ownerEmail).getOwner().getId();
@@ -117,6 +119,8 @@ public class AccommodationPaymentMethodService {
      * @param ownerId el identificador único del propietario autenticado
      * @return lista de DTOs de métodos de pago del alojamiento
      */
+    // MÉTODOS ORIGINALES (Retornan DTOs)
+    // =========================================================================
     @Transactional(readOnly = true)
     public List<AccommodationPaymentMethodResponse> list(Long ownerId) {
         Accommodation accommodation = getAccommodation(ownerId);
@@ -353,10 +357,6 @@ public class AccommodationPaymentMethodService {
         m.setInstructions(blankToNull(r.getInstructions()));
     }
 
-    /**
-     * Valida los datos obligatorios según el tipo del método de pago.
-     * Se ejecuta después de aplicar los campos para que PATCH valide el estado final.
-     */
     private void validateRequiredFieldsByType(AccommodationPaymentMethod method) {
         if (method.getPaymentType() == PaymentMethodType.BANK_TRANSFER) {
             requireField(method.getBankName(), "bankName", "BANK_TRANSFER");

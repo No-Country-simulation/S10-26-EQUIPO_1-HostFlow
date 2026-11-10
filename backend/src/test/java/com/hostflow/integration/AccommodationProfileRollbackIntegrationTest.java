@@ -1,10 +1,12 @@
-package com.hostflow.service;
+package com.hostflow.integration;
 
 import com.hostflow.dto.response.CloudinaryUploadResult;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.Owner;
 import com.hostflow.repository.AccommodationRepository;
 import com.hostflow.repository.OwnerRepository;
+import com.hostflow.service.AccommodationProfileService;
+import com.hostflow.service.CloudinaryImageService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

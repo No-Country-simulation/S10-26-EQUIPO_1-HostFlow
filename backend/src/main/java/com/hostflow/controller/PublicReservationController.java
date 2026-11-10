@@ -3,6 +3,8 @@ package com.hostflow.controller;
 import com.hostflow.dto.request.CompleteReservationOnboardingRequest;
 import com.hostflow.dto.response.ReservationOnboardingConfirmationResponse;
 import com.hostflow.dto.response.ReservationOnboardingDetailsResponse;
+import com.hostflow.dto.request.ConfirmReservationRequest;
+import com.hostflow.dto.response.ReservationResponse;
 import com.hostflow.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
