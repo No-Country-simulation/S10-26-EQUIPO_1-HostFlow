@@ -24,7 +24,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -47,11 +47,9 @@ import java.util.List;
  *
  * <p><strong>🆕 Mejora de arquitectura y seguridad (v2.1):</strong></p>
  * <ul>
- *   <li>Se eliminó la inyección directa de {@code OwnerRepository} y {@code AccommodationRepository}.</li>
- *   <li>Se eliminó el método privado {@code getCurrentOwnerId()} que consultaba la BD.</li>
- *   <li>🛡️ <strong>Corrección de seguridad (IDOR):</strong> Todos los endpoints ahora validan estrictamente
- *       que la reserva o la consulta de disponibilidad pertenezca al alojamiento del propietario autenticado,
- *       evitando que un owner manipule datos de otros alojamientos.</li>
+ *   <li>Los endpoints obtienen el propietario desde la autenticación.</li>
+ *   <li>Las consultas de disponibilidad siempre se limitan al alojamiento del propietario autenticado.</li>
+ *   <li>Las operaciones sobre reservas validan su pertenencia al propietario.</li>
  * </ul>
  *
  * @author HostFlow Team
@@ -94,7 +92,7 @@ public class OwnerReservationController {
             Validaciones:
             - No se permiten reservas overlapping (doble booking).
             - El huésped debe tener métodos de pago activos.
-            - Las fechas deben ser futuras y válidas.
+            - Check-in puede ser hoy; no se admiten fechas pasadas y check-out debe ser posterior.
             """
     )
     @ApiResponses(value = {
@@ -241,25 +239,30 @@ public class OwnerReservationController {
     @GetMapping("/check-availability")
     @Operation(
             summary = "Verificar disponibilidad",
-            description = "Verifica si el alojamiento está disponible en las fechas especificadas (sin solapamientos)."
+            description = "Verifica la disponibilidad del alojamiento del propietario autenticado. Las fechas usan formato YYYY-MM-DD; check-out no ocupa esa noche."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Disponibilidad verificada (true/false)"),
-            @ApiResponse(responseCode = "400", description = "Fechas inválidas")
+            @ApiResponse(responseCode = "400", description = "Fechas inválidas"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "404", description = "Owner o alojamiento no encontrado")
     })
     public ResponseEntity<Boolean> checkAvailability(
-            @RequestParam Long accommodationId,
-
-            // ✅ CORRECCIÓN: @DateTimeFormat le indica a Spring cómo parsear el formato ISO 8601 con 'Z'
             @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime checkIn,
-
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate checkIn,
             @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime checkOut) {
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate checkOut,
+            Authentication authentication) {
 
-        boolean available = reservationService.isAccommodationAvailable(accommodationId, checkIn, checkOut);
+        Long ownerId = getCurrentOwnerId(authentication);
+        Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No tienes un alojamiento registrado. Registra los datos de tu alojamiento primero."));
+
+        boolean available = reservationService.isAccommodationAvailable(
+                accommodation.getId(), checkIn, checkOut);
         return ResponseEntity.ok(available);
     }
 

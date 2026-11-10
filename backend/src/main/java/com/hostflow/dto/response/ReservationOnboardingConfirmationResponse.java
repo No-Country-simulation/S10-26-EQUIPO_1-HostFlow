@@ -9,7 +9,7 @@ import com.hostflow.model.ReservationAdditionalService;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -24,8 +24,8 @@ public record ReservationOnboardingConfirmationResponse(
         String confirmationCode,
         Long accommodationId,
         String accommodationName,
-        LocalDateTime checkIn,
-        LocalDateTime checkOut,
+        LocalDate checkIn,
+        LocalDate checkOut,
         Integer nights,
         Integer guestCount,
         BigDecimal pricePerNight,

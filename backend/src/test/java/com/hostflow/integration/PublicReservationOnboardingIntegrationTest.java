@@ -15,6 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -59,8 +60,8 @@ class PublicReservationOnboardingIntegrationTest {
 
         reservation = Reservation.builder().confirmationCode("HF-" + UUID.randomUUID().toString().substring(0, 8))
                 .accommodation(accommodation).guestName("Huésped pendiente").guestEmail("preliminar@example.test")
-                .guestPhone("+541112345678").checkIn(LocalDateTime.now().plusDays(10).withHour(15).withMinute(0).withSecond(0).withNano(0))
-                .checkOut(LocalDateTime.now().plusDays(13).withHour(10).withMinute(0).withSecond(0).withNano(0))
+                .guestPhone("+541112345678").checkIn(LocalDate.now().plusDays(10))
+                .checkOut(LocalDate.now().plusDays(13))
                 .nights(3).guestCount(2).currency(Currency.ARS).pricePerNight(new BigDecimal("10000.00"))
                 .subtotal(new BigDecimal("30000.00")).additionalServicesTotal(BigDecimal.ZERO)
                 .totalAmount(new BigDecimal("30000.00")).status(ReservationStatus.PENDING)
@@ -127,8 +128,8 @@ class PublicReservationOnboardingIntegrationTest {
                 .guestName("Huésped pendiente")
                 .guestEmail("preliminar@example.test")
                 .guestPhone("+541112345678")
-                .checkIn(LocalDateTime.now().plusDays(20).withHour(15).withMinute(0).withSecond(0).withNano(0))
-                .checkOut(LocalDateTime.now().plusDays(22).withHour(10).withMinute(0).withSecond(0).withNano(0))
+                .checkIn(LocalDate.now().plusDays(20))
+                .checkOut(LocalDate.now().plusDays(22))
                 .nights(2).guestCount(1).currency(Currency.ARS)
                 .pricePerNight(new BigDecimal("10000.00"))
                 .subtotal(new BigDecimal("20000.00")).additionalServicesTotal(BigDecimal.ZERO)

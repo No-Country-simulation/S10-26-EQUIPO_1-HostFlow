@@ -5,6 +5,7 @@ import com.hostflow.enums.PaymentStatus;
 import com.hostflow.model.Reservation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -37,11 +38,11 @@ public record ReservationResponse(
         @Schema(description = "Correo del huésped", example = "juan.perez@email.com")
         String guestEmail,
 
-        @Schema(description = "Fecha de check-in", example = "2026-12-15T14:00:00")
-        LocalDateTime checkIn,
+        @Schema(description = "Fecha de check-in", example = "2026-12-15")
+        LocalDate checkIn,
 
-        @Schema(description = "Fecha de check-out", example = "2026-12-18T11:00:00")
-        LocalDateTime checkOut,
+        @Schema(description = "Fecha de check-out", example = "2026-12-18")
+        LocalDate checkOut,
 
         @Schema(description = "Número de noches", example = "3")
         Integer nights,

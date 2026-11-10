@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -88,7 +89,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * 🛡️ VERIFICACIÓN CRÍTICA: Busca reservas ACTIVAS que se solapen
      * con un rango de fechas específico para un alojamiento.
      *
-     * <p><strong>Lógica de solapamiento:</strong> Dos rangos de fechas [A, B] y [C, D]
+     * <p><strong>Lógica de solapamiento:</strong> Dos estadías [A, B) y [C, D)
      * se solapan si y solo si: A < D y C < B.</p>
      *
      * @param accommodationId ID del alojamiento a verificar
@@ -105,8 +106,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     """)
     List<Reservation> findOverlappingReservations(
             @Param("accommodationId") Long accommodationId,
-            @Param("newCheckIn") LocalDateTime newCheckIn,
-            @Param("newCheckOut") LocalDateTime newCheckOut);
+            @Param("newCheckIn") LocalDate newCheckIn,
+            @Param("newCheckOut") LocalDate newCheckOut);
 
     /**
      * Verifica de forma optimizada y nativa si existe alguna reserva activa
@@ -131,8 +132,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     """, nativeQuery = true)
     boolean existsOverlappingReservation(
             @Param("accommodationId") Long accommodationId,
-            @Param("newCheckIn") LocalDateTime newCheckIn,
-            @Param("newCheckOut") LocalDateTime newCheckOut);
+            @Param("newCheckIn") LocalDate newCheckIn,
+            @Param("newCheckOut") LocalDate newCheckOut);
 
     /**
      * Cuenta las reservas activas de un alojamiento en un rango de fechas específico.
@@ -151,16 +152,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     """)
     long countActiveReservationsInRange(
             @Param("accommodationId") Long accommodationId,
-            @Param("from") LocalDateTime from,
-            @Param("to") LocalDateTime to);
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 
 
 
     @Query("SELECT r FROM Reservation r WHERE r.accommodation.id = :accommodationId AND r.id <> :excludeId AND r.status IN ('PENDING', 'CONFIRMED') AND r.checkIn < :newCheckOut AND r.checkOut > :newCheckIn")
     List<Reservation> findOverlappingReservationsExcludingId(
             @Param("accommodationId") Long accommodationId,
-            @Param("newCheckIn") LocalDateTime newCheckIn,
-            @Param("newCheckOut") LocalDateTime newCheckOut,
+            @Param("newCheckIn") LocalDate newCheckIn,
+            @Param("newCheckOut") LocalDate newCheckOut,
             @Param("excludeId") Long excludeId);
 
     // =========================================================================

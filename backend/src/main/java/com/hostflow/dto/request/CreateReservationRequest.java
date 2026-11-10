@@ -2,7 +2,7 @@ package com.hostflow.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List; // 🆕 Import necesario para la lista de alergias
 
 /**
@@ -15,7 +15,7 @@ import java.util.List; // 🆕 Import necesario para la lista de alergias
  * <ul>
  *   <li>Nombre y apellido del huésped son obligatorios.</li>
  *   <li>Correo electrónico debe ser válido.</li>
- *   <li>Fechas de check-in y check-out deben ser futuras.</li>
+ *   <li>Check-in puede ser hoy; no se admiten fechas pasadas y check-out debe ser posterior.</li>
  *   <li>Check-out debe ser posterior a check-in.</li>
  *   <li>Preferencias y alergias son opcionales, pero cruciales para la experiencia del huésped.</li>
  * </ul>
@@ -59,22 +59,20 @@ public record CreateReservationRequest(
         String guestPhone,
 
         /**
-         * Fecha y hora de check-in.
-         * Debe ser una fecha futura.
+         * Fecha de check-in (día calendario).
+         * Se permite el día actual; no se permiten fechas pasadas.
          */
         @NotNull(message = "La fecha de check-in es obligatoria")
-        @Future(message = "La fecha de check-in debe ser futura")
-        @Schema(description = "Fecha y hora de ingreso al alojamiento", example = "2026-12-15T14:00:00")
-        LocalDateTime checkIn,
+        @Schema(description = "Fecha de ingreso al alojamiento (YYYY-MM-DD)", example = "2026-12-15")
+        LocalDate checkIn,
 
         /**
-         * Fecha y hora de check-out.
+         * Fecha de check-out (día calendario).
          * Debe ser posterior al check-in.
          */
         @NotNull(message = "La fecha de check-out es obligatoria")
-        @Future(message = "La fecha de check-out debe ser futura")
-        @Schema(description = "Fecha y hora de salida del alojamiento", example = "2026-12-18T11:00:00")
-        LocalDateTime checkOut,
+        @Schema(description = "Fecha de salida del alojamiento (YYYY-MM-DD)", example = "2026-12-18")
+        LocalDate checkOut,
 
         /**
          * Número de huéspedes que se hospedarán.

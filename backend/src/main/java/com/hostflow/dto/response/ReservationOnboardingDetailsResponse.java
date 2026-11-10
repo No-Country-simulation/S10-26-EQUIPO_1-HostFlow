@@ -4,15 +4,15 @@ import com.hostflow.enums.Currency;
 import com.hostflow.enums.PaymentMethodType;
 import com.hostflow.enums.ServicePriceType;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 /** Información pública mínima para mostrar el resumen y completar el onboarding. */
 public record ReservationOnboardingDetailsResponse(
         String confirmationCode,
         String accommodationName,
-        LocalDateTime checkIn,
-        LocalDateTime checkOut,
+        LocalDate checkIn,
+        LocalDate checkOut,
         Integer nights,
         Integer guestCount,
         BigDecimal pricePerNight,

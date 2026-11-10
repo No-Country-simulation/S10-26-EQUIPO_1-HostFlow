@@ -28,6 +28,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -634,10 +635,11 @@ public class ReservationService {
         }
 
         // Validar que la fecha de check-out ya haya pasado
-        if (reservation.getCheckOut().isAfter(LocalDateTime.now())) {
+        // Sin una hora de salida configurada, la reserva se completa desde el día siguiente al check-out.
+        if (!reservation.getCheckOut().isBefore(LocalDate.now())) {
             throw new BusinessException(
-                    "No se puede completar una reserva cuya fecha de check-out " +
-                            "aún no ha llegado. Check-out: " + reservation.getCheckOut());
+                    "La reserva solo puede completarse a partir del día siguiente al check-out. " +
+                            "Check-out: " + reservation.getCheckOut());
         }
 
         // Cambiar estado a COMPLETED
@@ -704,7 +706,8 @@ public class ReservationService {
     }
 
     @Transactional(readOnly = true)
-    public boolean isAccommodationAvailable(Long accommodationId, LocalDateTime checkIn, LocalDateTime checkOut) {
+    public boolean isAccommodationAvailable(Long accommodationId, LocalDate checkIn, LocalDate checkOut) {
+        validateDates(checkIn, checkOut);
         return !reservationRepository.existsOverlappingReservation(accommodationId, checkIn, checkOut);
     }
 
@@ -737,12 +740,16 @@ public class ReservationService {
     /**
      * Valida que las fechas de check-in y check-out sean lógicas y futuras.
      */
-    private void validateDates(LocalDateTime checkIn, LocalDateTime checkOut) {
-        if (checkIn.isBefore(LocalDateTime.now())) {
-            throw new BusinessException("La fecha de check-in no puede ser en el pasado.");
+    private void validateDates(LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn == null || checkOut == null) {
+            throw new BusinessException("Las fechas de check-in y check-out son obligatorias.");
         }
-        if (checkOut.isBefore(LocalDateTime.now())) {
-            throw new BusinessException("La fecha de check-out no puede ser en el pasado.");
+        LocalDate today = LocalDate.now();
+        if (checkIn.isBefore(today)) {
+            throw new BusinessException("La fecha de check-in no puede ser anterior al día de hoy.");
+        }
+        if (checkOut.isBefore(today)) {
+            throw new BusinessException("La fecha de check-out no puede ser anterior al día de hoy.");
         }
         if (!checkOut.isAfter(checkIn)) {
             throw new BusinessException("La fecha de check-out debe ser posterior a la fecha de check-in.");
@@ -760,7 +767,7 @@ public class ReservationService {
     /**
      * 🛡️ VALIDACIÓN CRÍTICA: Verifica que no haya reservas overlapping.
      */
-    private void validateAvailability(Long accommodationId, LocalDateTime checkIn, LocalDateTime checkOut) {
+    private void validateAvailability(Long accommodationId, LocalDate checkIn, LocalDate checkOut) {
         validateAvailability(accommodationId, checkIn, checkOut, null);
     }
 
@@ -768,7 +775,7 @@ public class ReservationService {
      * 🛡️ VALIDACIÓN CRÍTICA: Verifica que no haya reservas overlapping,
      * excluyendo una reserva específica (útil al re-confirmar).
      */
-    private void validateAvailability(Long accommodationId, LocalDateTime checkIn, LocalDateTime checkOut, Long excludeReservationId) {
+    private void validateAvailability(Long accommodationId, LocalDate checkIn, LocalDate checkOut, Long excludeReservationId) {
         List<Reservation> overlapping = excludeReservationId == null
                 ? reservationRepository.findOverlappingReservations(accommodationId, checkIn, checkOut)
                 : reservationRepository.findOverlappingReservationsExcludingId(
@@ -783,8 +790,8 @@ public class ReservationService {
     /**
      * Calcula el número de noches entre check-in y check-out.
      */
-    private int calculateNights(LocalDateTime checkIn, LocalDateTime checkOut) {
-        return (int) java.time.temporal.ChronoUnit.DAYS.between(checkIn.toLocalDate(), checkOut.toLocalDate());
+    private int calculateNights(LocalDate checkIn, LocalDate checkOut) {
+        return Math.toIntExact(java.time.temporal.ChronoUnit.DAYS.between(checkIn, checkOut));
     }
 
     /**

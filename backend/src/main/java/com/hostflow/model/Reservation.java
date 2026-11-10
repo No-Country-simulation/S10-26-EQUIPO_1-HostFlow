@@ -9,6 +9,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -83,10 +84,10 @@ public class Reservation {
 
     // Estadía
     @Column(name = "check_in_date", nullable = false)
-    private LocalDateTime checkIn;
+    private LocalDate checkIn;
 
     @Column(name = "check_out_date", nullable = false)
-    private LocalDateTime checkOut;
+    private LocalDate checkOut;
 
     @Column(name = "nights", nullable = false)
     private Integer nights;
@@ -180,7 +181,7 @@ public class Reservation {
         if (checkIn == null || checkOut == null) {
             return 0;
         }
-        return Math.toIntExact(ChronoUnit.DAYS.between(checkIn.toLocalDate(), checkOut.toLocalDate()));
+        return Math.toIntExact(ChronoUnit.DAYS.between(checkIn, checkOut));
     }
 
     /** Una reserva bloquea fechas mientras esté pendiente o confirmada. */
@@ -189,7 +190,7 @@ public class Reservation {
     }
 
     /** Regla de intervalos semiabiertos: check-out puede coincidir con otro check-in. */
-    public boolean overlapsWith(LocalDateTime newCheckIn, LocalDateTime newCheckOut) {
+    public boolean overlapsWith(LocalDate newCheckIn, LocalDate newCheckOut) {
         return checkIn != null && checkOut != null && newCheckIn != null && newCheckOut != null
                 && checkIn.isBefore(newCheckOut) && checkOut.isAfter(newCheckIn);
     }

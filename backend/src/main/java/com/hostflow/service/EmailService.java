@@ -22,7 +22,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +68,7 @@ public class EmailService {
     @Value("${spring.application.name:HostFlow}")
     private String appName;
 
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     // Constructor actualizado para incluir ObjectMapper
     public EmailService(TemplateEngine templateEngine, CurrencyConversionService currencyConversionService,
@@ -280,8 +280,8 @@ public class EmailService {
 
     public void sendReservationConfirmationEmail(String toEmail, String guestName, String confirmationCode,
                                                  String confirmationUrl, Accommodation accommodation,
-                                                 String accommodationName, LocalDateTime checkIn,
-                                                 LocalDateTime checkOut, BigDecimal totalAmount,
+                                                 String accommodationName, LocalDate checkIn,
+                                                 LocalDate checkOut, BigDecimal totalAmount,
                                                  int expirationHours) {
         Context context = new Context();
         context.setVariable("guestName", guestName);
