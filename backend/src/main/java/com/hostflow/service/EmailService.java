@@ -57,8 +57,7 @@ public class EmailService {
 
     private final TemplateEngine templateEngine;
     private final CurrencyConversionService currencyConversionService;
-    private final ObjectMapper objectMapper; // Para serializar JSON de forma segura
-    private final ExchangeRateProviderService exchangeRateService;
+    private final ObjectMapper objectMapper;
 
     @Value("${brevo.api.key:}")
     private String brevoApiKey;

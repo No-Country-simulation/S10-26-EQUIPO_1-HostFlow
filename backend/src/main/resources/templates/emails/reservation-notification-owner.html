@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,226 +10,305 @@
         /* ==========================================================================
            RESET DE ESTILOS: Máxima compatibilidad con clientes de correo (Gmail, Outlook, etc.)
            ========================================================================== */
-        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
-        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-        img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
-        table { border-collapse: collapse !important; }
-        body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+        body,
+        table,
+        td,
+        a {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+
+        table,
+        td {
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
+
+        img {
+            -ms-interpolation-mode: bicubic;
+            border: 0;
+            height: auto;
+            line-height: 100%;
+            outline: none;
+            text-decoration: none;
+        }
+
+        table {
+            border-collapse: collapse !important;
+        }
+
+        body {
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
 
         /* ==========================================================================
            ESTILOS RESPONSIVE: Adaptación para dispositivos móviles
            ========================================================================== */
         @media screen and (max-width: 600px) {
-            .email-container { width: 100% !important; max-width: 100% !important; }
+            .email-container {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
         }
     </style>
 </head>
-<body style="margin: 0 !important; padding: 0 !important; background-color: #f4f4f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
 
-<!-- ==================== 1. CONTENEDOR PRINCIPAL (Fondo) ==================== -->
-<table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; padding: 20px 0;">
-    <tr>
-        <td align="center" valign="top">
+<body
+    style="margin: 0 !important; padding: 0 !important; background-color: #f4f4f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
 
-            <!-- ==================== 2. CONTENEDOR DEL EMAIL (Ancho fijo 600px) ==================== -->
-            <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container"
-                   style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+    <!-- ==================== 1. CONTENEDOR PRINCIPAL (Fondo) ==================== -->
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; padding: 20px 0;">
+        <tr>
+            <td align="center" valign="top">
 
-                <!-- ==================== 2.1 HEADER CON BRANDING DEL ALOJAMIENTO ==================== -->
-                <tr>
-                    <td align="center"
-                        th:style="'background: linear-gradient(135deg, ' + (${accommodation.primaryColor} ?: '#1E293B') + ' 0%, ' + (${accommodation.primaryColor} ?: '#1E293B') + ' 100%); padding: 30px 20px;'">
+                <!-- ==================== 2. CONTENEDOR DEL EMAIL (Ancho fijo 600px) ==================== -->
+                <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container"
+                    style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
 
-                        <!-- Logo del Alojamiento -->
-                        <img th:if="${accommodation.logoUrl != null}"
-                             th:src="${accommodation.logoUrl}"
-                             th:alt="${accommodation.name}"
-                             style="max-width: 150px; height: auto; margin-bottom: 15px; border-radius: 8px; background: white; padding: 10px; display: block;">
+                    <!-- ==================== 2.1 HEADER CON BRANDING DEL ALOJAMIENTO ==================== -->
+                    <tr>
+                        <td align="center"
+                            th:style="'background: linear-gradient(135deg, ' + (${accommodation.primaryColor} ?: '#1E293B') + ' 0%, ' + (${accommodation.primaryColor} ?: '#1E293B') + ' 100%); padding: 30px 20px;'">
 
-                        <!-- Nombre del Alojamiento -->
-                        <h1 th:text="${accommodation.name}"
-                            style="color: #ffffff; margin: 0 0 10px 0; font-size: 28px; font-weight: bold; text-align: center;">
-                            Nombre del Alojamiento
-                        </h1>
+                            <!-- Logo del Alojamiento -->
+                            <img th:if="${accommodation.logoUrl != null}" th:src="${accommodation.logoUrl}"
+                                th:alt="${accommodation.name}"
+                                style="max-width: 150px; height: auto; margin-bottom: 15px; border-radius: 8px; background: white; padding: 10px; display: block;">
 
-                        <!-- Título de la Notificación -->
-                        <p style="color: #ffffff; margin: 0; font-size: 16px; opacity: 0.9; text-align: center;">
-                            🔔 Nueva Reserva Confirmada
-                        </p>
-                    </td>
-                </tr>
+                            <!-- Nombre del Alojamiento -->
+                            <h1 th:text="${accommodation.name}"
+                                style="color: #ffffff; margin: 0 0 10px 0; font-size: 28px; font-weight: bold; text-align: center;">
+                                Nombre del Alojamiento
+                            </h1>
 
-                <!-- ==================== 2.2 CONTENIDO PRINCIPAL ==================== -->
-                <tr>
-                    <td style="padding: 30px 20px; color: #333333;">
-
-                        <!-- Saludo Personalizado al Propietario -->
-                        <h2 th:style="'color: ' + (${accommodation.primaryColor} ?: '#1E293B') + '; margin-top: 0; font-size: 24px;'">
-                            ¡Hola <span th:text="${ownerName} ?: 'Propietario'">Propietario</span>! 👋
-                        </h2>
-                        <p style="font-size: 16px; line-height: 1.6; color: #555555; margin: 15px 0 25px 0;">
-                            Has recibido una nueva reserva confirmada en tu alojamiento. A continuación encontrarás todos los detalles:
-                        </p>
-
-                        <!-- ==================== 2.2.1 INFORMACIÓN DEL HUÉSPED ==================== -->
-                        <div th:style="'background-color: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#2196F3') + ';'">
-                            <h3 th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#1976D2') + '; font-size: 18px;'">👤 Información del Huésped</h3>
-                            <table border="0" cellpadding="5" cellspacing="0" width="100%">
-                                <tr>
-                                    <td style="padding: 3px 0; color: #555; width: 35%;"><strong>Nombre completo:</strong></td>
-                                    <td style="padding: 3px 0; color: #333;"><span th:text="${reservation.guest.fullName}">Nombre del Huésped</span></td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 3px 0; color: #555;"><strong>Correo electrónico:</strong></td>
-                                    <td style="padding: 3px 0; color: #333;">
-                                        <a th:href="'mailto:' + ${reservation.guest.email}" th:text="${reservation.guest.email}" style="color: #2196F3; text-decoration: none;">email@ejemplo.com</a>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 3px 0; color: #555;"><strong>Teléfono:</strong></td>
-                                    <td style="padding: 3px 0; color: #333;">
-                                        <span th:text="${reservation.guest.phone} ?: 'No proporcionado'">+1 234 567 890</span>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-
-                        <!-- ==================== 2.2.2 DETALLES DE LA RESERVA ==================== -->
-                        <div th:style="'background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#1E293B') + ';'">
-                            <h3 th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#333333') + '; font-size: 18px;'">📅 Detalles de la Reserva</h3>
-                            <table border="0" cellpadding="5" cellspacing="0" width="100%">
-                                <tr>
-                                    <td style="padding: 3px 0; color: #555; width: 35%;"><strong>Código:</strong></td>
-                                    <td style="padding: 3px 0; color: #333;">
-                                        <span th:text="${reservation.confirmationCode}" style="font-family: 'Courier New', monospace; background: #ffffff; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #1E293B;">ABC123</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 3px 0; color: #555;"><strong>Check-in:</strong></td>
-                                    <td style="padding: 3px 0; color: #333;"><span th:text="${#temporals.format(reservation.checkIn, 'EEEE, dd MMMM yyyy')}">Lunes, 01 Enero 2026</span></td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 3px 0; color: #555;"><strong>Check-out:</strong></td>
-                                    <td style="padding: 3px 0; color: #333;"><span th:text="${#temporals.format(reservation.checkOut, 'EEEE, dd MMMM yyyy')}">Viernes, 05 Enero 2026</span></td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 3px 0; color: #555;"><strong>Noches:</strong></td>
-                                    <td style="padding: 3px 0; color: #333;"><span th:text="${reservation.nights}">4</span> noches</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 3px 0; color: #555;"><strong>Huéspedes:</strong></td>
-                                    <td style="padding: 3px 0; color: #333;">
-                                        <span th:text="${reservation.guestCount} ?: 'No especificado'">2</span> personas
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-
-                        <!-- ==================== 2.2.3 INFORMACIÓN FINANCIERA (LÓGICA DE MONEDAS) ==================== -->
-                        <div th:style="'background-color: #e8f5e9; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#4CAF50') + ';'">
-                            <h3 th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#2E7D32') + '; font-size: 18px;'">💰 Información Financiera</h3>
-                            <table border="0" cellpadding="5" cellspacing="0" width="100%">
-                                <tr>
-                                    <td style="padding: 3px 0; color: #555; width: 45%;"><strong>Total en moneda base:</strong></td>
-                                    <td style="padding: 3px 0; color: #333; text-align: right; font-size: 20px; font-weight: bold; color: #2E7D32;">
-                                        <span th:text="${#numbers.formatDecimal(originalTotal, 1, 2)}">0.00</span>
-                                        <span th:text="${originalCurrency}">ARS</span>
-                                    </td>
-                                </tr>
-                                <tr th:if="${showCurrencyEquivalents and totalUsd != null}">
-                                    <td style="padding: 3px 0; color: #555;"><strong>Equivalente en USD:</strong></td>
-                                    <td style="padding: 3px 0; color: #333; text-align: right; font-weight: bold;">
-                                        $<span th:text="${#numbers.formatDecimal(totalUsd, 1, 2)}">0.00</span> USD
-                                    </td>
-                                </tr>
-                                <tr th:if="${showCurrencyEquivalents and totalEur != null}">
-                                    <td style="padding: 3px 0; color: #555;"><strong>Equivalente en EUR:</strong></td>
-                                    <td style="padding: 3px 0; color: #333; text-align: right; font-weight: bold;">
-                                        €<span th:text="${#numbers.formatDecimal(totalEur, 1, 2)}">0.00</span> EUR
-                                    </td>
-                                </tr>
-                                <tr th:if="${showCurrencyEquivalents}">
-                                    <td colspan="2" style="padding-top: 8px; color: #777; font-size: 12px; text-align: right;">
-                                        USD y EUR son equivalencias informativas. El pago se coordina con el alojamiento.
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td colspan="2" style="padding: 10px 0 5px 0; border-top: 2px solid #4CAF50; text-align: right;">
-                                        <span th:text="${#strings.toUpperCase(reservation.status)}"
-                                              style="padding: 5px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; background-color: #4CAF50; color: white;">
-                                            CONFIRMADA
-                                        </span>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-
-                        <!-- ==================== 2.2.4 PREFERENCIAS DEL HUÉSPED (Condicional) ==================== -->
-                        <div th:if="${reservation.guest.preferences != null and !#strings.isEmpty(reservation.guest.preferences)}"
-                             th:style="'background-color: #fff3e0; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#FF9800') + ';'">
-                            <h3 th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#E65100') + '; font-size: 18px;'">⭐ Preferencias del Huésped</h3>
-                            <p th:text="${reservation.guest.preferences}" style="margin: 0; color: #555; line-height: 1.6;">Preferencias especiales</p>
-                        </div>
-
-                        <!-- ==================== 2.2.5 ALERGIAS/RESTRICCIONES (Manejo correcto de Array/Lista) ==================== -->
-                        <div th:if="${reservation.guest.allergies != null and !#lists.isEmpty(reservation.guest.allergies)}"
-                             th:style="'background-color: #ffebee; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#f44336') + ';'">
-                            <h3 th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#c62828') + '; font-size: 18px;'">⚠️ Alergias/Restricciones Alimentarias</h3>
-                            <ul style="margin: 10px 0; padding-left: 20px; color: #555; line-height: 1.6;">
-                                <!-- th:each recorre el array/lista de alergias e imprime cada una -->
-                                <li th:each="allergy : ${reservation.guest.allergies}"
-                                    th:text="${allergy}"
-                                    style="margin-bottom: 5px;">
-                                    Alergia
-                                </li>
-                            </ul>
-                        </div>
-
-                        <!-- ==================== 3. BOTÓN DE ACCIÓN ==================== -->
-                        <div style="text-align: center; margin: 35px 0;">
-                            <a th:href="${reservationUrl} ?: '#'"
-                               th:style="'display: inline-block; padding: 15px 40px; background-color: ' + (${accommodation.primaryColor} ?: '#1E293B') + '; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);'"
-                               style="display: inline-block; padding: 15px 40px; background-color: #1E293B; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                                📋 Ver Reserva en el Panel
-                            </a>
-                        </div>
-
-                        <!-- ==================== 4. MENSAJE DE RECORDATORIO ==================== -->
-                        <div style="background-color: #f0f4f8; padding: 15px; border-radius: 6px; margin: 25px 0; text-align: center;">
-                            <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.6;">
-                                <strong>Consejo:</strong> Confirma la reserva lo antes posible para brindar una excelente experiencia al huésped.
+                            <!-- Título de la Notificación -->
+                            <p style="color: #ffffff; margin: 0; font-size: 16px; opacity: 0.9; text-align: center;">
+                                🔔 Nueva Reserva Confirmada
                             </p>
-                        </div>
-                    </td>
-                </tr>
+                        </td>
+                    </tr>
 
-                <!-- ==================== 5. FOOTER CON MARCA DE AGUA HOSTFLOW ==================== -->
-                <tr>
-                    <td style="background-color: #f8f9fa; padding: 25px 20px; text-align: center; border-top: 2px solid #e0e0e0;">
-                        <div style="margin-bottom: 15px;">
-                            <span style="font-size: 14px; color: #666;">Powered by</span>
-                            <h3 style="margin: 5px 0; color: #4A90E2; font-size: 20px;">HostFlow</h3>
-                        </div>
-                        <p th:text="${watermark}" style="margin: 0 0 10px 0; color: #666; font-size: 13px; font-weight: 500;">Panel de Administración HostFlow</p>
-                        <p style="margin: 0 0 15px 0; color: #999; font-size: 12px; line-height: 1.5;">Gestión de alojamientos simplificada<br>Este es un correo automático del sistema de reservas.</p>
-                        <p style="margin: 15px 0 0 0; color: #999; font-size: 11px;">
-                            © <span th:text="${#dates.year(#dates.createNow())}">2026</span> HostFlow. Todos los derechos reservados.
-                        </p>
-                        <div style="margin-top: 15px;">
-                            <a href="https://hostflow.com" style="color: #4A90E2; text-decoration: none; font-size: 12px; margin: 0 10px;">Sitio Web</a>
-                            <span style="color: #ccc;">|</span>
-                            <a href="https://support.hostflow.com" style="color: #4A90E2; text-decoration: none; font-size: 12px; margin: 0 10px;">Soporte</a>
-                        </div>
-                    </td>
-                </tr>
+                    <!-- ==================== 2.2 CONTENIDO PRINCIPAL ==================== -->
+                    <tr>
+                        <td style="padding: 30px 20px; color: #333333;">
 
-            </table>
-            <!-- ==================== FIN CONTENEDOR DEL EMAIL ==================== -->
+                            <!-- Saludo Personalizado al Propietario -->
+                            <h2
+                                th:style="'color: ' + (${accommodation.primaryColor} ?: '#1E293B') + '; margin-top: 0; font-size: 24px;'">
+                                ¡Hola <span th:text="${ownerName} ?: 'Propietario'">Propietario</span>! 👋
+                            </h2>
+                            <p style="font-size: 16px; line-height: 1.6; color: #555555; margin: 15px 0 25px 0;">
+                                Has recibido una nueva reserva confirmada en tu alojamiento. A continuación encontrarás
+                                todos los detalles:
+                            </p>
 
-        </td>
-    </tr>
-</table>
-<!-- ==================== FIN CONTENEDOR PRINCIPAL ==================== -->
+                            <!-- ==================== 2.2.1 INFORMACIÓN DEL HUÉSPED ==================== -->
+                            <div
+                                th:style="'background-color: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#2196F3') + ';'">
+                                <h3
+                                    th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#1976D2') + '; font-size: 18px;'">
+                                    👤 Información del Huésped</h3>
+                                <table border="0" cellpadding="5" cellspacing="0" width="100%">
+                                    <tr>
+                                        <td style="padding: 3px 0; color: #555; width: 35%;"><strong>Nombre
+                                                completo:</strong></td>
+                                        <td style="padding: 3px 0; color: #333;"><span
+                                                th:text="${reservation.guest.fullName}">Nombre del Huésped</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 3px 0; color: #555;"><strong>Correo electrónico:</strong>
+                                        </td>
+                                        <td style="padding: 3px 0; color: #333;">
+                                            <a th:href="'mailto:' + ${reservation.guest.email}"
+                                                th:text="${reservation.guest.email}"
+                                                style="color: #2196F3; text-decoration: none;">email@ejemplo.com</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 3px 0; color: #555;"><strong>Teléfono:</strong></td>
+                                        <td style="padding: 3px 0; color: #333;">
+                                            <span th:text="${reservation.guest.phone} ?: 'No proporcionado'">+1 234 567
+                                                890</span>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- ==================== 2.2.2 DETALLES DE LA RESERVA ==================== -->
+                            <div
+                                th:style="'background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#1E293B') + ';'">
+                                <h3
+                                    th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#333333') + '; font-size: 18px;'">
+                                    📅 Detalles de la Reserva</h3>
+                                <table border="0" cellpadding="5" cellspacing="0" width="100%">
+                                    <tr>
+                                        <td style="padding: 3px 0; color: #555; width: 35%;"><strong>Código:</strong>
+                                        </td>
+                                        <td style="padding: 3px 0; color: #333;">
+                                            <span th:text="${reservation.confirmationCode}"
+                                                style="font-family: 'Courier New', monospace; background: #ffffff; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #1E293B;">ABC123</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 3px 0; color: #555;"><strong>Check-in:</strong></td>
+                                        <td style="padding: 3px 0; color: #333;"><span
+                                                th:text="${#temporals.format(reservation.checkIn, 'EEEE, dd MMMM yyyy')}">Lunes,
+                                                01 Enero 2026</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 3px 0; color: #555;"><strong>Check-out:</strong></td>
+                                        <td style="padding: 3px 0; color: #333;"><span
+                                                th:text="${#temporals.format(reservation.checkOut, 'EEEE, dd MMMM yyyy')}">Viernes,
+                                                05 Enero 2026</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 3px 0; color: #555;"><strong>Noches:</strong></td>
+                                        <td style="padding: 3px 0; color: #333;"><span
+                                                th:text="${reservation.nights}">4</span> noches</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 3px 0; color: #555;"><strong>Huéspedes:</strong></td>
+                                        <td style="padding: 3px 0; color: #333;">
+                                            <span th:text="${reservation.guestCount} ?: 'No especificado'">2</span>
+                                            personas
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- ==================== 2.2.3 INFORMACIÓN FINANCIERA (LÓGICA DE MONEDAS) ==================== -->
+                            <div
+                                th:style="'background-color: #e8f5e9; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#4CAF50') + ';'">
+                                <h3
+                                    th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#2E7D32') + '; font-size: 18px;'">
+                                    💰 Información Financiera</h3>
+                                <table border="0" cellpadding="5" cellspacing="0" width="100%">
+                                    <tr>
+                                        <td style="padding: 3px 0; color: #555; width: 45%;"><strong>Total en moneda
+                                                base:</strong></td>
+                                        <td
+                                            style="padding: 3px 0; color: #333; text-align: right; font-size: 20px; font-weight: bold; color: #2E7D32;">
+                                            <span th:text="${#numbers.formatDecimal(originalTotal, 1, 2)}">0.00</span>
+                                            <span th:text="${originalCurrency}">ARS</span>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${showCurrencyEquivalents and totalUsd != null}">
+                                        <td style="padding: 3px 0; color: #555;"><strong>Equivalente en USD:</strong>
+                                        </td>
+                                        <td style="padding: 3px 0; color: #333; text-align: right; font-weight: bold;">
+                                            $<span th:text="${#numbers.formatDecimal(totalUsd, 1, 2)}">0.00</span> USD
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${showCurrencyEquivalents and totalEur != null}">
+                                        <td style="padding: 3px 0; color: #555;"><strong>Equivalente en EUR:</strong>
+                                        </td>
+                                        <td style="padding: 3px 0; color: #333; text-align: right; font-weight: bold;">
+                                            €<span th:text="${#numbers.formatDecimal(totalEur, 1, 2)}">0.00</span> EUR
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${showCurrencyEquivalents}">
+                                        <td colspan="2"
+                                            style="padding-top: 8px; color: #777; font-size: 12px; text-align: right;">
+                                            USD y EUR son equivalencias informativas. El pago se coordina con el
+                                            alojamiento.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"
+                                            style="padding: 10px 0 5px 0; border-top: 2px solid #4CAF50; text-align: right;">
+                                            <span th:text="${#strings.toUpperCase(reservation.status)}"
+                                                style="padding: 5px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; background-color: #4CAF50; color: white;">
+                                                CONFIRMADA
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- ==================== 2.2.4 PREFERENCIAS DEL HUÉSPED (Condicional) ==================== -->
+                            <div th:if="${reservation.guest.preferences != null and !#strings.isEmpty(reservation.guest.preferences)}"
+                                th:style="'background-color: #fff3e0; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#FF9800') + ';'">
+                                <h3
+                                    th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#E65100') + '; font-size: 18px;'">
+                                    ⭐ Preferencias del Huésped</h3>
+                                <p th:text="${reservation.guest.preferences}"
+                                    style="margin: 0; color: #555; line-height: 1.6;">Preferencias especiales</p>
+                            </div>
+
+                            <!-- ==================== 2.2.5 ALERGIAS/RESTRICCIONES (Manejo correcto de Array/Lista) ==================== -->
+                            <div th:if="${reservation.guest.allergies != null and !#lists.isEmpty(reservation.guest.allergies)}"
+                                th:style="'background-color: #ffebee; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#f44336') + ';'">
+                                <h3
+                                    th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#c62828') + '; font-size: 18px;'">
+                                    ⚠️ Alergias/Restricciones Alimentarias</h3>
+                                <ul style="margin: 10px 0; padding-left: 20px; color: #555; line-height: 1.6;">
+                                    <!-- th:each recorre el array/lista de alergias e imprime cada una -->
+                                    <li th:each="allergy : ${reservation.guest.allergies}" th:text="${allergy}"
+                                        style="margin-bottom: 5px;">
+                                        Alergia
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- ==================== 3. BOTÓN DE ACCIÓN ==================== -->
+                            <div style="text-align: center; margin: 35px 0;">
+                                <a th:href="${reservationUrl} ?: '#'"
+                                    th:style="'display: inline-block; padding: 15px 40px; background-color: ' + (${accommodation.primaryColor} ?: '#1E293B') + '; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);'"
+                                    style="display: inline-block; padding: 15px 40px; background-color: #1E293B; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                                    📋 Ver Reserva en el Panel
+                                </a>
+                            </div>
+
+                            <!-- ==================== 4. MENSAJE DE RECORDATORIO ==================== -->
+                            <div
+                                style="background-color: #f0f4f8; padding: 15px; border-radius: 6px; margin: 25px 0; text-align: center;">
+                                <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.6;">
+                                    <strong>Consejo:</strong> Confirma la reserva lo antes posible para brindar una
+                                    excelente experiencia al huésped.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- ==================== 5. FOOTER CON MARCA DE AGUA HOSTFLOW ==================== -->
+                    <tr>
+                        <td
+                            style="background-color: #f8f9fa; padding: 25px 20px; text-align: center; border-top: 2px solid #e0e0e0;">
+                            <div style="margin-bottom: 15px;">
+                                <span style="font-size: 14px; color: #666;">Powered by</span>
+                                <h3 style="margin: 5px 0; color: #4A90E2; font-size: 20px;">HostFlow</h3>
+                            </div>
+                            <p th:text="${watermark}"
+                                style="margin: 0 0 10px 0; color: #666; font-size: 13px; font-weight: 500;">Panel de
+                                Administración HostFlow</p>
+                            <p style="margin: 0 0 15px 0; color: #999; font-size: 12px; line-height: 1.5;">Gestión de
+                                alojamientos simplificada<br>Este es un correo automático del sistema de reservas.</p>
+                            <p style="margin: 15px 0 0 0; color: #999; font-size: 11px;">
+                                © <span th:text="${#dates.year(#dates.createNow())}">2026</span> HostFlow. Todos los
+                                derechos reservados.
+                            </p>
+                            <div style="margin-top: 15px;">
+                                <a href="https://hostflow.com"
+                                    style="color: #4A90E2; text-decoration: none; font-size: 12px; margin: 0 10px;">Sitio
+                                    Web</a>
+                                <span style="color: #ccc;">|</span>
+                                <a href="https://support.hostflow.com"
+                                    style="color: #4A90E2; text-decoration: none; font-size: 12px; margin: 0 10px;">Soporte</a>
+                            </div>
+                        </td>
+                    </tr>
+
+                </table>
+                <!-- ==================== FIN CONTENEDOR DEL EMAIL ==================== -->
+
+            </td>
+        </tr>
+    </table>
+    <!-- ==================== FIN CONTENEDOR PRINCIPAL ==================== -->
 
 </body>
+
 </html>

@@ -1,5 +1,6 @@
 package com.hostflow.service;
 
+import com.hostflow.dto.request.AccommodationProfileRequest;
 import com.hostflow.dto.response.AccommodationProfileResponse;
 import com.hostflow.dto.response.AccommodationImageResponse;
 import com.hostflow.dto.response.CloudinaryUploadResult;

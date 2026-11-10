@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -11,24 +12,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class SecurityIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
-    void protectedEndpoint_ShouldReturn401_WhenNoTokenProvided() throws Exception {
-        // Intenta acceder a un endpoint de OWNER sin token
+    void protectedEndpoint_ShouldReturn403_WhenNoTokenProvided() throws Exception {
+        // Sin token → anónimo → no tiene rol OWNER/ADMIN → 403
         mockMvc.perform(get("/owners/accommodation/profile"))
-                .andExpect(status().isUnauthorized()); // 401
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    void adminEndpoint_ShouldReturn403_WhenOwnerTriesToAccess() throws Exception {
-        // Aquí podrías usar @WithMockUser(username="test", roles={"OWNER"})
-        // para simular un usuario con rol OWNER intentando acceder a /admin/**
-        // Por ahora, sin token, devuelve 401, lo cual ya valida el filtro de seguridad.
+    void adminEndpoint_ShouldReturn403_WhenNoTokenProvided() throws Exception {
+        // Sin token → anónimo → no tiene rol ADMIN → 403
         mockMvc.perform(get("/admin/dashboard/metrics"))
-                .andExpect(status().isUnauthorized()); // 401 (o 403 si estuviera autenticado como OWNER)
+                .andExpect(status().isForbidden());
     }
 }

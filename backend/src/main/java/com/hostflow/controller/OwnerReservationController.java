@@ -74,12 +74,6 @@ public class OwnerReservationController {
     private final ReservationService reservationService;
     private final OwnerRepository ownerRepository;
     private final AccommodationRepository accommodationRepository;
-    /**
-     * Servicio que encapsula toda la lógica de negocio de las reservas.
-     * Se encarga de validar que el propietario tenga derecho a operar
-     * sobre la reserva o alojamiento solicitado.
-     */
-    private final ReservationService reservationService;
 
     // =========================================================================
     // 1. CREAR RESERVA
