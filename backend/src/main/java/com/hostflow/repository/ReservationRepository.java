@@ -189,8 +189,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     /**
      * Calcula los ingresos del último mes para un propietario.
      *
-     * <p>Suma el total de las reservas completadas. Se asume que el estado
-     * {@code COMPLETED} implica que el ingreso está asegurado.
+     * <p>Suma el total de las reservas completadas. {@code COMPLETED} solo se asigna
+     * tras registrar el pago ({@code PAID}), por lo que el ingreso se considera asegurado.
      * Utiliza {@code COALESCE} para devolver 0 en lugar de null si no hay reservas.</p>
      *
      * @param ownerId      ID del propietario

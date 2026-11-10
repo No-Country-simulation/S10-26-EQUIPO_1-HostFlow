@@ -180,11 +180,15 @@ public class OwnerReservationController {
     @PostMapping("/{reservationId}/cancel")
     @Operation(
             summary = "Cancelar reserva",
-            description = "Cancela una reserva existente. Solo se pueden cancelar reservas en estado PENDING o CONFIRMED."
+            description = """
+            Cancela una reserva en estado PENDING o CONFIRMED. También permite cancelar si el pago
+            ya está PAID (HostFlow no gestiona reembolsos). No se puede cancelar una reserva COMPLETED.
+            Invalida enlaces vigentes, libera fechas y notifica al huésped tras el commit.
+            """
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Reserva cancelada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "La reserva no se puede cancelar (ya está completada o cancelada)"),
+            @ApiResponse(responseCode = "200", description = "Reserva cancelada (correo de notificación post-commit)"),
+            @ApiResponse(responseCode = "400", description = "La reserva ya está cancelada o completada"),
             @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
     })
     public ResponseEntity<ReservationResponse> cancelReservation(
@@ -265,19 +269,18 @@ public class OwnerReservationController {
             summary = "Completar reserva",
             description = """
             Marca una reserva como COMPLETADA después del check-out del huésped.
-            
-            Esta acción es irreversible y es la que permite que los ingresos de esta 
-            reserva se reflejen en las métricas del dashboard del propietario 
-            (incomeLastMonth y accumulatedIncome).
+            Esta acción es irreversible y alimenta las métricas de ingreso del dashboard
+            (incomeLastMonth y accumulatedIncome), que solo suman reservas COMPLETED.
             
             Validaciones:
-            - La reserva debe estar en estado CONFIRMED.
-            - La fecha de check-out ya debe haber pasado.
+            - Estado CONFIRMED.
+            - paymentStatus = PAID (el pago debe estar registrado).
+            - La fecha de check-out ya debe haber pasado (a partir del día siguiente).
             """
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Reserva completada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "La reserva no puede ser completada (no está CONFIRMED o el check-out no ha pasado)"),
+            @ApiResponse(responseCode = "200", description = "Reserva completada; ingreso disponible en dashboard"),
+            @ApiResponse(responseCode = "400", description = "No cumple estado CONFIRMED, pago PAID o fecha de check-out"),
             @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
     })
     public ResponseEntity<ReservationResponse> completeReservation(

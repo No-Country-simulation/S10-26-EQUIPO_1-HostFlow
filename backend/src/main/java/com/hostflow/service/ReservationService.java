@@ -468,7 +468,10 @@ public class ReservationService {
     // =========================================================================
 
     /**
-     * Cancela una reserva existente.
+     * Cancela una reserva existente (PENDING o CONFIRMED), incluso si el pago está PAID.
+     *
+     * <p>No se puede cancelar una reserva COMPLETED. HostFlow no procesa reembolsos:
+     * cancelar una reserva PAID solo cambia el estado operativo y libera fechas.</p>
      *
      * @param ownerId       ID del propietario autenticado
      * @param reservationId ID de la reserva
@@ -486,6 +489,14 @@ public class ReservationService {
         }
         if (reservation.getStatus() == ReservationStatus.COMPLETED) {
             throw new BusinessException("No se puede cancelar una reserva que ya ha sido completada.");
+        }
+
+        // Se permite cancelar reservas PAID mientras no estén COMPLETED.
+        // HostFlow no gestiona reembolsos: solo se registra la cancelación operativa.
+        if (reservation.getPaymentStatus() == PaymentStatus.PAID) {
+            log.warn(
+                    "Cancelando reserva PAID {} (código {}). No se procesa reembolso en HostFlow.",
+                    reservationId, reservation.getConfirmationCode());
         }
 
         reservation.setStatus(ReservationStatus.CANCELLED);
@@ -510,19 +521,26 @@ public class ReservationService {
         final String cancellationReason = reason;
 
         // El correo de cancelación no debe revertir la cancelación ya persistida.
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                try {
-                    emailService.sendReservationCancelledEmail(
-                            guestEmail, guestName, confirmationCode, accommodationName, cancellationReason);
-                    log.info("📧 Correo de cancelación aceptado por el proveedor para: {}", guestEmail);
-                } catch (RuntimeException ex) {
-                    log.error("Reserva {} cancelada, pero no se pudo notificar al huésped {}: {}",
-                            confirmationCode, guestEmail, ex.getMessage(), ex);
-                }
+        Runnable sendCancellationEmail = () -> {
+            try {
+                emailService.sendReservationCancelledEmail(
+                        guestEmail, guestName, confirmationCode, accommodationName, cancellationReason);
+                log.info("Correo de cancelación aceptado por el proveedor para: {}", guestEmail);
+            } catch (RuntimeException ex) {
+                log.error("Reserva {} cancelada, pero no se pudo notificar al huésped {}: {}",
+                        confirmationCode, guestEmail, ex.getMessage(), ex);
             }
-        });
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendCancellationEmail.run();
+                }
+            });
+        } else {
+            sendCancellationEmail.run();
+        }
 
         return ReservationResponse.from(reservation, null);
     }
@@ -580,27 +598,33 @@ public class ReservationService {
         Accommodation accommodation = reservation.getAccommodation();
 
         // Los emails nunca deben enviarse si la transacción termina en rollback.
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                try {
-                    emailService.sendReservationConfirmedGuestEmail(
-                            reservation, accommodation, guestName, "#");
-                } catch (RuntimeException ex) {
-                    // El pago ya quedó registrado; un fallo de correo no debe revertirlo.
-                    log.error("No se pudo enviar la confirmación al huésped de la reserva {}: {}",
-                            reservation.getConfirmationCode(), ex.getMessage(), ex);
-                }
-
-                try {
-                    emailService.sendReservationConfirmedOwnerEmail(
-                            reservation, accommodation, ownerName, "#");
-                } catch (RuntimeException ex) {
-                    log.error("No se pudo enviar la notificación al propietario de la reserva {}: {}",
-                            reservation.getConfirmationCode(), ex.getMessage(), ex);
-                }
+        Runnable sendPaymentEmails = () -> {
+            try {
+                emailService.sendReservationConfirmedGuestEmail(
+                        reservation, accommodation, guestName, "#");
+            } catch (RuntimeException ex) {
+                log.error("No se pudo enviar la confirmación al huésped de la reserva {}: {}",
+                        reservation.getConfirmationCode(), ex.getMessage(), ex);
             }
-        });
+            try {
+                emailService.sendReservationConfirmedOwnerEmail(
+                        reservation, accommodation, ownerName, "#");
+            } catch (RuntimeException ex) {
+                log.error("No se pudo enviar la notificación al propietario de la reserva {}: {}",
+                        reservation.getConfirmationCode(), ex.getMessage(), ex);
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendPaymentEmails.run();
+                }
+            });
+        } else {
+            // Sin TX activa (p. ej. tests unitarios): no bloquear la operación de negocio.
+            sendPaymentEmails.run();
+        }
 
         return ReservationResponse.from(reservation, null);
     }
@@ -612,13 +636,14 @@ public class ReservationService {
     /**
      * Marca una reserva como COMPLETADA después del check-out.
      *
-     * <p>Esta operación es irreversible y actualiza las métricas financieras
-     * del propietario (incomeLastMonth, accumulatedIncome) en el dashboard.</p>
+     * <p>Requisitos: estado {@code CONFIRMED}, {@code paymentStatus = PAID} y fecha de
+     * check-out ya superada (a partir del día siguiente). El dashboard usa
+     * {@code COMPLETED} como ingreso asegurado.</p>
      *
      * @param ownerId       ID del propietario autenticado
      * @param reservationId ID de la reserva a completar
      * @return la reserva actualizada
-     * @throws BusinessException si la reserva no está en estado CONFIRMED o el check-out no ha pasado
+     * @throws BusinessException si no cumple estado, pago o fecha
      * @throws ResourceNotFoundException si la reserva no existe
      */
     @Transactional
@@ -634,19 +659,24 @@ public class ReservationService {
                             "Estado actual: " + reservation.getStatus().getDisplayName());
         }
 
-        // Validar que la fecha de check-out ya haya pasado
-        // Sin una hora de salida configurada, la reserva se completa desde el día siguiente al check-out.
+        // El dashboard trata COMPLETED como ingreso asegurado: exige pago registrado.
+        if (reservation.getPaymentStatus() != PaymentStatus.PAID) {
+            throw new BusinessException(
+                    "Solo se pueden completar reservas con pago registrado (PAID). " +
+                            "Registra el pago antes de completar la estadía.");
+        }
+
+        // Sin hora de salida configurada, la reserva se completa desde el día siguiente al check-out.
         if (!reservation.getCheckOut().isBefore(LocalDate.now())) {
             throw new BusinessException(
                     "La reserva solo puede completarse a partir del día siguiente al check-out. " +
                             "Check-out: " + reservation.getCheckOut());
         }
 
-        // Cambiar estado a COMPLETED
         reservation.setStatus(ReservationStatus.COMPLETED);
         Reservation completed = reservationRepository.save(reservation);
 
-        log.info("✅ Reserva completada: {} | Ingreso registrado: ${}",
+        log.info("Reserva completada: {} | Ingreso registrado: {}",
                 completed.getConfirmationCode(), completed.getTotalAmount());
 
         return ReservationResponse.from(completed, null);
