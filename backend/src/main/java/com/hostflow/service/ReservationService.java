@@ -422,10 +422,16 @@ public class ReservationService {
         return guestRepository.save(newGuest);
     }
 
+    /**
+     * Equivalencias solo informativas (no se persisten). Se muestran USD/EUR cuando el
+     * alojamiento tiene billetera digital usable o PayPal; si solo hay transferencia, lista vacía.
+     */
     private List<ReservationOnboardingDetailsResponse.CurrencyEquivalent> buildCurrencyEquivalents(
             Accommodation accommodation, BigDecimal pricePerNight, BigDecimal subtotal,
             BigDecimal additionalServicesTotal, BigDecimal totalAmount) {
-        if (!hasActivePaypalPaymentMethod(accommodation)) return List.of();
+        if (!shouldShowInternationalCurrencyEquivalents(accommodation)) {
+            return List.of();
+        }
 
         List<ReservationOnboardingDetailsResponse.CurrencyEquivalent> equivalents = new java.util.ArrayList<>();
         for (Currency target : List.of(Currency.USD, Currency.EUR)) {
@@ -444,11 +450,24 @@ public class ReservationService {
         return List.copyOf(equivalents);
     }
 
-    private boolean hasActivePaypalPaymentMethod(Accommodation accommodation) {
-        if (accommodation.getPaymentMethods() == null) return false;
+    /**
+     * Billetera digital o PayPal → equivalencias internacionales.
+     * Solo transferencia bancaria (u otros sin wallet/PayPal) → no.
+     */
+    private boolean shouldShowInternationalCurrencyEquivalents(Accommodation accommodation) {
+        if (accommodation.getPaymentMethods() == null) {
+            return false;
+        }
         return accommodation.getPaymentMethods().stream()
                 .filter(this::isUsablePaymentMethod)
-                .anyMatch(method -> containsPaypal(method.getDisplayName()) || containsPaypal(method.getProviderName()));
+                .anyMatch(this::isInternationalPaymentMethod);
+    }
+
+    private boolean isInternationalPaymentMethod(AccommodationPaymentMethod method) {
+        if (method.getPaymentType() == PaymentMethodType.DIGITAL_WALLET) {
+            return true;
+        }
+        return containsPaypal(method.getDisplayName()) || containsPaypal(method.getProviderName());
     }
 
     private boolean containsPaypal(String value) {

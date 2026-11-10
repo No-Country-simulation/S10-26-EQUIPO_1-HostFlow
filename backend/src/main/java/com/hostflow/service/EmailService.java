@@ -231,22 +231,32 @@ public class EmailService {
         String originalCurrency = accommodation.getBaseCurrency() != null
                 ? accommodation.getBaseCurrency().name() : Currency.ARS.name();
         BigDecimal total = amount != null ? amount : BigDecimal.ZERO;
-        boolean paypal = hasActivePaypalPaymentMethod(accommodation);
+        // Informativo: billetera digital o PayPal → USD/EUR; solo transferencia → solo moneda base.
+        boolean showEquivalents = shouldShowInternationalCurrencyEquivalents(accommodation);
 
         context.setVariable("originalCurrency", originalCurrency);
         context.setVariable("originalTotal", total);
-        context.setVariable("showCurrencyEquivalents", paypal);
-        context.setVariable("totalUsd", paypal && accommodation.getBaseCurrency() != Currency.USD
+        context.setVariable("showCurrencyEquivalents", showEquivalents);
+        context.setVariable("totalUsd", showEquivalents && accommodation.getBaseCurrency() != Currency.USD
                 ? currencyConversionService.convertIfAvailable(accommodation.getId(), total, Currency.USD) : null);
-        context.setVariable("totalEur", paypal && accommodation.getBaseCurrency() != Currency.EUR
+        context.setVariable("totalEur", showEquivalents && accommodation.getBaseCurrency() != Currency.EUR
                 ? currencyConversionService.convertIfAvailable(accommodation.getId(), total, Currency.EUR) : null);
     }
 
-    private boolean hasActivePaypalPaymentMethod(Accommodation accommodation) {
-        if (accommodation.getPaymentMethods() == null) return false;
+    private boolean shouldShowInternationalCurrencyEquivalents(Accommodation accommodation) {
+        if (accommodation.getPaymentMethods() == null) {
+            return false;
+        }
         return accommodation.getPaymentMethods().stream()
                 .filter(this::isUsablePaymentMethod)
-                .anyMatch(method -> containsPaypal(method.getDisplayName()) || containsPaypal(method.getProviderName()));
+                .anyMatch(this::isInternationalPaymentMethod);
+    }
+
+    private boolean isInternationalPaymentMethod(AccommodationPaymentMethod method) {
+        if (method.getPaymentType() == PaymentMethodType.DIGITAL_WALLET) {
+            return true;
+        }
+        return containsPaypal(method.getDisplayName()) || containsPaypal(method.getProviderName());
     }
 
     private boolean isUsablePaymentMethod(AccommodationPaymentMethod method) {
@@ -280,6 +290,23 @@ public class EmailService {
             amounts.append(String.format(java.util.Locale.ROOT, "\nEquivalente informativo: %s %s",
                     formatAmount(converted), currency.name()));
         }
+    }
+
+
+    /**
+     * Variables de plantilla para el desglose de servicios adicionales (solo visualización).
+     */
+    private void addAdditionalServicesVariables(Context context, Reservation reservation) {
+        var services = reservation.getAdditionalServices() == null
+                ? java.util.List.of()
+                : reservation.getAdditionalServices();
+        context.setVariable("additionalServices", services);
+        context.setVariable("hasAdditionalServices", !services.isEmpty());
+        context.setVariable("additionalServicesTotal",
+                reservation.getAdditionalServicesTotal() != null
+                        ? reservation.getAdditionalServicesTotal() : BigDecimal.ZERO);
+        context.setVariable("accommodationSubtotal",
+                reservation.getSubtotal() != null ? reservation.getSubtotal() : BigDecimal.ZERO);
     }
 
     private String formatAmount(BigDecimal amount) {
@@ -388,7 +415,7 @@ public class EmailService {
         context.setVariable("watermark", "Plataforma de Reservas HostFlow");
         context.setVariable("reservationUrl", reservationUrl);
         context.setVariable("paymentConfirmed", true);
-
+        addAdditionalServicesVariables(context, reservation);
         addReservationCurrencyVariables(context, reservation, accommodation);
 
         String htmlContent = templateEngine.process("emails/reservation-confirmation-guest", context);
@@ -415,7 +442,7 @@ public class EmailService {
         context.setVariable("watermark", "Panel de Administración HostFlow");
         context.setVariable("reservationUrl", reservationUrl);
         context.setVariable("paymentConfirmed", true);
-
+        addAdditionalServicesVariables(context, reservation);
         addReservationCurrencyVariables(context, reservation, accommodation);
 
         String htmlContent = templateEngine.process("emails/reservation-notification-owner", context);

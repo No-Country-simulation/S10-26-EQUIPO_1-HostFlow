@@ -161,6 +161,36 @@
                                     th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#2E7D32') + '; font-size: 18px;'">
                                     💰 Resumen de Pago</h3>
                                 <table border="0" cellpadding="5" cellspacing="0" width="100%">
+                                    <tr th:if="${accommodationSubtotal != null}">
+                                        <td style="padding: 3px 0; color: #555; width: 45%;"><strong>Subtotal alojamiento:</strong></td>
+                                        <td style="padding: 3px 0; color: #333; text-align: right;">
+                                            <span th:text="${#numbers.formatDecimal(accommodationSubtotal, 1, 2)}">0.00</span>
+                                            <span th:text="${originalCurrency}">ARS</span>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${hasAdditionalServices}">
+                                        <td colspan="2" style="padding: 12px 0 4px 0; color: #555;">
+                                            <strong>Servicios adicionales:</strong>
+                                        </td>
+                                    </tr>
+                                    <tr th:each="svc : ${additionalServices}" th:if="${hasAdditionalServices}">
+                                        <td style="padding: 2px 0 2px 12px; color: #555;">
+                                            <span th:text="${svc.serviceNameSnapshot}">Servicio</span>
+                                            <span th:if="${svc.quantity != null and svc.quantity > 1}"
+                                                  th:text="' × ' + ${svc.quantity}"></span>
+                                        </td>
+                                        <td style="padding: 2px 0; color: #333; text-align: right;">
+                                            <span th:text="${#numbers.formatDecimal(svc.lineTotal, 1, 2)}">0.00</span>
+                                            <span th:text="${svc.currency}">ARS</span>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${hasAdditionalServices}">
+                                        <td style="padding: 3px 0; color: #555;"><strong>Total adicionales:</strong></td>
+                                        <td style="padding: 3px 0; color: #333; text-align: right;">
+                                            <span th:text="${#numbers.formatDecimal(additionalServicesTotal, 1, 2)}">0.00</span>
+                                            <span th:text="${originalCurrency}">ARS</span>
+                                        </td>
+                                    </tr>
                                     <tr>
                                         <td style="padding: 3px 0; color: #555; width: 45%;"><strong>Total en moneda
                                                 base:</strong></td>

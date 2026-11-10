@@ -1,6 +1,7 @@
 package com.hostflow.service;
 
 import com.hostflow.enums.Currency;
+import com.hostflow.enums.UsdRateType;
 import com.hostflow.exception.BusinessException;
 import com.hostflow.exception.ResourceNotFoundException;
 import com.hostflow.model.AcceptedCurrency;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -105,18 +107,69 @@ public class CurrencyConversionService {
 
     /**
      * Conversión tolerante para importes exclusivamente informativos (pantalla/correos).
-     * Devuelve null cuando la moneda o su tasa no están disponibles, sin propagar
-     * la excepción ni marcar como rollback-only la transacción que consulta la reserva.
+     *
+     * <p>No persiste el resultado. No exige que USD/EUR estén configurados ni habilitados
+     * en el alojamiento: si hay {@link AcceptedCurrency} se usa su tasa; si no, se toma
+     * la tasa del caché global del sistema (USD blue por defecto, EUR genérico).</p>
+     *
+     * <p>La decisión de <em>mostrar</em> equivalencias la toma la capa de reservas/correos
+     * según el método de pago (billetera digital / PayPal). Este método solo calcula el monto.</p>
      */
     @Transactional(readOnly = true)
     public BigDecimal convertIfAvailable(Long accommodationId, BigDecimal amount, Currency targetCurrency) {
         try {
-            return convert(accommodationId, amount, targetCurrency);
+            if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
+                return null;
+            }
+
+            AcceptedCurrency cfg = acceptedCurrencyRepository
+                    .findByAccommodation_IdAndCurrency(accommodationId, targetCurrency)
+                    .orElse(null);
+
+            BigDecimal rate;
+            if (cfg != null) {
+                // Preferir configuración del alojamiento (aunque esté deshabilitada para multi-moneda).
+                rate = resolveRate(cfg, targetCurrency);
+            } else {
+                // Sin configuración local: tasa global del sistema (no depende del owner).
+                rate = resolveGlobalCacheRate(targetCurrency);
+                if (rate == null) {
+                    log.debug("Sin tasa global de {} para equivalencia informativa (alojamiento {})",
+                            targetCurrency, accommodationId);
+                    return null;
+                }
+            }
+
+            return targetCurrency.scale(amount.multiply(rate, MC));
         } catch (RuntimeException ex) {
             log.debug("Equivalencia informativa no disponible para {} en alojamiento {}: {}",
                     targetCurrency, accommodationId, ex.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Tasa ARS→destino desde el caché global, sin exigir AcceptedCurrency del alojamiento.
+     * USD: intenta BLUE y luego OFICIAL. EUR: tasa genérica (sin tipo de dólar).
+     */
+    private BigDecimal resolveGlobalCacheRate(Currency targetCurrency) {
+        if (targetCurrency == Currency.USD) {
+            for (UsdRateType type : List.of(UsdRateType.BLUE, UsdRateType.OFICIAL)) {
+                var cached = exchangeRateCacheRepository
+                        .findByFromCurrencyAndToCurrencyAndUsdRateType(Currency.ARS, Currency.USD, type);
+                if (cached.isPresent() && cached.get().getRate() != null
+                        && cached.get().getRate().compareTo(BigDecimal.ZERO) > 0) {
+                    return cached.get().getRate();
+                }
+            }
+            return null;
+        }
+
+        return exchangeRateCacheRepository
+                .findByFromCurrencyAndToCurrencyAndUsdRateTypeIsNull(Currency.ARS, targetCurrency)
+                .map(ExchangeRateCache::getRate)
+                .filter(rate -> rate != null && rate.compareTo(BigDecimal.ZERO) > 0)
+                .orElse(null);
     }
 
     // =========================================================================
