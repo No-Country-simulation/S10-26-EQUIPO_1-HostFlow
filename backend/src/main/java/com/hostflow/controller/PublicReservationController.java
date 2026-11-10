@@ -1,7 +1,8 @@
 package com.hostflow.controller;
 
-import com.hostflow.dto.request.ConfirmReservationRequest;
-import com.hostflow.dto.response.ReservationResponse;
+import com.hostflow.dto.request.CompleteReservationOnboardingRequest;
+import com.hostflow.dto.response.ReservationOnboardingConfirmationResponse;
+import com.hostflow.dto.response.ReservationOnboardingDetailsResponse;
 import com.hostflow.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -49,12 +50,9 @@ public class PublicReservationController {
             @ApiResponse(responseCode = "400", description = "Enlace inválido o expirado"),
             @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
     })
-    public ResponseEntity<ReservationResponse> getReservationDetails(
+    public ResponseEntity<ReservationOnboardingDetailsResponse> getReservationDetails(
             @RequestParam String token) {
-
-        // Buscar la reserva por el token (implementar en servicio)
-        // Por ahora, retornar respuesta básica
-        return ResponseEntity.ok(null);
+        return ResponseEntity.ok(reservationService.getOnboardingDetails(token));
     }
 
     /**
@@ -62,30 +60,22 @@ public class PublicReservationController {
      */
     @PostMapping("/confirm")
     @Operation(
-            summary = "Confirmar reserva",
+            summary = "Completar onboarding y confirmar reserva",
             description = """
-            Confirma una reserva pendiente usando el token del enlace y seleccionando
-            un método de pago activo del huésped.
-            
-            <strong>Proceso:</strong>
-            1. Valida el token del enlace (vigencia y uso único).
-            2. Valida que el método de pago sea activo.
-            3. Re-valida disponibilidad del alojamiento.
-            4. Cambia el estado a CONFIRMED.
-            5. Envía email de confirmación al huésped.
+            Guarda datos personales, documento, alergias, preferencias, servicios adicionales
+            y el indicador opcional de solicitud de transfer; luego confirma la reserva en
+            una sola transacción. No registra pagos: paymentStatus permanece PENDING.
             """
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Reserva confirmada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Enlace inválido, expirado o método de pago no válido"),
+            @ApiResponse(responseCode = "400", description = "Enlace inválido, expirado o datos de onboarding no válidos"),
             @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
     })
-    public ResponseEntity<ReservationResponse> confirmReservation(
+    public ResponseEntity<ReservationOnboardingConfirmationResponse> completeOnboarding(
             @RequestParam String token,
-            @Valid @RequestBody ConfirmReservationRequest request) {
-
-        ReservationResponse response = reservationService.confirmReservation(
-                token, request.paymentMethodId());
+            @Valid @RequestBody CompleteReservationOnboardingRequest request) {
+        ReservationOnboardingConfirmationResponse response = reservationService.completeOnboarding(token, request);
         return ResponseEntity.ok(response);
     }
 }

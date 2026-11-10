@@ -1,6 +1,7 @@
 package com.hostflow.dto.response;
 
 import com.hostflow.enums.ReservationStatus;
+import com.hostflow.enums.PaymentStatus;
 import com.hostflow.model.Reservation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
@@ -60,6 +61,12 @@ public record ReservationResponse(
         @Schema(description = "Estado de la reserva", example = "PENDING")
         ReservationStatus status,
 
+        @Schema(description = "Estado del pago", example = "PENDING")
+        PaymentStatus paymentStatus,
+
+        @Schema(description = "Fecha y hora en que el propietario registró el pago")
+        LocalDateTime paidAt,
+
         @Schema(description = "Número de huéspedes", example = "2")
         Integer guestCount,
 
@@ -87,29 +94,27 @@ public record ReservationResponse(
      * @return el DTO de respuesta completo
      */
     public static ReservationResponse from(Reservation r, ReservationLinkResponse link) {
-        GuestPaymentMethodResponse paymentMethodResponse = r.getPaymentMethod() != null
-                ? GuestPaymentMethodResponse.from(r.getPaymentMethod())
-                : null;
-
         return new ReservationResponse(
                 r.getId(),
                 r.getConfirmationCode(),
                 r.getAccommodation().getId(),
                 r.getAccommodation().getName(),
-                r.getGuest().getId(),
-                r.getGuest().getFullName(),
-                r.getGuest().getEmail(),
+                r.getGuest() != null ? r.getGuest().getId() : null,
+                r.getGuest() != null ? r.getGuest().getFullName() : r.getGuestName(),
+                r.getGuest() != null ? r.getGuest().getEmail() : r.getGuestEmail(),
                 r.getCheckIn(),
                 r.getCheckOut(),
                 r.getNights(),
                 r.getPricePerNight(),
                 r.getSubtotal(),
-                r.getTaxes(),
+                BigDecimal.ZERO,
                 r.getTotalAmount(),
                 r.getStatus(),
+                r.getPaymentStatus(),
+                r.getPaidAt(),
                 r.getGuestCount(),
                 r.getSpecialRequests(),
-                paymentMethodResponse,
+                null,
                 link,
                 r.getCreatedAt(),
                 r.getUpdatedAt()

@@ -1,6 +1,7 @@
 package com.hostflow.service;
 
 import com.hostflow.dto.response.CloudinaryUploadResult;
+import com.hostflow.dto.response.AccommodationProfileResponse;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.Owner;
 import com.hostflow.repository.AccommodationRepository;
@@ -109,10 +110,11 @@ class AccommodationProfileReplacementIntegrationTest {
             return null;
         }).when(cloudinaryImageService).deleteImage(OLD_PUBLIC_ID);
 
-        Accommodation result = accommodationProfileService.uploadLogo(ownerId, file);
+        AccommodationProfileResponse result = accommodationProfileService.uploadLogo(ownerId, file);
 
-        assertThat(result.getLogoUrl()).isEqualTo(NEW_LOGO_URL);
-        assertThat(result.getLogoPublicId()).isEqualTo(NEW_PUBLIC_ID);
+        assertThat(result.logoUrl()).isEqualTo(NEW_LOGO_URL);
+        // El DTO público no expone logoPublicId; se valida en la entidad persistida.
+
 
         Accommodation persisted = accommodationRepository.findById(accommodationId).orElseThrow();
         assertThat(persisted.getLogoUrl()).isEqualTo(NEW_LOGO_URL);

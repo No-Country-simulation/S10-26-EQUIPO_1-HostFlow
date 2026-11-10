@@ -68,7 +68,7 @@ public class PublicGuestController {
     // =========================================================================
 
     /**
-     * Crea un nuevo huésped o retorna el existente si el email ya está registrado.
+     * Crea un huésped o reutiliza el registro si coincide el documento de identidad.
      *
      * <p><strong>Idempotencia:</strong> Este endpoint es idempotente. Si el email
      * ya existe en la base de datos, retorna el huésped existente en lugar de
@@ -76,8 +76,8 @@ public class PublicGuestController {
      */
     @PostMapping
     @Operation(
-            summary = "Crear o buscar huésped por email",
-            description = "Crea un nuevo huésped en el sistema. Si el email ya está registrado, retorna el huésped existente."
+            summary = "Crear o buscar huésped por documento",
+            description = "Crea un nuevo huésped en el sistema. Si el documento ya está registrado, reutiliza el huésped; el email puede repetirse."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Huésped creado exitosamente o existente retornado"),
@@ -98,7 +98,7 @@ public class PublicGuestController {
 
     @GetMapping("/email/{email}")
     @Operation(
-            summary = "Buscar huésped por email",
+            summary = "Buscar huésped por email (registro más reciente)",
             description = "Obtiene la información de un huésped utilizando su correo electrónico."
     )
     @ApiResponses(value = {

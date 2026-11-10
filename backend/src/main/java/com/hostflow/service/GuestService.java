@@ -55,70 +55,61 @@ public class GuestService {
     // =========================================================================
 
     /**
-     * Crea un nuevo huésped o retorna uno existente por su correo electrónico.
+     * Crea un nuevo huésped o reutiliza el registro existente por documento de identidad.
+     * El correo es un dato de contacto y puede repetirse entre huéspedes y reservas.
      *
-     * <p><strong>⚠️ Excepción de Diseño:</strong> Este método retorna la entidad {@link Guest}
-     * (no un DTO) porque es utilizado internamente por {@code ReservationService} para
-     * asociar el huésped a una nueva reserva ({@code reservation.setGuest(guest)}).
-     * Para la capa web (Controladores), utilice {@link #getGuestById} o {@link #getGuestByEmail}.</p>
+     * <p>Este método retorna la entidad {@link Guest} para permitir su asociación
+     * con una reserva. Para lecturas desde la capa web, utilice los métodos DTO.</p>
      *
      * @param request los datos del huésped a crear o buscar
      * @return la entidad Guest existente (actualizada) o recién creada
-     * @throws BusinessException si el documento de identidad ya está registrado
+     * @throws BusinessException si el documento ya está asociado a otro correo electrónico
      */
     @Transactional
     public Guest createOrFindGuest(CreateGuestRequest request) {
-        log.info("🔍 Buscando huésped por email: {}", request.email());
+        String normalizedEmail = request.email().trim().toLowerCase(java.util.Locale.ROOT);
+        String normalizedDocument = request.documentNumber() == null || request.documentNumber().isBlank()
+                ? null : request.documentNumber().trim();
 
-        return guestRepository.findByEmail(request.email())
-                .map(existingGuest -> {
-                    log.info("✅ Huésped encontrado: {} (ID: {})", existingGuest.getFullName(), existingGuest.getId());
+        // El documento, cuando existe, permite reconocer al mismo huésped.
+        // El correo puede repetirse y nunca se utiliza como clave de identidad.
+        if (normalizedDocument != null) {
+            Guest existingGuest = guestRepository.findByDocumentNumber(normalizedDocument).orElse(null);
+            if (existingGuest != null) {
+                if (existingGuest.getEmail() != null
+                        && !existingGuest.getEmail().equalsIgnoreCase(normalizedEmail)) {
+                    throw new BusinessException(
+                            "El documento ya está registrado con otro correo electrónico.");
+                }
+                boolean updated = false;
+                if (request.preferences() != null && !request.preferences().isBlank()) {
+                    existingGuest.setPreferences(request.preferences().trim());
+                    updated = true;
+                }
+                if (request.allergies() != null && !request.allergies().isEmpty()) {
+                    existingGuest.setAllergies(request.allergies());
+                    updated = true;
+                }
+                return updated ? guestRepository.save(existingGuest) : existingGuest;
+            }
+        }
 
-                    boolean updated = false;
-                    if (request.preferences() != null && !request.preferences().isBlank()) {
-                        existingGuest.setPreferences(request.preferences().trim());
-                        updated = true;
-                    }
-                    if (request.allergies() != null && !request.allergies().isEmpty()) {
-                        existingGuest.setAllergies(request.allergies());
-                        updated = true;
-                    }
-
-                    if (updated) {
-                        return guestRepository.save(existingGuest);
-                    }
-                    return existingGuest;
-                })
-                .orElseGet(() -> {
-                    if (request.documentNumber() != null && !request.documentNumber().isBlank()) {
-                        String normalizedDoc = request.documentNumber().trim();
-                        guestRepository.findByDocumentNumber(normalizedDoc)
-                                .ifPresent(guestWithSameDoc -> {
-                                    throw new BusinessException(
-                                            "Ya existe un huésped registrado con el documento: " + normalizedDoc);
-                                });
-                    }
-
-                    String firstName = request.firstName() != null ? request.firstName().trim() : "";
-                    String lastName = request.lastName() != null ? request.lastName().trim() : "";
-                    String fullName = (firstName + " " + lastName).trim();
-
-                    Guest newGuest = Guest.builder()
-                            .firstName(firstName)
-                            .lastName(lastName)
-                            .fullName(fullName)
-                            .email(request.email().trim().toLowerCase())
-                            .phone(request.phone() != null ? request.phone().trim() : null)
-                            .documentNumber(request.documentNumber() != null ? request.documentNumber().trim() : null)
-                            .preferences(request.preferences() != null && !request.preferences().isBlank() ? request.preferences().trim() : null)
-                            .allergies(request.allergies())
-                            .active(true)
-                            .build();
-
-                    Guest savedGuest = guestRepository.save(newGuest);
-                    log.info("✅ Nuevo huésped creado: {} (ID: {})", savedGuest.getFullName(), savedGuest.getId());
-                    return savedGuest;
-                });
+        String firstName = request.firstName() != null ? request.firstName().trim() : "";
+        String lastName = request.lastName() != null ? request.lastName().trim() : "";
+        String fullName = (firstName + " " + lastName).trim();
+        Guest newGuest = Guest.builder()
+                .firstName(firstName)
+                .lastName(lastName)
+                .fullName(fullName)
+                .email(normalizedEmail)
+                .phone(request.phone() != null ? request.phone().trim() : null)
+                .documentNumber(normalizedDocument)
+                .preferences(request.preferences() != null && !request.preferences().isBlank()
+                        ? request.preferences().trim() : null)
+                .allergies(request.allergies())
+                .active(true)
+                .build();
+        return guestRepository.save(newGuest);
     }
 
     @Transactional(readOnly = true)
@@ -131,7 +122,7 @@ public class GuestService {
 
     @Transactional(readOnly = true)
     public GuestResponse getGuestByEmail(String email) {
-        return guestRepository.findByEmail(email.trim().toLowerCase())
+        return guestRepository.findFirstByEmailOrderByIdDesc(email.trim().toLowerCase())
                 .map(GuestResponse::from)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No se encontró el huésped con email: " + email));

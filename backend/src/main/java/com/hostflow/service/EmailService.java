@@ -3,6 +3,9 @@ package com.hostflow.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.Reservation;
+import com.hostflow.enums.Currency;
+import com.hostflow.enums.PaymentMethodType;
+import com.hostflow.model.AccommodationPaymentMethod;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +17,6 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -53,8 +55,8 @@ public class EmailService {
     private JavaMailSender mailSender;
 
     private final TemplateEngine templateEngine;
-    private final ExchangeRateProviderService exchangeRateService;
-    private final ObjectMapper objectMapper; // 🆕 Para serializar JSON de forma segura
+    private final CurrencyConversionService currencyConversionService;
+    private final ObjectMapper objectMapper; // Para serializar JSON de forma segura
 
     @Value("${brevo.api.key:}")
     private String brevoApiKey;
@@ -68,9 +70,10 @@ public class EmailService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
 
     // Constructor actualizado para incluir ObjectMapper
-    public EmailService(TemplateEngine templateEngine, ExchangeRateProviderService exchangeRateService, ObjectMapper objectMapper) {
+    public EmailService(TemplateEngine templateEngine, CurrencyConversionService currencyConversionService,
+                        ObjectMapper objectMapper) {
         this.templateEngine = templateEngine;
-        this.exchangeRateService = exchangeRateService;
+        this.currencyConversionService = currencyConversionService;
         this.objectMapper = objectMapper;
     }
 
@@ -157,29 +160,74 @@ public class EmailService {
     }
 
     // =========================================================================
-    // MÉTODOS AUXILIARES PARA LÓGICA DE MONEDAS
+    // EQUIVALENCIAS INFORMATIVAS PARA RESERVAS CON PAYPAL
     // =========================================================================
 
-    private boolean isArgentinaOnly(Accommodation accommodation) {
-        boolean isArsCurrency = accommodation.getBaseCurrency() != null &&
-                accommodation.getBaseCurrency().toString().equalsIgnoreCase("ARS");
-        return isArsCurrency;
+    private void addReservationCurrencyVariables(Context context, Reservation reservation,
+                                                 Accommodation accommodation) {
+        BigDecimal total = reservation.getTotalAmount() != null
+                ? reservation.getTotalAmount() : BigDecimal.ZERO;
+        addReservationCurrencyVariables(context, accommodation, total);
     }
 
-    private BigDecimal convertCurrency(BigDecimal amount, String fromCurrency, String toCurrency) {
-        if (amount == null || fromCurrency == null || toCurrency == null) {
-            return BigDecimal.ZERO;
+    private void addReservationCurrencyVariables(Context context, Accommodation accommodation,
+                                                 BigDecimal amount) {
+        String originalCurrency = accommodation.getBaseCurrency() != null
+                ? accommodation.getBaseCurrency().name() : Currency.ARS.name();
+        BigDecimal total = amount != null ? amount : BigDecimal.ZERO;
+        boolean paypal = hasActivePaypalPaymentMethod(accommodation);
+
+        context.setVariable("originalCurrency", originalCurrency);
+        context.setVariable("originalTotal", total);
+        context.setVariable("showCurrencyEquivalents", paypal);
+        context.setVariable("totalUsd", paypal && accommodation.getBaseCurrency() != Currency.USD
+                ? currencyConversionService.convertIfAvailable(accommodation.getId(), total, Currency.USD) : null);
+        context.setVariable("totalEur", paypal && accommodation.getBaseCurrency() != Currency.EUR
+                ? currencyConversionService.convertIfAvailable(accommodation.getId(), total, Currency.EUR) : null);
+    }
+
+    private boolean hasActivePaypalPaymentMethod(Accommodation accommodation) {
+        if (accommodation.getPaymentMethods() == null) return false;
+        return accommodation.getPaymentMethods().stream()
+                .filter(this::isUsablePaymentMethod)
+                .anyMatch(method -> containsPaypal(method.getDisplayName()) || containsPaypal(method.getProviderName()));
+    }
+
+    private boolean isUsablePaymentMethod(AccommodationPaymentMethod method) {
+        if (method == null || !method.isActive() || method.getPaymentType() == null
+                || method.getDisplayName() == null || method.getDisplayName().isBlank()) return false;
+        return switch (method.getPaymentType()) {
+            case BANK_TRANSFER -> notBlank(method.getBankName()) && notBlank(method.getAccountHolder())
+                    && (notBlank(method.getCbuCvu()) || notBlank(method.getAccountNumber()) || notBlank(method.getAlias()));
+            case DIGITAL_WALLET -> notBlank(method.getProviderName())
+                    && (notBlank(method.getUserIdentifier()) || notBlank(method.getWalletPhone())
+                    || notBlank(method.getWalletEmail()) || notBlank(method.getAlias()));
+            case CASH -> true;
+            case CARD, OTHER -> notBlank(method.getInstructions()) || notBlank(method.getProviderName())
+                    || notBlank(method.getAccountNumber());
+        };
+    }
+
+    private boolean notBlank(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private boolean containsPaypal(String value) {
+        return value != null && value.toLowerCase(java.util.Locale.ROOT).contains("paypal");
+    }
+
+    private void appendEquivalent(StringBuilder amounts, Accommodation accommodation,
+                                  BigDecimal amount, Currency currency) {
+        if (accommodation.getBaseCurrency() == currency) return;
+        BigDecimal converted = currencyConversionService.convertIfAvailable(accommodation.getId(), amount, currency);
+        if (converted != null) {
+            amounts.append(String.format(java.util.Locale.ROOT, "\nEquivalente informativo: %s %s",
+                    formatAmount(converted), currency.name()));
         }
-        if (fromCurrency.equalsIgnoreCase(toCurrency)) {
-            return amount;
-        }
-        try {
-            BigDecimal rate = exchangeRateService.getConversionRate(fromCurrency, toCurrency);
-            return amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
-        } catch (Exception e) {
-            log.warn("⚠️ No se pudo convertir de {} a {}. Usando monto original.", fromCurrency, toCurrency);
-            return amount;
-        }
+    }
+
+    private String formatAmount(BigDecimal amount) {
+        return amount == null ? "—" : String.format(java.util.Locale.ROOT, "%,.2f", amount);
     }
 
     // =========================================================================
@@ -230,18 +278,38 @@ public class EmailService {
     // =========================================================================
 
     public void sendReservationConfirmationEmail(String toEmail, String guestName, String confirmationCode,
-                                                 String confirmationUrl, String accommodationName,
-                                                 LocalDateTime checkIn, LocalDateTime checkOut,
-                                                 BigDecimal totalAmount, int expirationHours) {
-        String plainText = String.format("""
-            ¡Hola %s!
-            Un propietario ha creado una reserva para ti en %s.
-            Código: %s | Check-in: %s | Check-out: %s | Monto total: $%,.2f
-            Para confirmar, haz clic en: %s (Expira en %d horas)
-            """, guestName, accommodationName, confirmationCode,
-                checkIn.format(DATE_FORMATTER), checkOut.format(DATE_FORMATTER), totalAmount, confirmationUrl, expirationHours);
+                                                 String confirmationUrl, Accommodation accommodation,
+                                                 String accommodationName, LocalDateTime checkIn,
+                                                 LocalDateTime checkOut, BigDecimal totalAmount,
+                                                 int expirationHours) {
+        Context context = new Context();
+        context.setVariable("guestName", guestName);
+        context.setVariable("confirmationCode", confirmationCode);
+        context.setVariable("confirmationUrl", confirmationUrl);
+        context.setVariable("accommodation", accommodation);
+        context.setVariable("accommodationName", accommodationName);
+        context.setVariable("checkIn", checkIn);
+        context.setVariable("checkOut", checkOut);
+        context.setVariable("expirationHours", expirationHours);
+        context.setVariable("watermark", "Powered by HostFlow");
+        addReservationCurrencyVariables(context, accommodation, totalAmount);
 
-        sendHybridEmail(toEmail, "🏨 " + appName + " - Confirma tu reserva " + confirmationCode, null, plainText);
+        String htmlContent = templateEngine.process("emails/reservation-link-guest", context);
+        String plainText = String.format(java.util.Locale.ROOT, """
+            ¡Hola %s!
+            Se ha creado una reserva para ti en %s.
+            Código: %s | Check-in: %s | Check-out: %s
+            Importe inicial: %s %s
+            Para completar tu reserva, ingresa aquí: %s
+            Este enlace vence en %d horas.
+            """, guestName, accommodationName, confirmationCode,
+                checkIn.format(DATE_FORMATTER), checkOut.format(DATE_FORMATTER),
+                formatAmount(totalAmount), accommodation.getBaseCurrency() != null
+                        ? accommodation.getBaseCurrency().name() : Currency.ARS.name(),
+                confirmationUrl, expirationHours);
+
+        sendHybridEmail(toEmail, "🏡 " + accommodationName + " - Completa tu reserva " + confirmationCode,
+                htmlContent, plainText);
     }
 
     public void sendReservationConfirmedGuestEmail(Reservation reservation, Accommodation accommodation,
@@ -257,24 +325,15 @@ public class EmailService {
         context.setVariable("guestName", guestName);
         context.setVariable("watermark", "Plataforma de Reservas HostFlow");
         context.setVariable("reservationUrl", reservationUrl);
+        context.setVariable("paymentConfirmed", true);
 
-        boolean argentinaOnly = isArgentinaOnly(accommodation);
-        context.setVariable("isArgentinaOnly", argentinaOnly);
-
-        String originalCurrency = accommodation.getBaseCurrency() != null ?
-                accommodation.getBaseCurrency().toString().toUpperCase() : "ARS";
-        BigDecimal total = reservation.getTotalAmount() != null ? reservation.getTotalAmount() : BigDecimal.ZERO;
-
-        context.setVariable("totalArs", convertCurrency(total, originalCurrency, "ARS"));
-        context.setVariable("totalUsd", convertCurrency(total, originalCurrency, "USD"));
-        context.setVariable("totalEur", convertCurrency(total, originalCurrency, "EUR"));
-        context.setVariable("originalCurrency", originalCurrency);
+        addReservationCurrencyVariables(context, reservation, accommodation);
 
         String htmlContent = templateEngine.process("emails/reservation-confirmation-guest", context);
 
         sendHybridEmail(
                 reservation.getGuest().getEmail(),
-                "✅ " + appName + " - ¡Reserva confirmada! " + reservation.getConfirmationCode(),
+                "✅ " + appName + " - Pago recibido y reserva confirmada " + reservation.getConfirmationCode(),
                 htmlContent,
                 null
         );
@@ -293,24 +352,15 @@ public class EmailService {
         context.setVariable("ownerName", ownerName);
         context.setVariable("watermark", "Panel de Administración HostFlow");
         context.setVariable("reservationUrl", reservationUrl);
+        context.setVariable("paymentConfirmed", true);
 
-        boolean argentinaOnly = isArgentinaOnly(accommodation);
-        context.setVariable("isArgentinaOnly", argentinaOnly);
-
-        String originalCurrency = accommodation.getBaseCurrency() != null ?
-                accommodation.getBaseCurrency().toString().toUpperCase() : "ARS";
-        BigDecimal total = reservation.getTotalAmount() != null ? reservation.getTotalAmount() : BigDecimal.ZERO;
-
-        context.setVariable("totalArs", convertCurrency(total, originalCurrency, "ARS"));
-        context.setVariable("totalUsd", convertCurrency(total, originalCurrency, "USD"));
-        context.setVariable("totalEur", convertCurrency(total, originalCurrency, "EUR"));
-        context.setVariable("originalCurrency", originalCurrency);
+        addReservationCurrencyVariables(context, reservation, accommodation);
 
         String htmlContent = templateEngine.process("emails/reservation-notification-owner", context);
 
         sendHybridEmail(
                 accommodation.getOwner().getEmail(),
-                "🔔 " + appName + " - ¡Nueva reserva confirmada! " + reservation.getConfirmationCode(),
+                "💰 " + appName + " - Pago recibido para la reserva " + reservation.getConfirmationCode(),
                 htmlContent,
                 null
         );

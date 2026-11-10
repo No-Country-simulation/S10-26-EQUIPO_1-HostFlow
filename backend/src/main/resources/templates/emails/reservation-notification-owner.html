@@ -128,42 +128,36 @@
                         <div th:style="'background-color: #e8f5e9; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid ' + (${accommodation.primaryColor} ?: '#4CAF50') + ';'">
                             <h3 th:style="'margin-top: 0; color: ' + (${accommodation.primaryColor} ?: '#2E7D32') + '; font-size: 18px;'">💰 Información Financiera</h3>
                             <table border="0" cellpadding="5" cellspacing="0" width="100%">
-
-                                <!-- CASO 1: Solo muestra ARS (Alojamiento local con billeteras argentinas) -->
-                                <tr th:if="${isArgentinaOnly}">
-                                    <td style="padding: 3px 0; color: #555; width: 35%;"><strong>Total a Pagar:</strong></td>
+                                <tr>
+                                    <td style="padding: 3px 0; color: #555; width: 45%;"><strong>Total en moneda base:</strong></td>
                                     <td style="padding: 3px 0; color: #333; text-align: right; font-size: 20px; font-weight: bold; color: #2E7D32;">
-                                        $<span th:text="${#numbers.formatDecimal(totalArs, 1, 2)}">0.00</span> ARS
+                                        <span th:text="${#numbers.formatDecimal(originalTotal, 1, 2)}">0.00</span>
+                                        <span th:text="${originalCurrency}">ARS</span>
                                     </td>
                                 </tr>
-
-                                <!-- CASO 2: Muestra las 3 monedas (Alojamiento internacional o sin billeteras ARS) -->
-                                <tr th:unless="${isArgentinaOnly}">
-                                    <td style="padding: 3px 0; color: #555; width: 35%;"><strong>Total en ARS:</strong></td>
-                                    <td style="padding: 3px 0; color: #333; text-align: right; font-weight: bold;">
-                                        $<span th:text="${#numbers.formatDecimal(totalArs, 1, 2)}">0.00</span> ARS
-                                    </td>
-                                </tr>
-                                <tr th:unless="${isArgentinaOnly}">
-                                    <td style="padding: 3px 0; color: #555;"><strong>Total en USD:</strong></td>
+                                <tr th:if="${showCurrencyEquivalents and totalUsd != null}">
+                                    <td style="padding: 3px 0; color: #555;"><strong>Equivalente en USD:</strong></td>
                                     <td style="padding: 3px 0; color: #333; text-align: right; font-weight: bold;">
                                         $<span th:text="${#numbers.formatDecimal(totalUsd, 1, 2)}">0.00</span> USD
                                     </td>
                                 </tr>
-                                <tr th:unless="${isArgentinaOnly}">
-                                    <td style="padding: 3px 0; color: #555;"><strong>Total en EUR:</strong></td>
+                                <tr th:if="${showCurrencyEquivalents and totalEur != null}">
+                                    <td style="padding: 3px 0; color: #555;"><strong>Equivalente en EUR:</strong></td>
                                     <td style="padding: 3px 0; color: #333; text-align: right; font-weight: bold;">
                                         €<span th:text="${#numbers.formatDecimal(totalEur, 1, 2)}">0.00</span> EUR
                                     </td>
                                 </tr>
-
-                                <!-- Estado de la reserva -->
+                                <tr th:if="${showCurrencyEquivalents}">
+                                    <td colspan="2" style="padding-top: 8px; color: #777; font-size: 12px; text-align: right;">
+                                        USD y EUR son equivalencias informativas. El pago se coordina con el alojamiento.
+                                    </td>
+                                </tr>
                                 <tr>
                                     <td colspan="2" style="padding: 10px 0 5px 0; border-top: 2px solid #4CAF50; text-align: right;">
-                                            <span th:text="${#strings.toUpperCase(reservation.status)}"
-                                                  style="padding: 5px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; background-color: #4CAF50; color: white;">
-                                                CONFIRMADA
-                                            </span>
+                                        <span th:text="${#strings.toUpperCase(reservation.status)}"
+                                              style="padding: 5px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; background-color: #4CAF50; color: white;">
+                                            CONFIRMADA
+                                        </span>
                                     </td>
                                 </tr>
                             </table>

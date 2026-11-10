@@ -1,5 +1,7 @@
 package com.hostflow.service;
 
+import com.hostflow.dto.response.AccommodationProfileResponse;
+import com.hostflow.dto.response.AccommodationImageResponse;
 import com.hostflow.dto.response.CloudinaryUploadResult;
 import com.hostflow.exception.BusinessException;
 import com.hostflow.model.Accommodation;
@@ -67,34 +69,43 @@ class AccommodationProfileServiceTest {
         AccommodationProfileRequest request = new AccommodationProfileRequest();
         request.setName("Cabañas del Río");
 
-        Accommodation saved = service.createProfile(1L, request);
+        AccommodationProfileResponse saved = service.createProfile(1L, request);
 
-        assertEquals("#0fa3a3", saved.getPrimaryColor());
-        assertEquals("#d4f53c", saved.getAccentColor());
-        assertEquals("#f4b8c4", saved.getTertiaryColor());
-        assertEquals("none", saved.getBackgroundPattern());
+        assertEquals("#0fa3a3", saved.primaryColor());
+        assertEquals("#d4f53c", saved.accentColor());
+        assertEquals("#f4b8c4", saved.tertiaryColor());
+        assertEquals("none", saved.backgroundPattern());
     }
 
     @Test
     void patchDeColorDeAcentoNoModificaLosOtrosCamposDeMarca() {
+        Owner owner = Owner.builder()
+                .id(1L)
+                .fullName("Propietario de prueba")
+                .accommodationName("Cabañas del Río")
+                .build();
+
         Accommodation accommodation = new Accommodation();
+        accommodation.setOwner(owner);
         accommodation.setPrimaryColor("#123456");
         accommodation.setAccentColor("#d4f53c");
         accommodation.setTertiaryColor("#f4b8c4");
         accommodation.setBackgroundPattern("waves");
-        when(accommodationRepository.findByOwner_Id(1L)).thenReturn(Optional.of(accommodation));
+
+        when(accommodationRepository.findByOwner_Id(1L))
+                .thenReturn(Optional.of(accommodation));
         when(accommodationRepository.save(any(Accommodation.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         AccommodationProfileRequest request = new AccommodationProfileRequest();
         request.setAccentColor("#abcdef");
 
-        Accommodation saved = service.updateProfile(1L, request);
+        AccommodationProfileResponse saved = service.updateProfile(1L, request);
 
-        assertEquals("#123456", saved.getPrimaryColor());
-        assertEquals("#abcdef", saved.getAccentColor());
-        assertEquals("#f4b8c4", saved.getTertiaryColor());
-        assertEquals("waves", saved.getBackgroundPattern());
+        assertEquals("#123456", saved.primaryColor());
+        assertEquals("#abcdef", saved.accentColor());
+        assertEquals("#f4b8c4", saved.tertiaryColor());
+        assertEquals("waves", saved.backgroundPattern());
     }
 
     @Test
@@ -124,10 +135,10 @@ class AccommodationProfileServiceTest {
                 "hostflow/galeria-4", "https://res.cloudinary.com/demo/galeria-4.jpg", "jpg", 512_000L, "hostflow"));
         when(imageRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AccommodationImage saved = service.uploadGalleryImage(1L,
+        AccommodationImageResponse saved = service.uploadGalleryImage(1L,
                 new MockMultipartFile("file", "imagen.jpg", "image/jpeg", new byte[512_000]));
 
-        assertEquals("hostflow/galeria-4", saved.getCloudinaryPublicId());
+        assertEquals("https://res.cloudinary.com/demo/galeria-4.jpg", saved.url());
         verify(cloudinaryImageService).uploadImage(any());
         verify(imageRepository).save(any());
     }

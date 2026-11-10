@@ -1,12 +1,14 @@
 package com.hostflow.service;
 
 import com.hostflow.dto.request.AccommodationPaymentMethodRequest;
+import com.hostflow.dto.response.AccommodationPaymentMethodResponse;
 import com.hostflow.enums.PaymentMethodType;
 import com.hostflow.exception.BusinessException;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.AccommodationPaymentMethod;
 import com.hostflow.repository.AccommodationPaymentMethodRepository;
 import com.hostflow.repository.AccommodationRepository;
+import com.hostflow.repository.OwnerRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -17,100 +19,115 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
-/**
- * Pruebas unitarias para {@link AccommodationPaymentMethodService}.
- *
- * <p>Esta clase valida la lógica de negocio relacionada con la creación,
- * actualización y validación de métodos de pago para un alojamiento.</p>
- *
- * <p><strong>Casos de prueba cubiertos:</strong></p>
- * <ul>
- *   <li>Creación de métodos de pago genéricos y específicos (Transferencia, Billetera).</li>
- *   <li>Validación de campos obligatorios y formatos (ej. correos electrónicos).</li>
- *   <li>Actualizaciones parciales (PATCH) conservando datos existentes.</li>
- *   <li>Rechazo de operaciones inválidas o con datos incompletos.</li>
- * </ul>
- *
- * @author HostFlow Team
- * @version 2.0.0
- */
+/** Pruebas unitarias de la lógica de métodos de pago del alojamiento. */
 class AccommodationPaymentMethodServiceTest {
-
-    // =========================================================================
-    // MOCKS E INICIALIZACIÓN
-    // =========================================================================
 
     private final AccommodationRepository accommodationRepository = mock(AccommodationRepository.class);
     private final AccommodationPaymentMethodRepository paymentMethodRepository = mock(AccommodationPaymentMethodRepository.class);
-    private final EmailService emailService = mock(EmailService.class); // ✅ Agregado para resolver el error de constructor
+    private final OwnerRepository ownerRepository = mock(OwnerRepository.class);
+    private final EmailService emailService = mock(EmailService.class);
 
-    private final AccommodationPaymentMethodService service =
-            new AccommodationPaymentMethodService(accommodationRepository, paymentMethodRepository, emailService);
+    private final AccommodationPaymentMethodService service = new AccommodationPaymentMethodService(
+            accommodationRepository, paymentMethodRepository, ownerRepository, emailService);
 
     private final Accommodation accommodation = new Accommodation();
 
     @BeforeEach
     void setUp() {
-        // Configuración base del alojamiento de prueba
         accommodation.setId(10L);
-
-        // Comportamiento por defecto de los repositorios mockeados
         when(accommodationRepository.findByOwner_Id(1L)).thenReturn(Optional.of(accommodation));
         when(paymentMethodRepository.existsByAccommodation_IdAndDefaultMethodTrue(10L)).thenReturn(true);
         when(paymentMethodRepository.save(any(AccommodationPaymentMethod.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
-    // =========================================================================
-    // PRUEBAS DE CREACIÓN (CREATE)
-    // =========================================================================
+    // CREATE
 
     @Test
     void creaMetodosGenericosSinCamposEspecificos() {
         for (PaymentMethodType type : new PaymentMethodType[]{
                 PaymentMethodType.CASH, PaymentMethodType.CARD, PaymentMethodType.OTHER}) {
-            AccommodationPaymentMethodRequest request = request(type, "Método " + type);
+            AccommodationPaymentMethodResponse result = service.create(1L, request(type, "Método " + type));
 
-            AccommodationPaymentMethod result = service.create(1L, request);
-
-            assertEquals(type, result.getPaymentType());
-            assertEquals("Método " + type, result.getDisplayName());
+            assertEquals(10L, result.accommodationId());
+            assertEquals(type, result.paymentType());
+            assertEquals("Método " + type, result.displayName());
+            assertTrue(result.isActive());
         }
     }
 
     @Test
     void creaTransferenciaBancariaConTodosLosCamposObligatorios() {
-        AccommodationPaymentMethod result = service.create(1L, bankRequest());
+        AccommodationPaymentMethodResponse result = service.create(1L, bankRequest());
 
-        assertEquals(PaymentMethodType.BANK_TRANSFER, result.getPaymentType());
-        assertEquals("Banco Nación", result.getBankName());
-        assertEquals("Caja de ahorro", result.getAccountType());
-        assertEquals("123456", result.getAccountNumber());
-        assertEquals("0000003100000000000001", result.getCbuCvu());
-        assertEquals("hostflow.pagos", result.getAlias());
+        assertEquals(PaymentMethodType.BANK_TRANSFER, result.paymentType());
+        assertEquals("Banco Nación", result.bankName());
+        assertEquals("Titular de prueba", result.accountHolder());
+        assertEquals("Caja de ahorro", result.accountType());
+        assertEquals("123456", result.accountNumber());
+        assertEquals("0000003100000000000001", result.cbuCvu());
+        assertEquals("hostflow.pagos", result.alias());
     }
 
     @Test
     void creaBilleteraDigitalConTodosLosCamposObligatorios() {
-        AccommodationPaymentMethod result = service.create(1L, walletRequest());
+        AccommodationPaymentMethodResponse result = service.create(1L, walletRequest());
 
-        assertEquals(PaymentMethodType.DIGITAL_WALLET, result.getPaymentType());
-        assertEquals("usuario.123", result.getUserIdentifier());
-        assertEquals("+5491112345678", result.getWalletPhone());
-        assertEquals("usuario@example.com", result.getWalletEmail());
+        assertEquals(PaymentMethodType.DIGITAL_WALLET, result.paymentType());
+        assertEquals("Titular de prueba", result.accountHolder());
+        assertEquals("usuario.123", result.userIdentifier());
+        assertEquals("+5491112345678", result.walletPhone());
+        assertEquals("usuario@example.com", result.walletEmail());
     }
 
-    // =========================================================================
-    // PRUEBAS DE VALIDACIÓN Y RECHAZO (CREATE)
-    // =========================================================================
+    @Test
+    void creaMetodoConCamposComunesYEstadosSolicitados() {
+        AccommodationPaymentMethodRequest request = request(PaymentMethodType.CASH, "Efectivo");
+        request.setProviderName("  Proveedor  ");
+        request.setTaxId("  20-12345678-9  ");
+        request.setInstructions("  Pagar al llegar  ");
+        request.setIsDefault(true);
+        request.setIsActive(false);
+
+        AccommodationPaymentMethodResponse result = service.create(1L, request);
+
+        assertEquals("Proveedor", result.providerName());
+        assertEquals("20-12345678-9", result.taxId());
+        assertEquals("Pagar al llegar", result.instructions());
+        assertTrue(result.isDefault());
+        assertFalse(result.isActive());
+        verify(paymentMethodRepository).clearDefaultForAccommodation(10L);
+    }
+
+    @Test
+    void primerMetodoSeEstableceComoPredeterminadoCuandoNoExisteOtro() {
+        when(paymentMethodRepository.existsByAccommodation_IdAndDefaultMethodTrue(10L)).thenReturn(false);
+
+        AccommodationPaymentMethodResponse result = service.create(1L, request(PaymentMethodType.CASH, "Efectivo"));
+
+        assertTrue(result.isDefault());
+        verify(paymentMethodRepository).clearDefaultForAccommodation(10L);
+    }
+
+    @Test
+    void rechazaCreacionSinTipoOPantallaVisible() {
+        AccommodationPaymentMethodRequest missingType = new AccommodationPaymentMethodRequest();
+        missingType.setDisplayName("Efectivo");
+        assertThrows(BusinessException.class, () -> service.create(1L, missingType));
+
+        AccommodationPaymentMethodRequest missingName = new AccommodationPaymentMethodRequest();
+        missingName.setPaymentType(PaymentMethodType.CASH);
+        assertThrows(BusinessException.class, () -> service.create(1L, missingName));
+
+        verify(paymentMethodRepository, never()).save(any());
+    }
 
     @Test
     void rechazaTransferenciaBancariaSinUnCampoObligatorio() {
         AccommodationPaymentMethodRequest request = bankRequest();
-        request.setAlias(" "); // Campo inválido
+        request.setAlias(" ");
 
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service.create(1L, request));
+        BusinessException error = assertThrows(BusinessException.class, () -> service.create(1L, request));
 
         assertTrue(error.getMessage().contains("alias"));
         verify(paymentMethodRepository, never()).save(any());
@@ -121,84 +138,60 @@ class AccommodationPaymentMethodServiceTest {
         AccommodationPaymentMethodRequest request = walletRequest();
         request.setWalletEmail("correo-no-valido");
 
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service.create(1L, request));
+        BusinessException error = assertThrows(BusinessException.class, () -> service.create(1L, request));
 
         assertTrue(error.getMessage().contains("walletEmail"));
         verify(paymentMethodRepository, never()).save(any());
     }
 
-    // =========================================================================
-    // PRUEBAS DE ACTUALIZACIÓN PARCIAL (PATCH)
-    // =========================================================================
+    // PATCH
 
     @Test
     void patchParcialActualizaSoloElCampoEnviadoYConservaLosDemas() {
         AccommodationPaymentMethod existing = bankMethod();
-        when(paymentMethodRepository.findByIdAndAccommodation_Id(50L, 10L))
-                .thenReturn(Optional.of(existing));
-
+        when(paymentMethodRepository.findByIdAndAccommodation_Id(50L, 10L)).thenReturn(Optional.of(existing));
         AccommodationPaymentMethodRequest patch = new AccommodationPaymentMethodRequest();
         patch.setAlias("nuevo.alias");
 
-        AccommodationPaymentMethod result = service.update(1L, 50L, patch);
+        AccommodationPaymentMethodResponse result = service.update(1L, 50L, patch);
 
-        assertEquals("nuevo.alias", result.getAlias());
-        // Verificar que los datos originales se conservan
-        assertEquals("Banco Nación", result.getBankName());
-        assertEquals("Titular de prueba", result.getAccountHolder());
-        assertEquals("Caja de ahorro", result.getAccountType());
-        assertEquals("123456", result.getAccountNumber());
-        assertEquals("0000003100000000000001", result.getCbuCvu());
-
+        assertEquals("nuevo.alias", result.alias());
+        assertEquals("Banco Nación", result.bankName());
+        assertEquals("Titular de prueba", result.accountHolder());
+        assertEquals("Caja de ahorro", result.accountType());
+        assertEquals("123456", result.accountNumber());
+        assertEquals("0000003100000000000001", result.cbuCvu());
         verify(paymentMethodRepository).save(existing);
     }
 
     @Test
     void patchRechazaCuerpoVacio() {
-        AccommodationPaymentMethodRequest patch = new AccommodationPaymentMethodRequest();
-
-        assertThrows(BusinessException.class, () -> service.update(1L, 50L, patch));
-
+        assertThrows(BusinessException.class,
+                () -> service.update(1L, 50L, new AccommodationPaymentMethodRequest()));
         verify(paymentMethodRepository, never()).findByIdAndAccommodation_Id(anyLong(), anyLong());
     }
 
     @Test
-    void patchPermiteCompletarCamposFaltantesDeUnaTransferenciaAntesDeValidarEstadoFinal() {
-        AccommodationPaymentMethod existing = new AccommodationPaymentMethod();
-        existing.setId(50L);
-        existing.setAccommodation(accommodation);
-        existing.setPaymentType(PaymentMethodType.BANK_TRANSFER);
-        existing.setDisplayName("Transferencia");
-        existing.setBankName("Banco Nación");
-        existing.setAccountHolder("Titular de prueba");
-        existing.setAccountType("Caja de ahorro");
-        existing.setAccountNumber("123456");
-        existing.setCbuCvu("0000003100000000000001");
-        existing.setAlias(null); // Simula un registro antiguo sin alias
-
-        when(paymentMethodRepository.findByIdAndAccommodation_Id(50L, 10L))
-                .thenReturn(Optional.of(existing));
-
+    void patchPermiteCompletarCamposFaltantesAntesDeValidarEstadoFinal() {
+        AccommodationPaymentMethod existing = bankMethod();
+        existing.setAlias(null);
+        when(paymentMethodRepository.findByIdAndAccommodation_Id(50L, 10L)).thenReturn(Optional.of(existing));
         AccommodationPaymentMethodRequest patch = new AccommodationPaymentMethodRequest();
         patch.setAlias("hostflow.pagos");
 
-        AccommodationPaymentMethod result = service.update(1L, 50L, patch);
+        AccommodationPaymentMethodResponse result = service.update(1L, 50L, patch);
 
-        assertEquals("hostflow.pagos", result.getAlias());
+        assertEquals("hostflow.pagos", result.alias());
     }
 
     @Test
     void patchRechazaCambioDeTipoSiLosDatosFinalesNoCumplenLasReglas() {
-        AccommodationPaymentMethod existing = bankMethod();
         when(paymentMethodRepository.findByIdAndAccommodation_Id(50L, 10L))
-                .thenReturn(Optional.of(existing));
-
+                .thenReturn(Optional.of(bankMethod()));
         AccommodationPaymentMethodRequest patch = new AccommodationPaymentMethodRequest();
         patch.setPaymentType(PaymentMethodType.DIGITAL_WALLET);
 
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service.update(1L, 50L, patch));
+        BusinessException error = assertThrows(BusinessException.class, () -> service.update(1L, 50L, patch));
 
         assertTrue(error.getMessage().contains("userIdentifier"));
         verify(paymentMethodRepository, never()).save(any());
@@ -206,40 +199,53 @@ class AccommodationPaymentMethodServiceTest {
 
     @Test
     void patchActualizaDatosDeBilleteraYValidaElEstadoFinal() {
-        AccommodationPaymentMethod existing = walletMethod();
         when(paymentMethodRepository.findByIdAndAccommodation_Id(50L, 10L))
-                .thenReturn(Optional.of(existing));
-
+                .thenReturn(Optional.of(walletMethod()));
         AccommodationPaymentMethodRequest patch = new AccommodationPaymentMethodRequest();
         patch.setWalletPhone("+5491198765432");
         patch.setWalletEmail("nuevo@example.com");
 
-        AccommodationPaymentMethod result = service.update(1L, 50L, patch);
+        AccommodationPaymentMethodResponse result = service.update(1L, 50L, patch);
 
-        assertEquals("+5491198765432", result.getWalletPhone());
-        assertEquals("nuevo@example.com", result.getWalletEmail());
-        assertEquals("usuario.123", result.getUserIdentifier());
+        assertEquals("+5491198765432", result.walletPhone());
+        assertEquals("nuevo@example.com", result.walletEmail());
+        assertEquals("usuario.123", result.userIdentifier());
     }
 
     @Test
-    void patchRechazaEliminarUnCampoObligatorioDeBilleteraConCadenaVacia() {
-        AccommodationPaymentMethod existing = walletMethod();
+    void patchRechazaEliminarUnCampoObligatorioConCadenaVacia() {
         when(paymentMethodRepository.findByIdAndAccommodation_Id(50L, 10L))
-                .thenReturn(Optional.of(existing));
-
+                .thenReturn(Optional.of(walletMethod()));
         AccommodationPaymentMethodRequest patch = new AccommodationPaymentMethodRequest();
         patch.setUserIdentifier(" ");
 
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service.update(1L, 50L, patch));
+        BusinessException error = assertThrows(BusinessException.class, () -> service.update(1L, 50L, patch));
 
         assertTrue(error.getMessage().contains("userIdentifier"));
         verify(paymentMethodRepository, never()).save(any());
     }
 
-    // =========================================================================
-    // MÉTODOS AUXILIARES (DATA BUILDERS)
-    // =========================================================================
+    @Test
+    void patchActualizaCamposComunesYEstadoActivo() {
+        AccommodationPaymentMethod existing = bankMethod();
+        when(paymentMethodRepository.findByIdAndAccommodation_Id(50L, 10L)).thenReturn(Optional.of(existing));
+        AccommodationPaymentMethodRequest patch = new AccommodationPaymentMethodRequest();
+        patch.setProviderName("Nuevo proveedor");
+        patch.setTaxId("30-12345678-0");
+        patch.setInstructions("Nuevas instrucciones");
+        patch.setIsActive(false);
+        patch.setIsDefault(true);
+
+        AccommodationPaymentMethodResponse result = service.update(1L, 50L, patch);
+
+        assertEquals("Nuevo proveedor", result.providerName());
+        assertEquals("30-12345678-0", result.taxId());
+        assertEquals("Nuevas instrucciones", result.instructions());
+        assertFalse(result.isActive());
+        assertTrue(result.isDefault());
+    }
+
+    // DATA BUILDERS
 
     private AccommodationPaymentMethodRequest request(PaymentMethodType type, String name) {
         AccommodationPaymentMethodRequest request = new AccommodationPaymentMethodRequest();

@@ -58,8 +58,8 @@ public class ReservationLink {
      * Reserva asociada a este enlace.
      * Relación OneToOne: un enlace pertenece a una única reserva.
      */
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "reservation_id", nullable = false, unique = true,
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "reservation_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_reservation_links_reservation"))
     private Reservation reservation;
 
@@ -104,6 +104,10 @@ public class ReservationLink {
     @Column(name = "used_at")
     private LocalDateTime usedAt;
 
+    /** Momento en que este enlace fue invalidado o reemplazado por otro. */
+    @Column(name = "invalidated_at")
+    private LocalDateTime invalidatedAt;
+
     /**
      * Número de veces que el enlace ha sido reactivado.
      * Útil para auditoría y control.
@@ -137,6 +141,7 @@ public class ReservationLink {
      */
     public boolean isValid() {
         return !Boolean.TRUE.equals(used)
+                && invalidatedAt == null
                 && expiresAt.isAfter(LocalDateTime.now());
     }
 
@@ -156,6 +161,11 @@ public class ReservationLink {
     public void markAsUsed() {
         this.used = true;
         this.usedAt = LocalDateTime.now();
+    }
+
+    /** Invalida este token sin alterar el estado ni las fechas de la reserva. */
+    public void invalidate() {
+        this.invalidatedAt = LocalDateTime.now();
     }
 
     /**

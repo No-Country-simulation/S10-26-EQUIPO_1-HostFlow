@@ -103,6 +103,22 @@ public class CurrencyConversionService {
         return targetCurrency.scale(amount.multiply(rate, MC));
     }
 
+    /**
+     * Conversión tolerante para importes exclusivamente informativos (pantalla/correos).
+     * Devuelve null cuando la moneda o su tasa no están disponibles, sin propagar
+     * la excepción ni marcar como rollback-only la transacción que consulta la reserva.
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal convertIfAvailable(Long accommodationId, BigDecimal amount, Currency targetCurrency) {
+        try {
+            return convert(accommodationId, amount, targetCurrency);
+        } catch (RuntimeException ex) {
+            log.debug("Equivalencia informativa no disponible para {} en alojamiento {}: {}",
+                    targetCurrency, accommodationId, ex.getMessage());
+            return null;
+        }
+    }
+
     // =========================================================================
     // RESOLUCIÓN DE TASAS (POR ID DE ALOJAMIENTO)
     // =========================================================================
