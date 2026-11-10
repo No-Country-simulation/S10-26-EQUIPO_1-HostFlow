@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * DTO de respuesta que representa una reserva completa con toda su información.
  *
  * @author HostFlow Team
- * @version 1.0.0
+ * @version 1.1.0 (Documentación alineada al contrato: pago separado del estado operativo)
  */
 @Schema(description = "Información completa de una reserva")
 public record ReservationResponse(
@@ -59,7 +59,7 @@ public record ReservationResponse(
         @Schema(description = "Monto total", example = "280500.00")
         BigDecimal totalAmount,
 
-        @Schema(description = "Estado de la reserva", example = "PENDING")
+        @Schema(description = "Estado operativo de la reserva (independiente del pago). CONFIRMED = onboarding completado.", example = "PENDING")
         ReservationStatus status,
 
         @Schema(description = "Estado del pago", example = "PENDING")
@@ -74,7 +74,7 @@ public record ReservationResponse(
         @Schema(description = "Solicitudes especiales")
         String specialRequests,
 
-        @Schema(description = "Método de pago utilizado")
+        @Schema(description = "Campo legado: siempre null. Los métodos de pago informados al huésped son los del alojamiento.", deprecated = true)
         GuestPaymentMethodResponse paymentMethod,
 
         @Schema(description = "Enlace de confirmación (solo si está pendiente)")

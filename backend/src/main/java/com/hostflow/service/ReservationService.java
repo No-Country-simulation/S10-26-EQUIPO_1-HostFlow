@@ -94,7 +94,7 @@ public class ReservationService {
      * @param ownerId ID del propietario que crea la reserva
      * @param request datos de la reserva solicitada
      * @return la reserva creada con el enlace de confirmación incluido
-     * @throws BusinessException si las fechas se superponen o el huésped no tiene métodos de pago
+     * @throws BusinessException si las fechas se superponen, el alojamiento no está listo o falla el correo
      */
     @Transactional
     public ReservationResponse createReservation(Long ownerId, CreateReservationRequest request) {
@@ -233,16 +233,18 @@ public class ReservationService {
     // =========================================================================
 
     /**
-     * Reactiva un enlace de confirmación expirado.
+     * Renueva el enlace de onboarding con vigencia fija de 24 horas.
      *
-     * @param ownerId         ID del propietario autenticado
-     * @param reservationId   ID de la reserva
-     * @param expirationHours horas de validez solicitadas (el flujo vigente genera enlaces de 24 h)
-     * @return el enlace reactivado
-     * @throws BusinessException si la reserva ya está confirmada o cancelada
+     * <p>Invalida los enlaces vigentes, crea uno nuevo y envía el correo en modo estricto.
+     * Si el envío falla, la transacción se revierte y se conservan los enlaces anteriores.</p>
+     *
+     * @param ownerId       ID del propietario autenticado
+     * @param reservationId ID de la reserva
+     * @return el nuevo enlace
+     * @throws BusinessException si la reserva no está en estado PENDING o falla el correo
      */
     @Transactional
-    public ReservationLinkResponse reactivateLink(Long ownerId, Long reservationId, int expirationHours) {
+    public ReservationLinkResponse reactivateLink(Long ownerId, Long reservationId) {
         Reservation reservation = findReservationOwnedBy(ownerId, reservationId);
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             throw new BusinessException("Solo se puede renovar el enlace de una reserva pendiente.");

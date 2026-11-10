@@ -28,32 +28,21 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Controlador REST para que los propietarios gestionen las reservas
- * de sus alojamientos en la plataforma HostFlow.
+ * Controlador REST para que los propietarios gestionen las reservas de sus alojamientos.
  *
- * <p>Permite a los owners:</p>
  * <ul>
- *   <li>Crear nuevas reservas generando enlaces de confirmación.</li>
- *   <li>Consultar el estado y listado de sus reservas.</li>
- *   <li>Cancelar reservas existentes.</li>
- *   <li>Reactivar enlaces de confirmación expirados.</li>
- *   <li>Verificar la disponibilidad de fechas para un alojamiento.</li>
- *   <li>🆕 Marcar reservas como COMPLETADAS después del check-out para registrar ingresos en el dashboard.</li>
+ *   <li>Crear reservas y enviar el enlace de onboarding (24 h fijas).</li>
+ *   <li>Listar y consultar reservas del propio alojamiento.</li>
+ *   <li>Registrar pago recibido y cancelar reservas.</li>
+ *   <li>Renovar el enlace de onboarding.</li>
+ *   <li>Verificar disponibilidad del propio alojamiento.</li>
+ *   <li>Marcar reservas como COMPLETED después del check-out.</li>
  * </ul>
  *
- * @author HostFlow Team
- * @version 1.2.0 (Agregado endpoint para completar reservas y registrar ingresos)
- * de sus alojamientos en la protected plataforma HostFlow.
- *
- * <p><strong>🆕 Mejora de arquitectura y seguridad (v2.1):</strong></p>
- * <ul>
- *   <li>Los endpoints obtienen el propietario desde la autenticación.</li>
- *   <li>Las consultas de disponibilidad siempre se limitan al alojamiento del propietario autenticado.</li>
- *   <li>Las operaciones sobre reservas validan su pertenencia al propietario.</li>
- * </ul>
+ * <p>Todas las operaciones se limitan al propietario autenticado y a su alojamiento.</p>
  *
  * @author HostFlow Team
- * @version 2.1.0
+ * @version 2.2.0 (Contrato Fase B: creación y renovación sin parámetros de expiración)
  */
 @RestController
 @RequestMapping("/owners/reservations")
@@ -81,18 +70,19 @@ public class OwnerReservationController {
     @Operation(
             summary = "Crear nueva reserva",
             description = """
-            Crea una nueva reserva para el alojamiento del owner autenticado.
+            Crea una reserva para el alojamiento del propietario autenticado y envía al huésped
+            el enlace de onboarding (vigencia fija de 24 horas).
             
             Proceso:
-            1. Valida disponibilidad del alojamiento en las fechas solicitadas.
-            2. Verifica que el huésped tenga al menos un método de pago activo.
-            3. Genera un enlace único de confirmación válido por 24 horas (configurable).
-            4. El enlace debe ser enviado al huésped por email.
+            1. Valida que el alojamiento esté habilitado para reservas (perfil, logo, galería y método de pago del alojamiento).
+            2. Valida fechas, capacidad y disponibilidad (sin solapamiento de noches).
+            3. Crea la reserva en estado PENDING y genera un enlace de onboarding de 24 horas.
+            4. Envía el correo al huésped; si el envío falla, la operación se revierte.
             
-            Validaciones:
-            - No se permiten reservas overlapping (doble booking).
-            - El huésped debe tener métodos de pago activos.
-            - Check-in puede ser hoy; no se admiten fechas pasadas y check-out debe ser posterior.
+            Notas:
+            - Los métodos de pago informados al huésped son los del alojamiento, no del huésped.
+            - Alergias, preferencias y servicios adicionales se capturan en el onboarding público.
+            - Check-in puede ser hoy; check-out debe ser posterior. Las fechas usan formato YYYY-MM-DD.
             """
     )
     @ApiResponses(value = {
@@ -212,23 +202,23 @@ public class OwnerReservationController {
 
     @PostMapping("/{reservationId}/reactivate-link")
     @Operation(
-            summary = "Reactivar enlace de confirmación",
+            summary = "Renovar enlace de onboarding",
             description = """
-            Reactiva un enlace de confirmación que ha expirado.
-            Genera un nuevo token y extiende la validez por las horas especificadas.
+            Invalida los enlaces vigentes de la reserva y genera uno nuevo con vigencia fija de 24 horas.
+            Solo aplica a reservas en estado PENDING. El correo al huésped se envía en modo estricto:
+            si falla el envío, la renovación se revierte y se conserva el enlace anterior.
             """
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Enlace reactivado exitosamente"),
-            @ApiResponse(responseCode = "400", description = "La reserva no está en estado PENDING"),
+            @ApiResponse(responseCode = "200", description = "Enlace renovado y correo aceptado por el proveedor"),
+            @ApiResponse(responseCode = "400", description = "La reserva no está en estado PENDING o falló el envío del correo"),
             @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
     })
     public ResponseEntity<ReservationLinkResponse> reactivateLink(
             @PathVariable Long reservationId,
-            @RequestParam(defaultValue = "24") int expirationHours,
             Authentication authentication) {
         Long ownerId = getCurrentOwnerId(authentication);
-        ReservationLinkResponse response = reservationService.reactivateLink(ownerId, reservationId, expirationHours);
+        ReservationLinkResponse response = reservationService.reactivateLink(ownerId, reservationId);
         return ResponseEntity.ok(response);
     }
 
