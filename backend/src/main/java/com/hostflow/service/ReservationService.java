@@ -80,9 +80,8 @@ public class ReservationService {
     // =========================================================================
 
 
-    @Value("${app.reservations.frontend-confirm-url:http://localhost:3000/reservations/confirm}")
+    @Value("${app.reservations.frontend-confirm-url}")
     private String frontendConfirmUrl;
-
 
     // =========================================================================
     // 1. CREACIÓN DE RESERVA
