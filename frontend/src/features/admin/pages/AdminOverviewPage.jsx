@@ -7,6 +7,7 @@ import { useSession } from "@features/auth/context/SessionContext";
 export default function AdminOverviewPage() {
   const { actions } = useSession();
   const lodgings = useStore((s) => s.admin.lodgings);
+  const metrics = useStore((s) => s.admin.metrics);
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -19,7 +20,7 @@ export default function AdminOverviewPage() {
 
   const active = lodgings.filter((l) => l.status === "ACTIVE").length;
   const paused = lodgings.filter((l) => l.status === "PAUSED").length;
-  const totalBookings = lodgings.length * 42; // métrica ilustrativa del backend
+  const totalBookings = metrics?.totalCompletedReservations ?? lodgings.length * 42;
 
   return (
     <div className="grid gap-6">

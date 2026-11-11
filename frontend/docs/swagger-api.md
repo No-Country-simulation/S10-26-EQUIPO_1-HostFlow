@@ -1,12 +1,13 @@
 # HostFlow · Contrato de API (Swagger / OpenAPI)
 
 El frontend consume el backend **Java Spring Boot** que vive en `backend/`. Este documento
-resume el contrato real; la fuente de verdad es el propio backend:
+resume el contrato y su consumo desde el cliente frontend:
 
 - **Swagger UI**: `http://localhost:8080/api/v1/swagger-ui.html`
 - **OpenAPI JSON**: `http://localhost:8080/api/v1/api-docs`
 - **Context path**: `/api/v1` (`server.servlet.context-path` en `application.properties`)
-- **Puerto**: `8080` · **CORS**: habilitado para `*` (ver `WebConfig`)
+- **Puerto backend**: `8080`
+- **CORS**: configurado para el frontend
 
 `VITE_API_URL` apunta a la **base con el context-path incluido**:
 
@@ -16,129 +17,57 @@ VITE_API_URL=http://localhost:8080/api/v1
 
 Las rutas de `src/lib/api/endpoints.js` son relativas a esa base.
 
-- Formato: JSON. Errores con `{ "message": "..." }` (se muestra tal cual al usuario).
-- Autenticación: `Authorization: Bearer <token>` (JWT, TTL 24 h).
-- En modo **demo** (sin `VITE_API_URL`) el frontend usa `src/lib/api/demoApi.js`, que
-  implementa el **mismo contrato** con datos en memoria.
+- Formato: JSON (y `multipart/form-data` para subidas de imágenes).
+- Autenticación: `Authorization: Bearer <token>` (JWT).
+- En modo **demo** (sin `VITE_API_URL`) el frontend usa `src/lib/api/demoApi.js`.
+- Con `VITE_API_URL` configurada, el frontend usa `src/lib/api/httpApi.js` y sincroniza el estado con el backend.
 
 ---
 
-## Auth
+## Módulos Integrados
 
-### `POST /auth/register` → 201
+### 1. Autenticación (`/auth/*`)
+- `POST /auth/login`: Ingreso con correo y contraseña. Retorna JWT y datos del usuario (`AuthResponse`).
+- `POST /auth/register`: Registro de anfitrión (`OwnerRegisterRequest`). Retorna JWT y rol `ROLE_OWNER`.
+- `POST /auth/forgot-password`: Genera y envía código OTP de 6 dígitos.
+- `POST /auth/reset-password`: Restablece contraseña con `{ email, code, newPassword }`.
+- `GET /auth/verify-email`: Verificación de correo.
 
-Cuerpo (`OwnerRegisterRequest`):
+### 2. Perfil y Galería de Alojamiento (`/owners/accommodation/*`)
+- `GET /owners/accommodation/profile`: Obtiene el perfil completo del alojamiento (`AccommodationProfileResponse`).
+- `POST /owners/accommodation/profile`: Crea el perfil inicial si aún no existe.
+- `PATCH /owners/accommodation/profile`: Modifica datos generales, capacidad, precios y estilo visual.
+- `GET /owners/accommodation/gallery`: Lista las fotos de la galería.
+- `POST /owners/accommodation/gallery/upload`: Carga de imagen multipart a Cloudinary.
+- `DELETE /owners/accommodation/gallery/{imageId}`: Elimina imagen de la galería.
+- `POST /owners/accommodation/profile/logo`: Carga y reemplazo del logotipo.
 
-```json
-{
-  "fullName": "Martina Silva",
-  "accommodationName": "Cabañas del Arroyo",
-  "email": "anfitrion@hostflow.app",
-  "password": "demo1234",
-  "termsAccepted": true
-}
-```
+### 3. Disponibilidad y Desactivaciones (`/owners/accommodation/*`)
+- `GET /owners/accommodation/status`: Estado actual de disponibilidad.
+- `GET /owners/accommodation/history`: Historial de desactivaciones temporales.
+- `POST /owners/accommodation/disable`: Desactiva temporalmente el alojamiento (`disabledFrom`, `disabledUntil`, `reason`).
+- `POST /owners/accommodation/enable`: Reactiva el alojamiento.
+- `GET /owners/accommodation/availability`: Consulta disponibilidad por fecha.
 
-Respuesta (`AuthResponse`):
+### 4. Monedas y Métodos de Pago (`/owners/accommodation/*`)
+- `GET /owners/accommodation/currencies`: Lista monedas habilitadas y cotizaciones.
+- `PUT /owners/accommodation/currencies`: Habilita/deshabilita monedas (USD, EUR) y tasas.
+- `GET /owners/accommodation/payment-methods`: Lista los métodos de pago configurados.
+- `POST /owners/accommodation/payment-methods`: Agrega nuevo método de pago.
+- `PATCH /owners/accommodation/payment-methods/{id}`: Modifica estado o datos del método.
+- `DELETE /owners/accommodation/payment-methods/{id}`: Elimina método de pago.
 
-```json
-{
-  "token": "eyJhbGciOi...",
-  "tokenType": "Bearer",
-  "userId": 1,
-  "email": "anfitrion@hostflow.app",
-  "fullName": "Martina Silva",
-  "roles": ["ROLE_OWNER"]
-}
-```
+### 5. Reservas del Propietario (`/owners/reservations/*`)
+- `GET /owners/reservations`: Listado de reservas del alojamiento propio.
+- `GET /owners/reservations/{id}`: Detalle de reserva.
+- `POST /owners/reservations/{id}/cancel`: Cancelación con motivo.
+- `POST /owners/reservations/{id}/complete`: Finalización de estadía post check-out.
+- `POST /owners/reservations/{id}/reactivate-link`: Regenera enlace de confirmación.
 
-Errores: `400` (validación / correo ya registrado) · `500`.
+### 6. Métricas y Estadísticas
+- `GET /owners/dashboard/metrics`: Métricas del anfitrión (reservas activas, completadas, ingresos).
+- `GET /admin/dashboard/metrics`: Métricas globales del administrador.
 
-### `POST /auth/login` → 200
-
-Cuerpo (`LoginRequest`): `{ "email": "...", "password": "..." }` → `AuthResponse` (igual que arriba).
-Errores: `401` (credenciales incorrectas) · `400` (datos inválidos).
-
-### `POST /auth/forgot-password` → 200
-
-Cuerpo (`ForgotPasswordRequest`): `{ "email": "..." }`
-
-Respuesta (`PasswordResetResponse`):
-
-```json
-{ "message": "Si el correo está registrado, recibirás un código.", "email": "an••••@...", "expirationMinutes": 60 }
-```
-
-- El código tiene **6 dígitos**, expira en **60 minutos** y es de un solo uso.
-- Por seguridad responde **200 siempre**, exista o no el correo (anti-enumeración de usuarios).
-
-### `POST /auth/reset-password` → 200
-
-Cuerpo (`ResetPasswordRequest`):
-
-```json
-{ "email": "anfitrion@hostflow.app", "code": "123456", "newPassword": "nueva1234" }
-```
-
-Respuesta: `PasswordResetResponse` (`message`, `email`, `expirationMinutes`).
-
-Errores: `400` (código inválido / expirado / ya usado) · `404` (usuario no encontrado).
-
-> El frontend valida la **confirmación de la nueva clave** en pantalla (2 inputs) y envía
-> `newPassword` al backend.
-
----
-
-## Dueños de alojamiento (requieren JWT)
-
-Controlador `OwnerController` · `ROLE_OWNER` o `ROLE_ADMIN`, salvo donde se indica.
-
-### `GET /owners/email/{email}` → 200
-
-`OwnerResponse`:
-
-```json
-{
-  "id": 1,
-  "fullName": "Martina Silva",
-  "accommodationName": "Cabañas del Arroyo",
-  "email": "anfitrion@hostflow.app",
-  "enabled": true,
-  "roles": ["ROLE_OWNER"],
-  "createdAt": "2026-10-19T18:20:16Z",
-  "updatedAt": "2026-10-19T18:20:16Z"
-}
-```
-
-Errores: `401` (sin token) · `403` (sin permisos) · `404` (no existe).
-
-### `GET /owners/{id}` → 200 → `OwnerResponse`
-
-### `GET /owners` → 200 → `OwnerResponse[]` — **solo `ROLE_ADMIN`**
-
-Lista completa de dueños registrados. Es la fuente del **panel de control interno**
-(`/admin` del frontend): cantidad de alojamientos y búsqueda por dueño, ID o correo
-(el filtrado del lado del frontend usa este listado).
-
-### `PATCH /owners/{id}/status?enabled=true` → 200 → `OwnerResponse` — **solo `ROLE_ADMIN`**
-
-Activa o desactiva la cuenta del dueño. `enabled=false` impide el inicio de sesión,
-pero conserva los datos.
-
----
-
-## Pendiente de definir en el backend
-
-Estos módulos todavía **no existen** en `backend/`. Mientras tanto la capa de servicios
-(`src/lib/api/index.js`) cae al **store local** (`src/lib/state/store.js`), de modo que las
-pantallas siguen siendo usables; cuando el backend los implemente, alcanza con agregar las
-rutas en `src/lib/api/endpoints.js` y los métodos en `src/lib/api/httpApi.js`: las
-pantallas ya consumen la capa de servicios y no cambian.
-
-| Módulo | Rutas reservadas en `endpoints.js` |
-|---|---|
-| Alojamiento (datos, imágenes, precio) | `/lodgings/mine` |
-| Disponibilidad (días bloqueados) | `/lodgings/mine/blocked-days` |
-| Reservas | `/lodgings/mine/bookings`, `/bookings/{id}` |
-| Métodos de pago | `/lodgings/mine/payment-methods` |
-| Estadísticas de administración | `/admin/stats` |
+### 7. Panel de Administración (`/owners/*`)
+- `GET /owners`: Lista completa de dueños registrados (solo `ROLE_ADMIN`).
+- `PATCH /owners/{id}/status?enabled={true|false}`: Activa o pausa la cuenta de un anfitrión.

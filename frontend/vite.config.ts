@@ -9,6 +9,16 @@ const srcPath = path.resolve(fileURLToPath(new URL('.', import.meta.url)), 'src'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    port: 3000,
+    proxy: {
+      '/api': {
+        target: 'https://hostflow-backend-mi26.onrender.com',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': srcPath,

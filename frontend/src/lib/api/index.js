@@ -2,7 +2,7 @@
 // Las pantallas importan `api` (o `actions` desde el contexto) y nunca hablan con fetch
 // ni con datos de prueba directamente.
 //   Sin VITE_API_URL → demoApi (datos en memoria, src/lib/api/demoApi.js).
-//   Con    VITE_API_URL → httpApi (backend real Java Spring Boot, src/lib/api/httpApi.js).
+//   Con VITE_API_URL → httpApi (backend real Java Spring Boot, src/lib/api/httpApi.js).
 import { DEMO_MODE } from "../config/env"
 import { demoApi } from "./demoApi"
 import { httpApi } from "./httpApi"
@@ -17,13 +17,14 @@ const impl = DEMO_MODE ? demoApi : httpApi
 const keepToken = (result) => {
   if (result?.token) tokenStorage.set(result.token)
   if (result?.user) actions.setUser(result.user)
+  if (!DEMO_MODE && result?.token) {
+    // Sincronizar datos iniciales en segundo plano tras autenticarse
+    api.syncUserData().catch(() => null)
+  }
   return result
 }
 
 // Operation helper.
-// El backend todavía no expone los módulos de alojamiento, reservas, disponibilidad
-// ni pagos. Para esos casos se cae al store local: las pantallas siguen siendo
-// usables y, sobre todo, NO fallan en silencio (que era el bug anterior).
 const op =
   (name) =>
   (...args) => {
@@ -45,17 +46,56 @@ export const api = {
     return keepToken(await impl.demoLogin(email))
   },
   register: async (data) => keepToken(await impl.register(data)),
-  // Equivale a POST /auth/forgot-password
   forgotPassword: (email) => impl.forgotPassword(email),
-  // Equivale a POST /auth/reset-password.
-  // La interfaz usa `password`; el backend espera `newPassword`: se envían ambos.
   resetPassword: ({ email, code, password }) =>
     impl.resetPassword({ email, code, password, newPassword: password }),
   logout: () => {
-    // Siempre hay que limpiar el store: con backend real no hay endpoint de logout,
-    // pero el usuario en memoria mantiene abierta la sesión de la interfaz.
     actions.setUser(null)
     tokenStorage.clear()
+  },
+
+  // ── Sincronización de datos con Backend ─────────────────────────────────
+  syncUserData: async () => {
+    if (DEMO_MODE) return
+    const user = store.get().user
+    const token = tokenStorage.get()
+    if (!token || !user) return
+
+    try {
+      if (user.role === "ADMIN") {
+        const [lodgings, metrics] = await Promise.all([
+          httpApi.getAdminLodgings().catch(() => []),
+          httpApi.getAdminMetrics().catch(() => null),
+        ])
+        store.setState((s) => ({
+          ...s,
+          admin: {
+            lodgings: lodgings.length ? lodgings : s.admin.lodgings,
+            metrics: metrics || s.admin.metrics,
+          },
+        }))
+      } else {
+        // Rol OWNER / HOST
+        const [lodging, bookings, blockedDays, payments, metrics] = await Promise.all([
+          httpApi.getLodging().catch(() => null),
+          httpApi.getBookings().catch(() => null),
+          httpApi.getBlockedDays().catch(() => null),
+          httpApi.getPayments().catch(() => null),
+          httpApi.getOwnerMetrics().catch(() => null),
+        ])
+
+        store.setState((s) => ({
+          ...s,
+          ...(lodging ? { lodging: { ...s.lodging, ...lodging } } : {}),
+          ...(Array.isArray(bookings) ? { bookings } : {}),
+          ...(Array.isArray(blockedDays) ? { blockedDays } : {}),
+          ...(payments ? { payments } : {}),
+          ownerMetrics: metrics,
+        }))
+      }
+    } catch (err) {
+      console.warn("No se pudieron sincronizar todos los datos del backend:", err)
+    }
   },
 
   // ── Alojamiento ─────────────────────────────────────────────────────────
@@ -82,6 +122,10 @@ export const api = {
   toggleWallet: op("toggleWallet"),
   togglePaymentMethod: op("togglePaymentMethod"),
   addPaymentMethod: op("addPaymentMethod"),
+
+  // ── Métricas ────────────────────────────────────────────────────────────
+  getOwnerMetrics: op("getOwnerMetrics"),
+  getAdminMetrics: op("getAdminMetrics"),
 
   // ── Admin ───────────────────────────────────────────────────────────────
   getAdminLodgings: op("getAdminLodgings"),
