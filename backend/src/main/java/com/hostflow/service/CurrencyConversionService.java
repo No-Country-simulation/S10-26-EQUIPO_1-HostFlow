@@ -280,12 +280,21 @@ public class CurrencyConversionService {
                             "No hay tasa de cambio disponible para " + targetCurrency + ". Actualice las tasas o use tasa manual."));
         }
 
-        // Advertencia si la tasa está desactualizada (pero se usa igual para no bloquear la operación)
+        // Validar que la tasa automática almacenada en caché sea válida.
+        BigDecimal rate = cached.getRate();
+
+        if (rate == null || rate.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException(
+                    "La tasa de cambio para " + targetCurrency +
+                            " no es válida. Debe ser mayor que cero.");
+        }
+
+        // Advertencia si la tasa está desactualizada (pero se usa igual para no bloquear la operación).
         if (cached.getFetchedAt().isBefore(LocalDateTime.now().minusHours(RATE_MAX_AGE_HOURS))) {
             log.warn("⚠️ Tasa de cambio para {} expirada (obtenida el {}). Usando valor cacheado.",
                     targetCurrency, cached.getFetchedAt());
         }
 
-        return cached.getRate();
+        return rate;
     }
 }
