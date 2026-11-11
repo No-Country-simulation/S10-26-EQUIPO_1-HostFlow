@@ -306,7 +306,8 @@ public class ReservationService {
         String lastName = request.lastName().trim();
         String phone = request.phone().trim();
 
-        Guest guest = resolveGuest(firstName, lastName, email, phone, documentNumber);
+        GuestResolution resolution = resolveGuest(firstName, lastName, email, phone, documentNumber);
+        Guest guest = resolution.guest();
         ReservationGuestInfo guestInfo = ReservationGuestInfo.builder()
                 .firstName(firstName)
                 .lastName(lastName)
@@ -317,9 +318,8 @@ public class ReservationService {
                 .allergies(request.allergies() == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(request.allergies()))
                 .build();
         reservation.setGuest(guest);
-        reservation.setGuestName(firstName + " " + lastName);
-        reservation.setGuestEmail(email);
-        reservation.setGuestPhone(phone);
+        // Los campos guestName/guestEmail/guestPhone de Reservation son el snapshot
+        // capturado por el owner al crear la reserva; no se sobrescriben con el onboarding.
         reservation.setGuestInfo(guestInfo);
         reservation.setBoatTransferRequested(request.boatTransferRequested());
 
@@ -374,6 +374,33 @@ public class ReservationService {
         reservationRepository.save(reservation);
         linkRepository.save(link);
 
+        // Avisar al correo anterior solo después de confirmar la transacción.
+        // El fallo de notificación no puede revertir el onboarding.
+        if (resolution.previousEmail() != null) {
+            String guestDisplayName = firstName + " " + lastName;
+            String maskedNewEmail = maskEmail(email);
+            Runnable notifyPreviousEmail = () -> emailService.sendGuestEmailChangedNotification(
+                    resolution.previousEmail(), guestDisplayName, maskedNewEmail);
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try { notifyPreviousEmail.run(); }
+                        catch (RuntimeException ex) {
+                            log.error("No se pudo enviar aviso de cambio de correo para huésped ID {}: {}",
+                                    guest.getId(), ex.getMessage(), ex);
+                        }
+                    }
+                });
+            } else {
+                try { notifyPreviousEmail.run(); }
+                catch (RuntimeException ex) {
+                    log.error("No se pudo enviar aviso de cambio de correo para huésped ID {}: {}",
+                            guest.getId(), ex.getMessage(), ex);
+                }
+            }
+        }
+
         List<ReservationOnboardingDetailsResponse.PaymentOption> paymentOptions =
                 accommodation.getPaymentMethods() == null ? List.of() : accommodation.getPaymentMethods().stream()
                         .filter(this::isUsablePaymentMethod)
@@ -399,28 +426,44 @@ public class ReservationService {
         }
     }
 
-    private Guest resolveGuest(String firstName, String lastName, String email, String phone, String documentNumber) {
-        // El correo es un dato de contacto, no una clave única del huésped.
-        // Solo reutilizamos el registro cuando coincide el documento de identidad.
-        Guest guest = guestRepository.findByDocumentNumber(documentNumber).orElse(null);
+    private GuestResolution resolveGuest(String firstName, String lastName, String email,
+                                         String phone, String documentNumber) {
+        // El documento identifica al huésped. Su nombre, correo y teléfono se mantienen
+        // con los datos más recientes proporcionados durante un onboarding válido.
+        Guest guest = guestRepository.findByDocumentNumberForUpdate(documentNumber).orElse(null);
         if (guest != null) {
-            if (guest.getEmail() != null && !guest.getEmail().equalsIgnoreCase(email)) {
-                throw new BusinessException("El documento ya está registrado con otro correo electrónico.");
-            }
+            String previousEmail = normalizeEmail(guest.getEmail());
+            boolean emailChanged = previousEmail != null && !previousEmail.equals(email);
             guest.setFirstName(firstName);
             guest.setLastName(lastName);
-            guest.setFullName(firstName + " " + lastName);
+            guest.setFullName((firstName + " " + lastName).trim());
+            guest.setEmail(email);
             guest.setPhone(phone);
-            return guestRepository.save(guest);
+            Guest saved = guestRepository.save(guest);
+            log.info("Perfil de huésped ID {} actualizado desde onboarding. Cambio de correo: {}",
+                    saved.getId(), emailChanged);
+            return new GuestResolution(saved, emailChanged ? previousEmail : null);
         }
 
-        // Un mismo correo puede pertenecer a distintas personas o utilizarse
-        // en varias reservas; por eso no buscamos ni bloqueamos por email.
         Guest newGuest = Guest.builder()
-                .firstName(firstName).lastName(lastName).fullName(firstName + " " + lastName)
+                .firstName(firstName).lastName(lastName).fullName((firstName + " " + lastName).trim())
                 .email(email).phone(phone).documentNumber(documentNumber).active(true).build();
-        return guestRepository.save(newGuest);
+        return new GuestResolution(guestRepository.save(newGuest), null);
     }
+
+    private String normalizeEmail(String email) {
+        return email == null || email.isBlank() ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private String maskEmail(String email) {
+        int at = email.indexOf('@');
+        if (at <= 0) return "***";
+        String local = email.substring(0, at);
+        String visible = local.length() == 1 ? "*" : local.substring(0, 1) + "***";
+        return visible + email.substring(at);
+    }
+
+    private record GuestResolution(Guest guest, String previousEmail) { }
 
     /**
      * Equivalencias solo informativas (no se persisten). Se muestran USD/EUR cuando el

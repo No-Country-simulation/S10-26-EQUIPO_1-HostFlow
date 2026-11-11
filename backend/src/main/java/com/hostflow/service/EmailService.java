@@ -455,12 +455,58 @@ public class EmailService {
         );
     }
 
+    /**
+     * Aviso de seguridad enviado al correo anterior cuando cambia el contacto principal del huésped.
+     * Es tolerante: un fallo de correo nunca revierte el onboarding ni la reserva.
+     */
+    public void sendGuestEmailChangedNotification(String previousEmail, String guestName, String maskedNewEmail) {
+        if (previousEmail == null || previousEmail.isBlank()) {
+            log.warn("No se envió aviso de cambio de correo: el huésped no tenía correo anterior registrado.");
+            return;
+        }
+        String displayName = guestName == null || guestName.isBlank() ? "Huésped" : guestName.trim();
+        String displayEmail = maskedNewEmail == null || maskedNewEmail.isBlank()
+                ? "No disponible" : maskedNewEmail.trim();
+        String plainText = "Hola " + displayName + ",\n\n"
+                + "El correo electrónico asociado a tu perfil de huésped en HostFlow fue actualizado.\n\n"
+                + "Nuevo correo registrado: " + displayEmail + "\n\n"
+                + "Si realizaste este cambio, no necesitas hacer nada. Si no reconoces esta modificación, "
+                + "comunícate con el propietario del alojamiento o con el equipo de soporte de HostFlow.\n\n"
+                + "Por seguridad, no compartas contraseñas ni códigos de verificación.\n\n"
+                + "Este es un aviso automático de seguridad de " + appName + ".";
+
+        Context context = new Context();
+        context.setVariable("guestName", displayName);
+        context.setVariable("maskedNewEmail", displayEmail);
+        context.setVariable("appName", appName);
+        String htmlContent = templateEngine.process("emails/guest-email-changed", context);
+        sendHybridEmail(previousEmail, "Aviso de seguridad: tu correo de HostFlow fue actualizado",
+                htmlContent, plainText);
+    }
+
     public void sendReservationCancelledEmail(String toEmail, String guestName, String confirmationCode,
                                               String accommodationName, String reason) {
-        String plainText = String.format("¡Hola %s!\n\nTu reserva %s en %s ha sido cancelada.\nMotivo: %s",
-                guestName, confirmationCode, accommodationName, reason != null ? reason : "No especificado");
+        String displayName = guestName == null || guestName.isBlank() ? "Huésped" : guestName.trim();
+        String displayCode = confirmationCode == null || confirmationCode.isBlank()
+                ? "No disponible" : confirmationCode.trim();
+        String displayAccommodation = accommodationName == null || accommodationName.isBlank()
+                ? "el alojamiento" : accommodationName.trim();
+        String displayReason = reason == null || reason.isBlank() ? "No especificado" : reason.trim();
+        String plainText = "Hola " + displayName + ",\n\n"
+                + "Te informamos que tu reserva " + displayCode + " en " + displayAccommodation
+                + " ha sido cancelada.\n\nMotivo: " + displayReason + "\n\n"
+                + "Si necesitas aclarar alguna duda, comunícate directamente con el alojamiento.\n\n"
+                + "Este mensaje es una notificación automática de " + appName + ".";
 
-        sendHybridEmail(toEmail, "❌ " + appName + " - Reserva cancelada " + confirmationCode, null, plainText);
+        Context context = new Context();
+        context.setVariable("guestName", displayName);
+        context.setVariable("confirmationCode", displayCode);
+        context.setVariable("accommodationName", displayAccommodation);
+        context.setVariable("reason", displayReason);
+        context.setVariable("appName", appName);
+        String htmlContent = templateEngine.process("emails/reservation-cancelled", context);
+        sendHybridEmail(toEmail, "Reserva cancelada " + displayCode + " - " + displayAccommodation,
+                htmlContent, plainText);
     }
 
     // =========================================================================

@@ -6,6 +6,7 @@ import com.hostflow.exception.EmailDeliveryException;
 import com.hostflow.model.Accommodation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.thymeleaf.TemplateEngine;
@@ -24,6 +25,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Verifica la política dual de correo de reservas (Fase A):
@@ -112,4 +114,44 @@ class EmailServiceReservationPolicyTest {
                 emailService.sendReservationCancelledEmail(
                         "guest@example.com", "Ana", "HF-TEST", "Casa Test", "Cambio de planes"));
     }
+    @Test
+    void guestEmailChangedNotificationUsesSecurityHtmlTemplate() {
+        emailService.sendGuestEmailChangedNotification(
+                "old@example.com", "Ana Pérez", "a***@example.com");
+
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("emails/guest-email-changed"), contextCaptor.capture());
+        assertEquals("Ana Pérez", contextCaptor.getValue().getVariable("guestName"));
+        assertEquals("a***@example.com", contextCaptor.getValue().getVariable("maskedNewEmail"));
+        assertEquals("HostFlow", contextCaptor.getValue().getVariable("appName"));
+        verify(mailSender).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void cancellationEmailUsesReservationCancellationHtmlTemplate() {
+        emailService.sendReservationCancelledEmail(
+                "guest@example.com", "Ana", "HF-TEST", "Casa Test", "Cambio de planes");
+
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("emails/reservation-cancelled"), contextCaptor.capture());
+        assertEquals("Ana", contextCaptor.getValue().getVariable("guestName"));
+        assertEquals("HF-TEST", contextCaptor.getValue().getVariable("confirmationCode"));
+        assertEquals("Casa Test", contextCaptor.getValue().getVariable("accommodationName"));
+        assertEquals("Cambio de planes", contextCaptor.getValue().getVariable("reason"));
+        verify(mailSender).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void cancellationEmailUsesSafeDefaultsWhenOptionalTextIsMissing() {
+        emailService.sendReservationCancelledEmail(
+                "guest@example.com", " ", null, null, " ");
+
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("emails/reservation-cancelled"), contextCaptor.capture());
+        assertEquals("Huésped", contextCaptor.getValue().getVariable("guestName"));
+        assertEquals("No disponible", contextCaptor.getValue().getVariable("confirmationCode"));
+        assertEquals("el alojamiento", contextCaptor.getValue().getVariable("accommodationName"));
+        assertEquals("No especificado", contextCaptor.getValue().getVariable("reason"));
+    }
+
 }

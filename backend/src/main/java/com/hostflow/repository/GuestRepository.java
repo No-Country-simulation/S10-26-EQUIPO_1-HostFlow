@@ -3,6 +3,10 @@ package com.hostflow.repository;
 import com.hostflow.model.Guest;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
@@ -58,6 +62,11 @@ public interface GuestRepository extends JpaRepository<Guest, Long> {
      * @return un {@link Optional} con el huésped encontrado, o vacío si no existe
      */
     Optional<Guest> findByDocumentNumber(String documentNumber);
+
+    /** Bloquea el perfil durante una actualización para evitar escrituras concurrentes perdidas. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select g from Guest g where g.documentNumber = :documentNumber")
+    Optional<Guest> findByDocumentNumberForUpdate(@Param("documentNumber") String documentNumber);
 
     /**
      * 🆕 Verifica si ya existe un huésped registrado con el número de documento especificado.

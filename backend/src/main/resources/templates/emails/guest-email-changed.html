@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Aviso de seguridad - HostFlow</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f3f5f7;font-family:Arial,Helvetica,sans-serif;color:#263238;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f5f7;padding:32px 12px;">
+    <tr><td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #e6ebef;border-radius:12px;">
+            <tr><td style="padding:28px 32px;background:#172b4d;border-radius:12px 12px 0 0;">
+                <p style="margin:0;color:#cbd5e1;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;">Notificación de seguridad</p>
+                <h1 style="margin:10px 0 0;color:#ffffff;font-size:25px;line-height:1.3;">Se actualizó tu correo electrónico</h1>
+            </td></tr>
+            <tr><td style="padding:30px 32px 12px;">
+                <p style="margin:0 0 14px;color:#263238;font-size:16px;line-height:1.6;">Hola <strong th:text="${guestName}">Huésped</strong>,</p>
+                <p style="margin:0;color:#52616b;font-size:15px;line-height:1.7;">Te informamos que el correo electrónico asociado a tu perfil de huésped en HostFlow fue actualizado durante un registro o actualización de tus datos.</p>
+            </td></tr>
+            <tr><td style="padding:12px 32px 22px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f7f9fb;border:1px solid #e5eaf0;border-radius:9px;">
+                    <tr><td style="padding:18px 20px;">
+                        <p style="margin:0 0 8px;color:#718096;font-size:11px;letter-spacing:1px;text-transform:uppercase;">Nuevo correo registrado</p>
+                        <p th:text="${maskedNewEmail}" style="margin:0;color:#172b4d;font-size:17px;font-weight:bold;line-height:1.5;word-break:break-word;">m***@example.com</p>
+                    </td></tr>
+                </table>
+            </td></tr>
+            <tr><td style="padding:0 32px 12px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fff8e8;border-left:4px solid #d69e36;">
+                    <tr><td style="padding:16px 18px;">
+                        <p style="margin:0 0 7px;color:#805b16;font-size:14px;font-weight:bold;">¿Reconoces este cambio?</p>
+                        <p style="margin:0;color:#6b5a37;font-size:14px;line-height:1.65;">Si realizaste esta actualización, no necesitas hacer nada. Si no reconoces el cambio, comunícate con el propietario del alojamiento o con el equipo de soporte de HostFlow para recibir ayuda.</p>
+                    </td></tr>
+                </table>
+            </td></tr>
+            <tr><td style="padding:20px 32px 30px;">
+                <p style="margin:0 0 10px;color:#52616b;font-size:13px;line-height:1.6;">Por tu seguridad, nunca compartas contraseñas ni códigos de verificación por correo o mensajería.</p>
+                <p style="margin:0;color:#718096;font-size:13px;line-height:1.6;">Este es un aviso automático de <strong th:text="${appName}">HostFlow</strong>. No es necesario responder a este mensaje.</p>
+            </td></tr>
+            <tr><td style="padding:18px 32px;background:#f7f9fb;border-radius:0 0 12px 12px;text-align:center;">
+                <p style="margin:0;color:#718096;font-size:12px;">© <span th:text="${appName}">HostFlow</span> · Plataforma de gestión de alojamientos</p>
+            </td></tr>
+        </table>
+    </td></tr>
+</table>
+</body>
+</html>
