@@ -1,16 +1,21 @@
 package com.hostflow.dto.response;
 
 import com.hostflow.enums.ReservationStatus;
+import com.hostflow.enums.PaymentStatus;
 import com.hostflow.model.Reservation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * DTO de respuesta que representa una reserva completa con toda su información.
+ * DTO de respuesta con la información de una reserva.
+ *
+ * <p>El estado operativo y el estado de pago son independientes.
+ * No incluye método de pago del huésped (fuera de alcance).</p>
  *
  * @author HostFlow Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 @Schema(description = "Información completa de una reserva")
 public record ReservationResponse(
@@ -36,29 +41,35 @@ public record ReservationResponse(
         @Schema(description = "Correo del huésped", example = "juan.perez@email.com")
         String guestEmail,
 
-        @Schema(description = "Fecha de check-in", example = "2026-12-15T14:00:00")
-        LocalDateTime checkIn,
+        @Schema(description = "Fecha de check-in", example = "2026-12-15")
+        LocalDate checkIn,
 
-        @Schema(description = "Fecha de check-out", example = "2026-12-18T11:00:00")
-        LocalDateTime checkOut,
+        @Schema(description = "Fecha de check-out", example = "2026-12-18")
+        LocalDate checkOut,
 
         @Schema(description = "Número de noches", example = "3")
         Integer nights,
 
-        @Schema(description = "Precio por noche", example = "85000.00")
+        @Schema(description = "Precio por noche")
         BigDecimal pricePerNight,
 
-        @Schema(description = "Subtotal", example = "255000.00")
+        @Schema(description = "Subtotal (noches × precio)")
         BigDecimal subtotal,
 
-        @Schema(description = "Impuestos", example = "25500.00")
+        @Schema(description = "Impuestos (si aplica)", example = "0")
         BigDecimal taxes,
 
-        @Schema(description = "Monto total", example = "280500.00")
+        @Schema(description = "Importe total")
         BigDecimal totalAmount,
 
-        @Schema(description = "Estado de la reserva", example = "PENDING")
+        @Schema(description = "Estado operativo de la reserva (independiente del pago). CONFIRMED = onboarding completado.", example = "PENDING")
         ReservationStatus status,
+
+        @Schema(description = "Estado del pago", example = "PENDING")
+        PaymentStatus paymentStatus,
+
+        @Schema(description = "Fecha y hora en que el propietario registró el pago")
+        LocalDateTime paidAt,
 
         @Schema(description = "Número de huéspedes", example = "2")
         Integer guestCount,
@@ -66,10 +77,7 @@ public record ReservationResponse(
         @Schema(description = "Solicitudes especiales")
         String specialRequests,
 
-        @Schema(description = "Método de pago utilizado")
-        GuestPaymentMethodResponse paymentMethod,
-
-        @Schema(description = "Enlace de confirmación (solo si está pendiente)")
+        @Schema(description = "Enlace de onboarding (solo si aplica)")
         ReservationLinkResponse confirmationLink,
 
         @Schema(description = "Fecha de creación", example = "2026-10-29T10:30:00")
@@ -79,37 +87,27 @@ public record ReservationResponse(
         LocalDateTime updatedAt
 ) {
 
-    /**
-     * Factory method que construye el DTO desde la entidad Reservation.
-     *
-     * @param r la entidad Reservation
-     * @param link el enlace de confirmación asociado (puede ser null)
-     * @return el DTO de respuesta completo
-     */
     public static ReservationResponse from(Reservation r, ReservationLinkResponse link) {
-        GuestPaymentMethodResponse paymentMethodResponse = r.getPaymentMethod() != null
-                ? GuestPaymentMethodResponse.from(r.getPaymentMethod())
-                : null;
-
         return new ReservationResponse(
                 r.getId(),
                 r.getConfirmationCode(),
                 r.getAccommodation().getId(),
                 r.getAccommodation().getName(),
-                r.getGuest().getId(),
-                r.getGuest().getFullName(),
-                r.getGuest().getEmail(),
+                r.getGuest() != null ? r.getGuest().getId() : null,
+                r.getGuest() != null ? r.getGuest().getFullName() : r.getGuestName(),
+                r.getGuest() != null ? r.getGuest().getEmail() : r.getGuestEmail(),
                 r.getCheckIn(),
                 r.getCheckOut(),
                 r.getNights(),
                 r.getPricePerNight(),
                 r.getSubtotal(),
-                r.getTaxes(),
+                BigDecimal.ZERO,
                 r.getTotalAmount(),
                 r.getStatus(),
+                r.getPaymentStatus(),
+                r.getPaidAt(),
                 r.getGuestCount(),
                 r.getSpecialRequests(),
-                paymentMethodResponse,
                 link,
                 r.getCreatedAt(),
                 r.getUpdatedAt()

@@ -3,92 +3,68 @@ package com.hostflow.enums;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * Enumeración que define los posibles estados de una reserva en el sistema HostFlow.
+ * Estados operativos de una reserva en HostFlow.
  *
- * <p><strong>Ciclo de vida típico de una reserva:</strong></p>
+ * <p>El estado de la reserva es independiente del estado de pago ({@code PaymentStatus})
+ * y del ciclo de vida del enlace de onboarding.</p>
+ *
+ * <p><strong>Ciclo de vida típico:</strong></p>
  * <pre>
  * PENDING → CONFIRMED → COMPLETED
  *    ↓          ↓
- * EXPIRED    CANCELLED
+ * CANCELLED  CANCELLED
  * </pre>
  *
- * <p><strong>Descripción de cada estado:</strong></p>
  * <ul>
- *   <li>{@code PENDING}: Reserva creada, esperando confirmación del huésped.</li>
- *   <li>{@code CONFIRMED}: Huésped confirmó la reserva y el pago fue procesado.</li>
- *   <li>{@code CANCELLED}: Reserva cancelada por el huésped o el propietario.</li>
- *   <li>{@code EXPIRED}: El enlace de confirmación expiró sin que el huésped confirmara.</li>
- *   <li>{@code COMPLETED}: Estadía finalizada exitosamente.</li>
+ *   <li>{@code PENDING}: el propietario creó la reserva; falta el onboarding del huésped.</li>
+ *   <li>{@code CONFIRMED}: el huésped completó el onboarding. <strong>No implica pago recibido.</strong></li>
+ *   <li>{@code CANCELLED}: el propietario canceló; deja de bloquear fechas.</li>
+ *   <li>{@code COMPLETED}: estadía finalizada según las reglas operativas del dashboard.</li>
+ *   <li>{@code EXPIRED}: valor legado. La caducidad del enlace <strong>no</strong> cambia el estado
+ *       de la reserva ni libera fechas. No usar en lógica nueva.</li>
  * </ul>
  *
  * @author HostFlow Team
- * @version 1.1.0
+ * @version 2.0.0
  */
-@Schema(description = "Estados posibles de una reserva en el sistema")
+@Schema(description = "Estados operativos de una reserva (independientes del estado de pago)")
 public enum ReservationStatus {
 
     /**
-     * Reserva creada, pendiente de confirmación por el huésped.
-     * Estado inicial de toda nueva reserva.
+     * Reserva creada por el propietario; pendiente de onboarding del huésped.
+     * Bloquea fechas aunque el enlace expire.
      */
     PENDING("Pendiente"),
 
     /**
-     * Reserva confirmada por el huésped y pago procesado exitosamente.
-     * El huésped ha completado el proceso de confirmación.
+     * Onboarding del huésped completado.
+     * El pago se gestiona por separado mediante {@code PaymentStatus}.
      */
     CONFIRMED("Confirmada"),
 
     /**
-     * Reserva cancelada por el huésped o el propietario.
-     * Puede incluir un motivo de cancelación en el campo cancellationReason.
+     * Reserva cancelada por el propietario.
+     * Invalida el enlace y deja de bloquear fechas.
      */
     CANCELLED("Cancelada"),
 
     /**
-     * El enlace de confirmación expiró sin que el huésped confirmara la reserva.
-     * Ocurre cuando el tiempo límite de confirmación ha pasado.
+     * Valor legado. No representa la caducidad del enlace de onboarding.
+     * Conservado solo por compatibilidad con datos históricos.
      */
     EXPIRED("Expirada"),
 
     /**
-     * Estadía finalizada exitosamente.
-     * El huésped completó su stay y no hay acciones pendientes.
+     * Estadía finalizada (típicamente después del check-out).
      */
     COMPLETED("Completada");
 
-    // =========================================================================
-    // ATRIBUTOS
-    // =========================================================================
-
-    /**
-     * Nombre legible en español del estado de la reserva.
-     * Utilizado para mostrar información amigable al usuario en la interfaz.
-     */
     private final String displayName;
 
-    // =========================================================================
-    // CONSTRUCTOR
-    // =========================================================================
-
-    /**
-     * Constructor privado del enum.
-     *
-     * @param displayName nombre legible en español del estado
-     */
     ReservationStatus(String displayName) {
         this.displayName = displayName;
     }
 
-    // =========================================================================
-    // MÉTODOS
-    // =========================================================================
-
-    /**
-     * Obtiene el nombre legible en español del estado de la reserva.
-     *
-     * @return nombre display del estado (ej: "Pendiente", "Confirmada")
-     */
     public String getDisplayName() {
         return displayName;
     }

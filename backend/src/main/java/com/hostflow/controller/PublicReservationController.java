@@ -1,91 +1,289 @@
 package com.hostflow.controller;
 
-import com.hostflow.dto.request.ConfirmReservationRequest;
-import com.hostflow.dto.response.ReservationResponse;
+import com.hostflow.dto.request.CompleteReservationOnboardingRequest;
+import com.hostflow.dto.response.ApiErrorResponse;
+import com.hostflow.dto.response.ReservationOnboardingConfirmationResponse;
+import com.hostflow.dto.response.ReservationOnboardingDetailsResponse;
 import com.hostflow.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Controlador REST PÚBLICO para que los huéspedes confirmen sus reservas
- * utilizando el enlace de confirmación recibido por email.
- *
- * <p>Estos endpoints no requieren autenticación, ya que la validación
- * se realiza mediante el token único del enlace.</p>
- *
- * @author HostFlow Team
- * @version 1.0.0
+ * Endpoints públicos de onboarding de reserva (sin JWT).
+ * El huésped accede con el token del enlace enviado por correo.
  */
 @RestController
 @RequestMapping("/public/reservations")
 @RequiredArgsConstructor
-@Tag(name = "Confirmación de Reservas (Público)",
-        description = "Endpoints públicos para que los huéspedes confirmen sus reservas")
+@Tag(
+        name = "Onboarding de Reserva (Público)",
+        description = """
+                El huésped completa la reserva con el token del enlace (24 h).
+                No registra pagos: paymentStatus permanece PENDING hasta mark-paid del owner.
+                No requiere autenticación.
+                """
+)
 @Slf4j
 public class PublicReservationController {
 
     private final ReservationService reservationService;
 
-    /**
-     * Obtiene los detalles de una reserva usando el token del enlace.
-     */
     @GetMapping("/confirm")
     @Operation(
-            summary = "Obtener detalles de reserva para confirmar",
+            summary = "Detalle de reserva para onboarding",
             description = """
-            Obtiene los detalles de una reserva pendiente usando el token del enlace.
-            El huésped puede ver la información antes de confirmar.
-            """
+                    Devuelve resumen de estadía, métodos de pago del alojamiento (informativos),
+                    servicios adicionales disponibles y equivalencias USD/EUR si aplica
+                    (billetera digital / PayPal). Token debe estar vigente y la reserva PENDING.
+                    """
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Reserva obtenida exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Enlace inválido o expirado"),
-            @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Detalle para onboarding",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ReservationOnboardingDetailsResponse.class),
+                            examples = @ExampleObject(name = "Detalle", value = EX_DETAILS))),
+            @ApiResponse(responseCode = "400", description = "Token inválido, usado o expirado",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = EX_400_TOKEN))),
+            @ApiResponse(responseCode = "404", description = "Reserva no encontrada",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = EX_404)))
     })
-    public ResponseEntity<ReservationResponse> getReservationDetails(
+    public ResponseEntity<ReservationOnboardingDetailsResponse> getReservationDetails(
+            @Parameter(
+                    description = "Token UUID del enlace de onboarding",
+                    required = true,
+                    example = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            )
             @RequestParam String token) {
-
-        // Buscar la reserva por el token (implementar en servicio)
-        // Por ahora, retornar respuesta básica
-        return ResponseEntity.ok(null);
+        return ResponseEntity.ok(reservationService.getOnboardingDetails(token));
     }
 
-    /**
-     * Confirma una reserva usando el token del enlace.
-     */
     @PostMapping("/confirm")
     @Operation(
-            summary = "Confirmar reserva",
+            summary = "Completar onboarding y confirmar reserva",
             description = """
-            Confirma una reserva pendiente usando el token del enlace y seleccionando
-            un método de pago activo del huésped.
-            
-            <strong>Proceso:</strong>
-            1. Valida el token del enlace (vigencia y uso único).
-            2. Valida que el método de pago sea activo.
-            3. Re-valida disponibilidad del alojamiento.
-            4. Cambia el estado a CONFIRMED.
-            5. Envía email de confirmación al huésped.
-            """
+                    Guarda datos personales, documento, alergias, preferencias, servicios adicionales
+                    y el flag boatTransferRequested. Confirma la reserva (CONFIRMED).
+                    No registra pago: paymentStatus = PENDING.
+                    El token solo puede usarse una vez.
+                    """
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Reserva confirmada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Enlace inválido, expirado o método de pago no válido"),
-            @ApiResponse(responseCode = "404", description = "Reserva no encontrada")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Onboarding completado",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ReservationOnboardingConfirmationResponse.class),
+                            examples = @ExampleObject(name = "Confirmada", value = EX_CONFIRM))),
+            @ApiResponse(responseCode = "400", description = "Token inválido o body inválido",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(name = "Token usado", value = EX_400_TOKEN),
+                                    @ExampleObject(name = "Validación", value = EX_400_VALIDATION)
+                            })),
+            @ApiResponse(responseCode = "404", description = "Reserva no encontrada",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = EX_404)))
     })
-    public ResponseEntity<ReservationResponse> confirmReservation(
+    public ResponseEntity<ReservationOnboardingConfirmationResponse> completeOnboarding(
+            @Parameter(
+                    description = "Token UUID del enlace",
+                    required = true,
+                    example = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            )
             @RequestParam String token,
-            @Valid @RequestBody ConfirmReservationRequest request) {
-
-        ReservationResponse response = reservationService.confirmReservation(
-                token, request.paymentMethodId());
-        return ResponseEntity.ok(response);
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            schema = @Schema(implementation = CompleteReservationOnboardingRequest.class),
+                            examples = @ExampleObject(name = "Onboarding", value = EX_ONBOARDING_BODY)
+                    )
+            )
+            @Valid @RequestBody CompleteReservationOnboardingRequest request) {
+        return ResponseEntity.ok(reservationService.completeOnboarding(token, request));
     }
+
+    private static final String EX_ONBOARDING_BODY = """
+            {
+              "firstName": "Juan Carlos",
+              "lastName": "Pérez",
+              "documentNumber": "30123456",
+              "email": "juan.perez@email.com",
+              "phone": "+54 11 5555 5555",
+              "allergies": ["Maní", "Lactosa"],
+              "preferences": "Prefiero piso alto y check-in tarde",
+              "additionalServices": [
+                { "serviceId": 1, "quantity": 2 },
+                { "serviceId": 3, "quantity": 1 }
+              ],
+              "boatTransferRequested": true
+            }
+            """;
+
+    private static final String EX_DETAILS = """
+            {
+              "confirmationCode": "HF-A1B2C3",
+              "accommodationName": "Cabañas del Lago",
+              "checkIn": "2026-12-15",
+              "checkOut": "2026-12-18",
+              "nights": 3,
+              "guestCount": 2,
+              "pricePerNight": 45000.00,
+              "accommodationSubtotal": 135000.00,
+              "additionalServicesTotal": 0,
+              "totalAmount": 135000.00,
+              "currency": "ARS",
+              "logoUrl": "https://res.cloudinary.com/demo/image/upload/logo.png",
+              "primaryColor": "#1E293B",
+              "accentColor": "#0EA5E9",
+              "tertiaryColor": "#F8FAFC",
+              "backgroundPattern": null,
+              "welcomeMessage": "¡Bienvenido a Cabañas del Lago!",
+              "paymentMethods": [
+                {
+                  "id": 1,
+                  "type": "DIGITAL_WALLET",
+                  "displayName": "Mercado Pago",
+                  "currency": "ARS",
+                  "instructions": "Enviar comprobante por WhatsApp",
+                  "bankName": null,
+                  "accountHolder": "María Owner",
+                  "accountNumber": null,
+                  "cbuCvu": null,
+                  "alias": null,
+                  "providerName": "Mercado Pago",
+                  "userIdentifier": "owner.mp",
+                  "walletPhone": "+54 11 4444 4444",
+                  "walletEmail": "owner@email.com"
+                }
+              ],
+              "additionalServices": [
+                {
+                  "id": 1,
+                  "name": "Desayuno",
+                  "description": "Desayuno continental",
+                  "basePrice": 5000.00,
+                  "priceType": "PER_PERSON",
+                  "currency": "ARS"
+                }
+              ],
+              "currencyEquivalents": [
+                {
+                  "currency": "USD",
+                  "pricePerNight": 45.00,
+                  "accommodationSubtotal": 135.00,
+                  "additionalServicesTotal": 0,
+                  "totalAmount": 135.00
+                },
+                {
+                  "currency": "EUR",
+                  "pricePerNight": 42.00,
+                  "accommodationSubtotal": 126.00,
+                  "additionalServicesTotal": 0,
+                  "totalAmount": 126.00
+                }
+              ]
+            }
+            """;
+
+    private static final String EX_CONFIRM = """
+            {
+              "reservationId": 12,
+              "confirmationCode": "HF-A1B2C3",
+              "accommodationId": 1,
+              "accommodationName": "Cabañas del Lago",
+              "checkIn": "2026-12-15",
+              "checkOut": "2026-12-18",
+              "nights": 3,
+              "guestCount": 2,
+              "pricePerNight": 45000.00,
+              "accommodationSubtotal": 135000.00,
+              "additionalServicesTotal": 15000.00,
+              "totalAmount": 150000.00,
+              "currency": "ARS",
+              "reservationStatus": "CONFIRMED",
+              "paymentStatus": "PENDING",
+              "boatTransferRequested": true,
+              "selectedAdditionalServices": [
+                {
+                  "serviceId": 1,
+                  "name": "Desayuno",
+                  "quantity": 2,
+                  "unitPrice": 5000.00,
+                  "priceType": "PER_PERSON",
+                  "nightsApplied": null,
+                  "lineTotal": 10000.00,
+                  "currency": "ARS"
+                }
+              ],
+              "paymentMethods": [
+                {
+                  "id": 1,
+                  "type": "DIGITAL_WALLET",
+                  "displayName": "Mercado Pago",
+                  "currency": "ARS",
+                  "instructions": "Enviar comprobante por WhatsApp",
+                  "bankName": null,
+                  "accountHolder": "María Owner",
+                  "accountNumber": null,
+                  "cbuCvu": null,
+                  "alias": null,
+                  "providerName": "Mercado",
+                  "userIdentifier": "owner.mp",
+                  "walletPhone": "+54 11 4444 4444",
+                  "walletEmail": "owner@email.com"
+                }
+              ],
+              "currencyEquivalents": [
+                {
+                  "currency": "USD",
+                  "pricePerNight": 45.00,
+                  "accommodationSubtotal": 135.00,
+                  "additionalServicesTotal": 15.00,
+                  "totalAmount": 150.00
+                }
+              ]
+            }
+            """;
+
+    private static final String EX_400_TOKEN = """
+            {
+              "timestamp": "2026-11-10T20:00:00",
+              "status": 400,
+              "error": "Bad Request",
+              "message": "El enlace de reserva es inválido, ya fue utilizado o ha expirado.",
+              "errorCode": "BUSINESS_ERROR"
+            }
+            """;
+
+    private static final String EX_400_VALIDATION = """
+            {
+              "timestamp": "2026-11-10T20:00:00",
+              "status": 400,
+              "error": "Bad Request",
+              "message": "Error de validación en los datos enviados",
+              "errorCode": "VALIDATION_ERROR"
+            }
+            """;
+
+    private static final String EX_404 = """
+            {
+              "timestamp": "2026-11-10T20:00:00",
+              "status": 404,
+              "error": "Not Found",
+              "message": "No se encontró la reserva asociada al enlace.",
+              "errorCode": "RESOURCE_NOT_FOUND"
+            }
+            """;
 }

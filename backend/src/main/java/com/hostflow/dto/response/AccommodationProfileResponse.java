@@ -2,6 +2,7 @@ package com.hostflow.dto.response;
 
 import com.hostflow.model.Accommodation;
 import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -46,6 +47,7 @@ public record AccommodationProfileResponse(
         @Schema(description = "Fecha y hora de creación del perfil.") LocalDateTime createdAt,
         @Schema(description = "Fecha y hora de la última actualización.") LocalDateTime updatedAt
 ) {
+
     /**
      * Convierte una entidad {@link Accommodation} en su DTO de respuesta correspondiente.
      *

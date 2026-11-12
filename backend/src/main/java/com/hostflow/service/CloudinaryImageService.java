@@ -8,6 +8,7 @@ import com.hostflow.exception.CloudinaryDeleteException;
 import com.hostflow.exception.CloudinaryUploadException;
 import com.hostflow.exception.InvalidImageException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
@@ -36,21 +37,7 @@ import java.util.Map;
 @Slf4j
 public class CloudinaryImageService {
 
-    /**
-     * Tamaño mínimo permitido para una imagen: 500 Kilobytes.
-     *
-     * <p>Este límite previene la subida de archivos demasiado pequeños
-     * que podrían ser imágenes corruptas o placeholders.</p>
-     */
-    private static final long MIN_IMAGE_SIZE_BYTES = 500_000L;
 
-    /**
-     * Tamaño máximo permitido para una imagen: 2 Megabytes.
-     *
-     * <p>Este límite se aplica tanto a la validación local como a la configuración
-     * de Cloudinary para rechazar archivos pesados antes de consumir ancho de banda.</p>
-     */
-    private static final long MAX_IMAGE_SIZE_BYTES = 2_000_000L;
 
     /**
      * Cliente de Cloudinary inyectado por Spring.
@@ -64,16 +51,33 @@ public class CloudinaryImageService {
      */
     private final String defaultFolder;
 
+    /** Tamaño mínimo permitido (bytes). Config: app.images.min-size-bytes */
+    private final long minImageSizeBytes;
+
+    /** Tamaño máximo permitido (bytes). Config: app.images.max-size-bytes */
+    private final long maxImageSizeBytes;
+
     /**
      * Constructor del servicio.
      *
      * @param cloudinary el cliente configurado de Cloudinary
      * @param properties las propiedades de configuración de Cloudinary
      */
-    public CloudinaryImageService(Cloudinary cloudinary, CloudinaryProperties properties) {
+    public CloudinaryImageService(
+            Cloudinary cloudinary,
+            CloudinaryProperties properties,
+            @Value("${app.images.min-size-bytes:512000}") long minImageSizeBytes,
+            @Value("${app.images.max-size-bytes:2097152}") long maxImageSizeBytes) {
         this.cloudinary = cloudinary;
         this.defaultFolder = properties.getFolder();
-        log.info("✅ CloudinaryImageService inicializado con carpeta predeterminada: {}", defaultFolder);
+        this.minImageSizeBytes = minImageSizeBytes;
+        this.maxImageSizeBytes = maxImageSizeBytes;
+        if (minImageSizeBytes <= 0 || maxImageSizeBytes <= minImageSizeBytes) {
+            throw new IllegalStateException(
+                    "Config inválida: app.images.min-size-bytes debe ser > 0 y max-size-bytes > min-size-bytes");
+        }
+        log.info("✅ CloudinaryImageService inicializado. Carpeta: {}, límites: {} – {}",
+                defaultFolder, formatSize(minImageSizeBytes), formatSize(maxImageSizeBytes));
     }
 
     /**
@@ -272,20 +276,24 @@ public class CloudinaryImageService {
         }
 
         // 2. Validar tamaño mínimo
-        if (file.getSize() < MIN_IMAGE_SIZE_BYTES) {
+        if (file.getSize() < minImageSizeBytes) {
             log.warn("⚠️ Imagen demasiado pequeña: {} bytes (mínimo: {} bytes)",
-                    file.getSize(), MIN_IMAGE_SIZE_BYTES);
+                    file.getSize(), minImageSizeBytes);
             throw new InvalidImageException(
-                    String.format("La imagen debe pesar al menos %d KB.", MIN_IMAGE_SIZE_BYTES / 1024)
+                    String.format(
+                            "La imagen es demasiado pequeña (%s). El tamaño mínimo permitido es %s.",
+                            formatSize(file.getSize()), formatSize(minImageSizeBytes))
             );
         }
 
         // 3. Validar tamaño máximo
-        if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
+        if (file.getSize() > maxImageSizeBytes) {
             log.warn("⚠️ Imagen demasiado grande: {} bytes (máximo: {} bytes)",
-                    file.getSize(), MAX_IMAGE_SIZE_BYTES);
+                    file.getSize(), maxImageSizeBytes);
             throw new InvalidImageException(
-                    String.format("La imagen no puede superar los %d MB.", MAX_IMAGE_SIZE_BYTES / (1024 * 1024))
+                    String.format(
+                            "La imagen supera el tamaño máximo permitido (%s). El máximo es %s.",
+                            formatSize(file.getSize()), formatSize(maxImageSizeBytes))
             );
         }
 
@@ -300,5 +308,20 @@ public class CloudinaryImageService {
 
         log.debug("✅ Imagen validada correctamente. Tamaño: {} bytes, Tipo: {}",
                 file.getSize(), contentType);
+    }
+
+    /**
+     * Formatea bytes a KB/MB de forma legible (evita división entera que mostraba "1 MB").
+     */
+    static String formatSize(long bytes) {
+        if (bytes >= 1024L * 1024L) {
+            double mb = bytes / (1024.0 * 1024.0);
+            if (Math.abs(mb - Math.rint(mb)) < 0.05) {
+                return String.format("%d MB", Math.round(mb));
+            }
+            return String.format("%.1f MB", mb);
+        }
+        long kb = Math.max(1, Math.round(bytes / 1024.0));
+        return String.format("%d KB", kb);
     }
 }

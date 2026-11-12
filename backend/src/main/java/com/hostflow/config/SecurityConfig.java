@@ -1,6 +1,8 @@
 package com.hostflow.config;
 
 import com.hostflow.security.JwtAuthenticationFilter;
+import com.hostflow.security.RestAccessDeniedHandler;
+import com.hostflow.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,7 +44,7 @@ import java.util.List;
  * (ej. {@code /owners/accommodation/**} debe ir antes que {@code /owners/**}).</p>
  *
  * @author HostFlow Team
- * @version 2.3.0
+ * @version 2.4.0 (401/403 JSON handlers)
  */
 @Configuration
 @EnableWebSecurity
@@ -52,6 +54,8 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final UserDetailsService userDetailsService;
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
 
     /**
      * El PasswordEncoder se inyecta desde la configuración existente (ej. PasswordEncoderConfig).
@@ -130,6 +134,12 @@ public class SecurityConfig {
 
                 // 6. Agregar el filtro JWT antes del filtro estándar de autenticación por username/password
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
+                // 7. 401 si no autenticado; 403 si autenticado sin permiso (JSON uniforme)
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler)
+                )
 
                 .build();
     }

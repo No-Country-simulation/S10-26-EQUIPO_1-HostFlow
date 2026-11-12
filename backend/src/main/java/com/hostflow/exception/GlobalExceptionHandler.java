@@ -144,8 +144,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
         return buildErrorResponse(
                 HttpStatus.FORBIDDEN,
-                "No tienes permisos para realizar esta operación.",
-                "ACCESS_DENIED"
+                "No tienes permisos para acceder a este recurso.",
+                "FORBIDDEN"
         );
     }
 

@@ -1,10 +1,21 @@
 package com.hostflow.controller;
 
 import com.hostflow.dto.request.CreateReservationRequest;
+import com.hostflow.dto.response.ApiErrorResponse;
 import com.hostflow.dto.response.ReservationLinkResponse;
 import com.hostflow.dto.response.ReservationResponse;
+import com.hostflow.exception.ResourceNotFoundException;
+import com.hostflow.model.Accommodation;
+import com.hostflow.model.Owner;
+import com.hostflow.repository.AccommodationRepository;
+import com.hostflow.repository.OwnerRepository;
 import com.hostflow.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -14,235 +25,323 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Controlador REST para que los propietarios gestionen las reservas
- * de sus alojamientos en la protected plataforma HostFlow.
+ * API de reservas del propietario autenticado (OWNER).
  *
- * <p><strong>🆕 Mejora de arquitectura y seguridad (v2.1):</strong></p>
- * <ul>
- *   <li>Se eliminó la inyección directa de {@code OwnerRepository} y {@code AccommodationRepository}.</li>
- *   <li>Se eliminó el método privado {@code getCurrentOwnerId()} que consultaba la BD.</li>
- *   <li>🛡️ <strong>Corrección de seguridad (IDOR):</strong> Todos los endpoints ahora validan estrictamente
- *       que la reserva o la consulta de disponibilidad pertenezca al alojamiento del propietario autenticado,
- *       evitando que un owner manipule datos de otros alojamientos.</li>
- * </ul>
- *
- * @author HostFlow Team
- * @version 2.1.0
+ * <p>Flujo: crear → onboarding del huésped (24 h) → mark-paid → complete (tras check-out, exige PAID).</p>
  */
 @RestController
 @RequestMapping("/owners/reservations")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('OWNER')")
 @SecurityRequirement(name = "Bearer Authentication")
-@Tag(name = "Gestión de Reservas (Owner)",
-        description = "Endpoints para que los propietarios gestionen las reservas de sus alojamientos")
+@Tag(
+        name = "Reservas del Propietario",
+        description = """
+                Gestión de reservas del alojamiento del owner.
+                El pago ocurre fuera de HostFlow; mark-paid solo registra la verificación del comprobante.
+                Todos los endpoints requieren JWT Bearer con rol OWNER.
+                """
+)
 @Slf4j
 public class OwnerReservationController {
 
-    // =========================================================================
-    // DEPENDENCIAS INYECTADAS
-    // =========================================================================
-
-    /**
-     * Servicio que encapsula toda la lógica de negocio de las reservas.
-     * Se encarga de validar que el propietario tenga derecho a operar
-     * sobre la reserva o alojamiento solicitado.
-     */
     private final ReservationService reservationService;
+    private final OwnerRepository ownerRepository;
+    private final AccommodationRepository accommodationRepository;
 
     // =========================================================================
-    // 1. CREAR RESERVA
+    // CREAR
     // =========================================================================
 
     @PostMapping
     @Operation(
-            summary = "Crear nueva reserva",
+            summary = "Crear reserva y generar enlace de onboarding",
             description = """
-            Crea una nueva reserva para el alojamiento del owner autenticado.
-            
-            Proceso:
-            1. Valida disponibilidad del alojamiento en las fechas solicitadas.
-            2. Verifica que el huésped tenga al menos un método de pago activo.
-            3. Genera un enlace único de confirmación válido por 24 horas (configurable).
-            4. El enlace debe ser enviado al huésped por email.
-            """
+                    Crea una reserva PENDING y un enlace de onboarding con vigencia fija de 24 horas.
+                    Envía el correo al huésped en modo estricto (si falla el envío, se revierte la creación).
+                    Check-in puede ser hoy; check-out debe ser posterior. No incluye alergias ni métodos de pago del huésped.
+                    """
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Reserva creada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Fechas inválidas, huésped sin método de pago o alojamiento no disponible"),
-            @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "Sin permisos de owner"),
-            @ApiResponse(responseCode = "404", description = "El owner no tiene un alojamiento registrado")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Reserva creada",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ReservationResponse.class),
+                            examples = @ExampleObject(name = "PENDING", value = ReservationApiExamples.RES_PENDING))),
+            @ApiResponse(responseCode = "400", description = "Validación o negocio (fechas, solapamiento, correo)",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(name = "Fechas ocupadas", value = ReservationApiExamples.ERR_400_DATES),
+                                    @ExampleObject(name = "Validación", value = ReservationApiExamples.ERR_400_VALIDATION)
+                            })),
+            @ApiResponse(responseCode = "401", description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_401))),
+            @ApiResponse(responseCode = "403", description = "Sin rol OWNER",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_403))),
+            @ApiResponse(responseCode = "404", description = "Owner o alojamiento no encontrado",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_404_ACCOMMODATION)))
     })
     public ResponseEntity<ReservationResponse> createReservation(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            schema = @Schema(implementation = CreateReservationRequest.class),
+                            examples = @ExampleObject(name = "Crear", value = ReservationApiExamples.REQ_CREATE)
+                    )
+            )
             @Valid @RequestBody CreateReservationRequest request,
             Authentication authentication) {
-
-        String ownerEmail = authentication.getName();
-        log.info("🏨 Creando nueva reserva para owner email: {}", ownerEmail);
-
-        ReservationResponse response = reservationService.createReservationByEmail(ownerEmail, request);
+        Long ownerId = getCurrentOwnerId(authentication);
+        ReservationResponse response = reservationService.createReservation(ownerId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     // =========================================================================
-    // 2. LISTAR MIS RESERVAS
+    // LISTAR / DETALLE
     // =========================================================================
 
     @GetMapping
-    @Operation(
-            summary = "Listar mis reservas",
-            description = "Obtiene todas las reservas del alojamiento del owner autenticado."
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de reservas obtenida exitosamente"),
-            @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "Sin permisos de owner"),
-            @ApiResponse(responseCode = "404", description = "El owner no tiene un alojamiento registrado")
+    @Operation(summary = "Listar mis reservas",
+            description = "Todas las reservas del alojamiento del owner autenticado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Listado",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ReservationResponse.class)),
+                            examples = @ExampleObject(value = ReservationApiExamples.RES_LIST))),
+            @ApiResponse(responseCode = "401", description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_401))),
+            @ApiResponse(responseCode = "403", description = "Sin permiso",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_403))),
+            @ApiResponse(responseCode = "404", description = "Sin alojamiento",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_404_ACCOMMODATION)))
     })
     public ResponseEntity<List<ReservationResponse>> listMyReservations(Authentication authentication) {
-        String ownerEmail = authentication.getName();
-        log.debug("📋 Listando reservas para owner email: {}", ownerEmail);
-
-        List<ReservationResponse> responses = reservationService.listMyReservationsByEmail(ownerEmail);
-        return ResponseEntity.ok(responses);
+        Long ownerId = getCurrentOwnerId(authentication);
+        Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No tienes un alojamiento registrado. Registra los datos de tu alojamiento primero."));
+        return ResponseEntity.ok(reservationService.listReservationsByAccommodation(accommodation.getId()));
     }
-
-    // =========================================================================
-    // 3. OBTENER RESERVA POR ID (CON VALIDACIÓN DE PROPIEDAD)
-    // =========================================================================
 
     @GetMapping("/{reservationId}")
-    @Operation(
-            summary = "Obtener reserva por ID",
-            description = "Obtiene los detalles de una reserva específica, validando que pertenezca al alojamiento del owner."
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Reserva obtenida exitosamente"),
-            @ApiResponse(responseCode = "404", description = "Reserva no encontrada o no pertenece a tu alojamiento")
+    @Operation(summary = "Obtener reserva por ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Reserva",
+                    content = @Content(schema = @Schema(implementation = ReservationResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.RES_CONFIRMED))),
+            @ApiResponse(responseCode = "401", description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_401))),
+            @ApiResponse(responseCode = "404", description = "No existe o no es del owner",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_404_RESERVATION)))
     })
-    public ResponseEntity<ReservationResponse> getReservation(
-            @PathVariable Long reservationId,
+    public ResponseEntity<ReservationResponse> getReservationById(
+            @Parameter(description = "ID de la reserva", example = "12") @PathVariable Long reservationId,
             Authentication authentication) {
-
-        String ownerEmail = authentication.getName();
-        log.debug("🔍 Obteniendo reserva ID: {} para owner email: {}", reservationId, ownerEmail);
-
-        ReservationResponse response = reservationService.getReservationByIdAndOwner(reservationId, ownerEmail);
-        return ResponseEntity.ok(response);
+        Long ownerId = getCurrentOwnerId(authentication);
+        return ResponseEntity.ok(reservationService.getReservationById(ownerId, reservationId));
     }
 
     // =========================================================================
-    // 4. CANCELAR RESERVA (CON VALIDACIÓN DE PROPIEDAD)
+    // CANCELAR
     // =========================================================================
 
     @PostMapping("/{reservationId}/cancel")
     @Operation(
             summary = "Cancelar reserva",
-            description = "Cancela una reserva existente, validando que pertenezca al alojamiento del owner."
+            description = """
+                    Cancela PENDING o CONFIRMED (también si está PAID). No cancela COMPLETED.
+                    HostFlow no procesa reembolsos. Notifica al huésped tras el commit.
+                    """
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Reserva cancelada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "La reserva no se puede cancelar (ya está completada o cancelada)"),
-            @ApiResponse(responseCode = "404", description = "Reserva no encontrada o no pertenece a tu alojamiento")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cancelada",
+                    content = @Content(schema = @Schema(implementation = ReservationResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.RES_CANCELLED))),
+            @ApiResponse(responseCode = "400", description = "Ya cancelada o completada",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_400_CANCEL))),
+            @ApiResponse(responseCode = "401", description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_401))),
+            @ApiResponse(responseCode = "404", description = "No encontrada",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_404_RESERVATION)))
     })
     public ResponseEntity<ReservationResponse> cancelReservation(
-            @PathVariable Long reservationId,
+            @Parameter(description = "ID de la reserva", example = "12") @PathVariable Long reservationId,
+            @Parameter(description = "Motivo", example = "Huésped solicitó cancelación")
             @RequestParam(required = false) String reason,
             Authentication authentication) {
-
-        String ownerEmail = authentication.getName();
-        log.info("❌ Cancelando reserva ID: {} para owner email: {}", reservationId, ownerEmail);
-
-        ReservationResponse response = reservationService.cancelReservationByIdAndOwner(reservationId, reason, ownerEmail);
-        return ResponseEntity.ok(response);
+        Long ownerId = getCurrentOwnerId(authentication);
+        return ResponseEntity.ok(reservationService.cancelReservation(ownerId, reservationId, reason));
     }
 
     // =========================================================================
-    // 5. REACTIVAR ENLACE (CON VALIDACIÓN DE PROPIEDAD)
+    // RENOVAR ENLACE
     // =========================================================================
 
     @PostMapping("/{reservationId}/reactivate-link")
     @Operation(
-            summary = "Reactivar enlace de confirmación",
-            description = "Reactiva un enlace de confirmación que ha expirado, validando la propiedad de la reserva."
+            summary = "Renovar enlace de onboarding",
+            description = "Solo PENDING. Nuevo enlace 24 h. Correo estricto: fallo de envío revierte la renovación."
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Enlace reactivado exitosamente"),
-            @ApiResponse(responseCode = "400", description = "La reserva no está en estado PENDING"),
-            @ApiResponse(responseCode = "404", description = "Reserva no encontrada o no pertenece a tu alojamiento")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Nuevo enlace de onboarding (24 h)",
+                    content = @Content(schema = @Schema(implementation = ReservationLinkResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.RES_LINK))),
+            @ApiResponse(responseCode = "400", description = "No PENDING o fallo de correo",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_400_REACTIVATE))),
+            @ApiResponse(responseCode = "401", description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_401))),
+            @ApiResponse(responseCode = "404", description = "No encontrada",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_404_RESERVATION)))
     })
     public ResponseEntity<ReservationLinkResponse> reactivateLink(
-            @PathVariable Long reservationId,
-            @RequestParam(defaultValue = "24") int expirationHours,
+            @Parameter(description = "ID de la reserva", example = "12") @PathVariable Long reservationId,
             Authentication authentication) {
-
-        String ownerEmail = authentication.getName();
-        log.info("🔄 Reactivando enlace para reserva ID: {} de owner email: {}", reservationId, ownerEmail);
-
-        ReservationLinkResponse response = reservationService.reactivateLinkByIdAndOwner(reservationId, expirationHours, ownerEmail);
-        return ResponseEntity.ok(response);
+        Long ownerId = getCurrentOwnerId(authentication);
+        return ResponseEntity.ok(reservationService.reactivateLink(ownerId, reservationId));
     }
 
     // =========================================================================
-    // 6. VERIFICAR DISPONIBILIDAD (CORREGIDO: SIN accommodationId EN LA URL)
+    // MARK PAID
     // =========================================================================
 
-    @GetMapping("/check-availability")
+    @PostMapping("/{reservationId}/mark-paid")
     @Operation(
-            summary = "Verificar disponibilidad de mi alojamiento",
-            description = "Verifica si el alojamiento del owner autenticado está disponible en las fechas especificadas. " +
-                    "Ya no requiere accommodationId en la URL para prevenir consultas a alojamientos ajenos."
+            summary = "Registrar pago recibido",
+            description = """
+                    Confirma que el owner recibió el pago fuera de HostFlow.
+                    Requiere CONFIRMED con onboarding. Idempotente si ya está PAID.
+                    Correos de confirmación en afterCommit (no revierten el pago).
+                    """
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Disponibilidad verificada (true/false)"),
-            @ApiResponse(responseCode = "400", description = "Fechas inválidas"),
-            @ApiResponse(responseCode = "404", description = "El owner no tiene un alojamiento registrado")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Pago registrado",
+                    content = @Content(schema = @Schema(implementation = ReservationResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.RES_PAID))),
+            @ApiResponse(responseCode = "400", description = "No CONFIRMED o sin onboarding",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_400_MARK_PAID))),
+            @ApiResponse(responseCode = "401", description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_401))),
+            @ApiResponse(responseCode = "404", description = "No encontrada",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_404_RESERVATION)))
     })
-    public ResponseEntity<Boolean> checkAvailability(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime checkIn,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime checkOut,
+    public ResponseEntity<ReservationResponse> markPaymentAsPaid(
+            @Parameter(description = "ID de la reserva", example = "12") @PathVariable Long reservationId,
             Authentication authentication) {
-
-        String ownerEmail = authentication.getName();
-        log.debug("📅 Verificando disponibilidad para owner email: {} entre {} y {}", ownerEmail, checkIn, checkOut);
-
-        // 🛡️ SEGURIDAD: El servicio deriva el accommodationId internamente desde el ownerEmail.
-        boolean available = reservationService.checkAvailabilityByEmail(ownerEmail, checkIn, checkOut);
-        return ResponseEntity.ok(available);
+        Long ownerId = getCurrentOwnerId(authentication);
+        return ResponseEntity.ok(reservationService.markPaymentAsPaid(ownerId, reservationId));
     }
 
     // =========================================================================
-    // 7. COMPLETAR RESERVA (CON VALIDACIÓN DE PROPIEDAD)
+    // COMPLETE
     // =========================================================================
 
     @PostMapping("/{reservationId}/complete")
     @Operation(
-            summary = "Completar reserva",
-            description = "Marca una reserva como COMPLETADA después del check-out, validando que pertenezca al owner."
+            summary = "Completar reserva (ingreso en dashboard)",
+            description = """
+                    Requisitos: status CONFIRMED, paymentStatus PAID, y día actual posterior al check-out.
+                    Alimenta incomeLastMonth / accumulatedIncome del dashboard.
+                    """
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Reserva completada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "La reserva no puede ser completada (no está CONFIRMED o el check-out no ha pasado)"),
-            @ApiResponse(responseCode = "404", description = "Reserva no encontrada o no pertenece a tu alojamiento")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Completada",
+                    content = @Content(schema = @Schema(implementation = ReservationResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.RES_COMPLETED))),
+            @ApiResponse(responseCode = "400", description = "Estado, pago o fecha inválidos",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(name = "Sin PAID", value = ReservationApiExamples.ERR_400_COMPLETE_PAID),
+                                    @ExampleObject(name = "Check-out no pasado", value = ReservationApiExamples.ERR_400_COMPLETE_DATE)
+                            })),
+            @ApiResponse(responseCode = "401", description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_401))),
+            @ApiResponse(responseCode = "404", description = "No encontrada",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_404_RESERVATION)))
     })
     public ResponseEntity<ReservationResponse> completeReservation(
-            @PathVariable Long reservationId,
+            @Parameter(description = "ID de la reserva", example = "12") @PathVariable Long reservationId,
             Authentication authentication) {
+        Long ownerId = getCurrentOwnerId(authentication);
+        return ResponseEntity.ok(reservationService.completeReservation(ownerId, reservationId));
+    }
 
-        String ownerEmail = authentication.getName();
-        log.info("✅ Completando reserva ID: {} para owner email: {}", reservationId, ownerEmail);
+    // =========================================================================
+    // DISPONIBILIDAD
+    // =========================================================================
 
-        ReservationResponse response = reservationService.completeReservationByIdAndOwner(reservationId, ownerEmail);
-        return ResponseEntity.ok(response);
+    @GetMapping("/check-availability")
+    @Operation(
+            summary = "Verificar disponibilidad de fechas",
+            description = "true si el rango [checkIn, checkOut) está libre. El día de check-out no bloquea otra reserva."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Disponibilidad",
+                    content = @Content(schema = @Schema(implementation = Boolean.class),
+                            examples = {
+                                    @ExampleObject(name = "Libre", value = "true"),
+                                    @ExampleObject(name = "Ocupado", value = "false")
+                            })),
+            @ApiResponse(responseCode = "400", description = "Fechas inválidas",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_400_DATES_INVALID))),
+            @ApiResponse(responseCode = "401", description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_401))),
+            @ApiResponse(responseCode = "404", description = "Sin alojamiento",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class),
+                            examples = @ExampleObject(value = ReservationApiExamples.ERR_404_ACCOMMODATION)))
+    })
+    public ResponseEntity<Boolean> checkAvailability(
+            @Parameter(description = "Check-in YYYY-MM-DD", example = "2026-12-20", required = true)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
+            @Parameter(description = "Check-out YYYY-MM-DD", example = "2026-12-23", required = true)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut,
+            Authentication authentication) {
+        Long ownerId = getCurrentOwnerId(authentication);
+        Accommodation accommodation = accommodationRepository.findByOwner_Id(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No tienes un alojamiento registrado. Registra los datos de tu alojamiento primero."));
+        boolean available = reservationService.isAccommodationAvailable(
+                accommodation.getId(), checkIn, checkOut);
+        return ResponseEntity.ok(available);
+    }
+
+    private Long getCurrentOwnerId(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException(
+                    "Se requiere autenticación válida.");
+        }
+        Owner owner = ownerRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No se encontró el propietario autenticado con el email: " + authentication.getName()));
+        return owner.getId();
     }
 }

@@ -1,8 +1,12 @@
 package com.hostflow.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hostflow.exception.EmailDeliveryException;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.Reservation;
+import com.hostflow.enums.Currency;
+import com.hostflow.enums.PaymentMethodType;
+import com.hostflow.model.AccommodationPaymentMethod;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +23,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -31,15 +35,24 @@ import java.util.Map;
  * <ul>
  *   <li>🟢 <strong>Producción (Render):</strong> Usa la API de Brevo si la clave está configurada.</li>
  *   <li>🟡 <strong>Desarrollo (Local):</strong> Usa Gmail SMTP si Brevo no está configurado.</li>
- *   <li>🔴 <strong>Modo Fallback:</strong> Si ninguno está configurado, solo registra el contenido en los logs.</li>
+ *   <li>🔴 <strong>Modo Fallback:</strong> Si ninguno está configurado, solo registra el contenido en los logs
+ *       (modo tolerante) o falla (modo estricto).</li>
  * </ul>
  *
- * <p><strong>Política de resiliencia:</strong> Todos los métodos de envío están envueltos
- * en bloques {@code try-catch}. Si el envío de email falla, se registra el error en los logs
- * pero NO se lanza una excepción, evitando interrumpir el flujo principal de negocio.</p>
+ * <p><strong>Política de envío (Fase A — reservas):</strong></p>
+ * <ul>
+ *   <li><strong>Estricto:</strong> creación y renovación del enlace de onboarding. Si el proveedor
+ *       rechaza el mensaje o no hay proveedor configurado, se propaga
+ *       {@link com.hostflow.exception.EmailDeliveryException} para revertir la transacción.</li>
+ *   <li><strong>Tolerante:</strong> pago, cancelación, auth y métodos de pago. Los fallos se
+ *       registran en log y no interrumpen la operación de negocio.</li>
+ * </ul>
+ *
+ * <p>La aceptación del proveedor no garantiza entrega en bandeja de entrada; solo confirma
+ * que el proveedor aceptó el mensaje (Brevo HTTP 201 o SMTP sin excepción).</p>
  *
  * @author HostFlow Team
- * @version 4.3.0 (Corregido error de JSON en Brevo usando ObjectMapper de Jackson)
+ * @version 4.4.0 (Política dual estricto/tolerante para correos de reservas)
  */
 @Service
 @Slf4j
@@ -53,8 +66,8 @@ public class EmailService {
     private JavaMailSender mailSender;
 
     private final TemplateEngine templateEngine;
-    private final ExchangeRateProviderService exchangeRateService;
-    private final ObjectMapper objectMapper; // 🆕 Para serializar JSON de forma segura
+    private final CurrencyConversionService currencyConversionService;
+    private final ObjectMapper objectMapper;
 
     @Value("${brevo.api.key:}")
     private String brevoApiKey;
@@ -65,12 +78,13 @@ public class EmailService {
     @Value("${spring.application.name:HostFlow}")
     private String appName;
 
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     // Constructor actualizado para incluir ObjectMapper
-    public EmailService(TemplateEngine templateEngine, ExchangeRateProviderService exchangeRateService, ObjectMapper objectMapper) {
+    public EmailService(TemplateEngine templateEngine, CurrencyConversionService currencyConversionService,
+                        ObjectMapper objectMapper) {
         this.templateEngine = templateEngine;
-        this.exchangeRateService = exchangeRateService;
+        this.currencyConversionService = currencyConversionService;
         this.objectMapper = objectMapper;
     }
 
@@ -78,27 +92,57 @@ public class EmailService {
     // MOTOR HÍBRIDO DE ENVÍO DE CORREOS (NÚCLEO)
     // =========================================================================
 
+    /**
+     * Envío tolerante: fallos solo en log (comportamiento histórico para auth y notificaciones).
+     */
     private void sendHybridEmail(String to, String subject, String htmlContent, String plainTextContent) {
-        if (brevoApiKey != null && !brevoApiKey.trim().isEmpty() && brevoApiKey.startsWith("xkeysib-")) {
-            sendViaBrevo(to, subject, htmlContent != null ? htmlContent : plainTextContent);
-        } else if (mailSender != null) {
-            sendViaGmail(to, subject, htmlContent, plainTextContent);
-        } else {
-            log.warn("⚠️ MODO DESARROLLO: No se configuró ni Brevo ni Gmail. El correo NO se envió a {}", to);
-            log.info("🔗 Contenido simulado:\nAsunto: {}\n{}", subject, plainTextContent != null ? plainTextContent : htmlContent);
-        }
+        sendHybridEmail(to, subject, htmlContent, plainTextContent, false);
     }
 
     /**
-     * Implementación 1: Envío vía API REST de Brevo (Ideal para Render / Producción)
-     * ✅ Usa ObjectMapper para garantizar un JSON 100% válido, sin importar el contenido del HTML.
+     * @param strict si es true, propaga {@link EmailDeliveryException} cuando el proveedor
+     *               rechaza el mensaje o no hay proveedor configurado.
      */
-    private void sendViaBrevo(String to, String subject, String content) {
+    private void sendHybridEmail(String to, String subject, String htmlContent, String plainTextContent,
+                                 boolean strict) {
+        try {
+            if (isBrevoConfigured()) {
+                sendViaBrevo(to, subject, htmlContent != null ? htmlContent : plainTextContent, strict);
+            } else if (mailSender != null) {
+                sendViaGmail(to, subject, htmlContent, plainTextContent, strict);
+            } else {
+                log.warn("⚠️ No hay proveedor de correo configurado. El mensaje NO se envió a {}. Asunto: {}",
+                        to, subject);
+                log.info("🔗 Contenido simulado:\nAsunto: {}\n{}", subject,
+                        plainTextContent != null ? plainTextContent : htmlContent);
+                if (strict) {
+                    throw new EmailDeliveryException(
+                            "No hay proveedor de correo configurado. No se pudo enviar el enlace de la reserva.");
+                }
+            }
+        } catch (EmailDeliveryException ex) {
+            throw ex;
+        } catch (RuntimeException ex) {
+            if (strict) {
+                throw new EmailDeliveryException(
+                        "No se pudo enviar el correo a " + to + ": " + ex.getMessage(), ex);
+            }
+            log.error("❌ Error inesperado enviando correo a {}: {}", to, ex.getMessage(), ex);
+        }
+    }
+
+    private boolean isBrevoConfigured() {
+        return brevoApiKey != null && !brevoApiKey.trim().isEmpty() && brevoApiKey.startsWith("xkeysib-");
+    }
+
+    /**
+     * Envío vía API REST de Brevo. En modo estricto exige HTTP 201.
+     */
+    private void sendViaBrevo(String to, String subject, String content, boolean strict) {
         try {
             HttpClient client = HttpClient.newHttpClient();
             String senderEmail = (fromEmail != null && !fromEmail.isEmpty()) ? fromEmail : "noreply@hostflow.com";
 
-            // 🆕 Construcción segura del payload usando Map y ObjectMapper
             Map<String, Object> sender = Map.of("name", appName, "email", senderEmail);
             Map<String, Object> recipient = Map.of("email", to);
 
@@ -109,7 +153,6 @@ public class EmailService {
                     "htmlContent", content
             );
 
-            // ObjectMapper escapa automáticamente comillas, saltos de línea y caracteres especiales
             String jsonBody = objectMapper.writeValueAsString(requestBody);
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -123,19 +166,31 @@ public class EmailService {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 201) {
-                log.info("✅ Email enviado exitosamente vía Brevo a: {}", to);
+                log.info("✅ Email aceptado por Brevo para: {}", to);
             } else {
-                log.error("❌ Error enviando email vía Brevo. Status: {}, Respuesta: {}", response.statusCode(), response.body());
+                log.error("❌ Brevo rechazó el email. Status: {}, Respuesta: {}",
+                        response.statusCode(), response.body());
+                if (strict) {
+                    throw new EmailDeliveryException(
+                            "El proveedor de correo rechazó el mensaje (HTTP " + response.statusCode() + ").");
+                }
             }
+        } catch (EmailDeliveryException ex) {
+            throw ex;
         } catch (Exception e) {
             log.error("❌ Excepción enviando email vía Brevo a {}: {}", to, e.getMessage(), e);
+            if (strict) {
+                throw new EmailDeliveryException(
+                        "No se pudo enviar el correo mediante Brevo: " + e.getMessage(), e);
+            }
         }
     }
 
     /**
-     * Implementación 2: Envío vía Gmail SMTP (Ideal para Desarrollo Local)
+     * Envío vía Gmail SMTP. En modo estricto propaga fallos del servidor SMTP.
      */
-    private void sendViaGmail(String to, String subject, String htmlContent, String plainTextContent) {
+    private void sendViaGmail(String to, String subject, String htmlContent, String plainTextContent,
+                              boolean strict) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -153,33 +208,109 @@ public class EmailService {
             log.info("✅ Email enviado exitosamente vía Gmail SMTP a: {}", to);
         } catch (Exception e) {
             log.error("❌ Error enviando email vía Gmail a {}: {}", to, e.getMessage(), e);
+            if (strict) {
+                throw new EmailDeliveryException(
+                        "No se pudo enviar el correo mediante Gmail SMTP: " + e.getMessage(), e);
+            }
         }
     }
 
     // =========================================================================
-    // MÉTODOS AUXILIARES PARA LÓGICA DE MONEDAS
+    // EQUIVALENCIAS INFORMATIVAS PARA RESERVAS CON PAYPAL
     // =========================================================================
 
-    private boolean isArgentinaOnly(Accommodation accommodation) {
-        boolean isArsCurrency = accommodation.getBaseCurrency() != null &&
-                accommodation.getBaseCurrency().toString().equalsIgnoreCase("ARS");
-        return isArsCurrency;
+    private void addReservationCurrencyVariables(Context context, Reservation reservation,
+                                                 Accommodation accommodation) {
+        BigDecimal total = reservation.getTotalAmount() != null
+                ? reservation.getTotalAmount() : BigDecimal.ZERO;
+        addReservationCurrencyVariables(context, accommodation, total);
     }
 
-    private BigDecimal convertCurrency(BigDecimal amount, String fromCurrency, String toCurrency) {
-        if (amount == null || fromCurrency == null || toCurrency == null) {
-            return BigDecimal.ZERO;
+    private void addReservationCurrencyVariables(Context context, Accommodation accommodation,
+                                                 BigDecimal amount) {
+        String originalCurrency = accommodation.getBaseCurrency() != null
+                ? accommodation.getBaseCurrency().name() : Currency.ARS.name();
+        BigDecimal total = amount != null ? amount : BigDecimal.ZERO;
+        // Informativo: billetera digital o PayPal → USD/EUR; solo transferencia → solo moneda base.
+        boolean showEquivalents = shouldShowInternationalCurrencyEquivalents(accommodation);
+
+        context.setVariable("originalCurrency", originalCurrency);
+        context.setVariable("originalTotal", total);
+        context.setVariable("showCurrencyEquivalents", showEquivalents);
+        context.setVariable("totalUsd", showEquivalents && accommodation.getBaseCurrency() != Currency.USD
+                ? currencyConversionService.convertIfAvailable(accommodation.getId(), total, Currency.USD) : null);
+        context.setVariable("totalEur", showEquivalents && accommodation.getBaseCurrency() != Currency.EUR
+                ? currencyConversionService.convertIfAvailable(accommodation.getId(), total, Currency.EUR) : null);
+    }
+
+    private boolean shouldShowInternationalCurrencyEquivalents(Accommodation accommodation) {
+        if (accommodation.getPaymentMethods() == null) {
+            return false;
         }
-        if (fromCurrency.equalsIgnoreCase(toCurrency)) {
-            return amount;
+        return accommodation.getPaymentMethods().stream()
+                .filter(this::isUsablePaymentMethod)
+                .anyMatch(this::isInternationalPaymentMethod);
+    }
+
+    private boolean isInternationalPaymentMethod(AccommodationPaymentMethod method) {
+        if (method.getPaymentType() == PaymentMethodType.DIGITAL_WALLET) {
+            return true;
         }
-        try {
-            BigDecimal rate = exchangeRateService.getConversionRate(fromCurrency, toCurrency);
-            return amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
-        } catch (Exception e) {
-            log.warn("⚠️ No se pudo convertir de {} a {}. Usando monto original.", fromCurrency, toCurrency);
-            return amount;
+        return containsPaypal(method.getDisplayName()) || containsPaypal(method.getProviderName());
+    }
+
+    private boolean isUsablePaymentMethod(AccommodationPaymentMethod method) {
+        if (method == null || !method.isActive() || method.getPaymentType() == null
+                || method.getDisplayName() == null || method.getDisplayName().isBlank()) return false;
+        return switch (method.getPaymentType()) {
+            case BANK_TRANSFER -> notBlank(method.getBankName()) && notBlank(method.getAccountHolder())
+                    && (notBlank(method.getCbuCvu()) || notBlank(method.getAccountNumber()) || notBlank(method.getAlias()));
+            case DIGITAL_WALLET -> notBlank(method.getProviderName())
+                    && (notBlank(method.getUserIdentifier()) || notBlank(method.getWalletPhone())
+                    || notBlank(method.getWalletEmail()) || notBlank(method.getAlias()));
+            case CASH -> true;
+            case CARD, OTHER -> notBlank(method.getInstructions()) || notBlank(method.getProviderName())
+                    || notBlank(method.getAccountNumber());
+        };
+    }
+
+    private boolean notBlank(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private boolean containsPaypal(String value) {
+        return value != null && value.toLowerCase(java.util.Locale.ROOT).contains("paypal");
+    }
+
+    private void appendEquivalent(StringBuilder amounts, Accommodation accommodation,
+                                  BigDecimal amount, Currency currency) {
+        if (accommodation.getBaseCurrency() == currency) return;
+        BigDecimal converted = currencyConversionService.convertIfAvailable(accommodation.getId(), amount, currency);
+        if (converted != null) {
+            amounts.append(String.format(java.util.Locale.ROOT, "\nEquivalente informativo: %s %s",
+                    formatAmount(converted), currency.name()));
         }
+    }
+
+
+    /**
+     * Variables de plantilla para el desglose de servicios adicionales (solo visualización).
+     */
+    private void addAdditionalServicesVariables(Context context, Reservation reservation) {
+        var services = reservation.getAdditionalServices() == null
+                ? java.util.List.of()
+                : reservation.getAdditionalServices();
+        context.setVariable("additionalServices", services);
+        context.setVariable("hasAdditionalServices", !services.isEmpty());
+        context.setVariable("additionalServicesTotal",
+                reservation.getAdditionalServicesTotal() != null
+                        ? reservation.getAdditionalServicesTotal() : BigDecimal.ZERO);
+        context.setVariable("accommodationSubtotal",
+                reservation.getSubtotal() != null ? reservation.getSubtotal() : BigDecimal.ZERO);
+    }
+
+    private String formatAmount(BigDecimal amount) {
+        return amount == null ? "—" : String.format(java.util.Locale.ROOT, "%,.2f", amount);
     }
 
     // =========================================================================
@@ -229,19 +360,45 @@ public class EmailService {
     // MÉTODOS: SISTEMA DE RESERVAS
     // =========================================================================
 
+    /**
+     * Envío del enlace de onboarding (creación o renovación).
+     * <p><strong>Modo estricto:</strong> si el proveedor falla, lanza
+     * {@link EmailDeliveryException} para que la transacción de negocio se revierta.</p>
+     */
     public void sendReservationConfirmationEmail(String toEmail, String guestName, String confirmationCode,
-                                                 String confirmationUrl, String accommodationName,
-                                                 LocalDateTime checkIn, LocalDateTime checkOut,
-                                                 BigDecimal totalAmount, int expirationHours) {
-        String plainText = String.format("""
-            ¡Hola %s!
-            Un propietario ha creado una reserva para ti en %s.
-            Código: %s | Check-in: %s | Check-out: %s | Monto total: $%,.2f
-            Para confirmar, haz clic en: %s (Expira en %d horas)
-            """, guestName, accommodationName, confirmationCode,
-                checkIn.format(DATE_FORMATTER), checkOut.format(DATE_FORMATTER), totalAmount, confirmationUrl, expirationHours);
+                                                 String confirmationUrl, Accommodation accommodation,
+                                                 String accommodationName, LocalDate checkIn,
+                                                 LocalDate checkOut, BigDecimal totalAmount,
+                                                 int expirationHours) {
+        Context context = new Context();
+        context.setVariable("guestName", guestName);
+        context.setVariable("confirmationCode", confirmationCode);
+        context.setVariable("confirmationUrl", confirmationUrl);
+        context.setVariable("accommodation", accommodation);
+        context.setVariable("accommodationName", accommodationName);
+        context.setVariable("checkIn", checkIn);
+        context.setVariable("checkOut", checkOut);
+        context.setVariable("expirationHours", expirationHours);
+        context.setVariable("watermark", "Powered by HostFlow");
+        addReservationCurrencyVariables(context, accommodation, totalAmount);
 
-        sendHybridEmail(toEmail, "🏨 " + appName + " - Confirma tu reserva " + confirmationCode, null, plainText);
+        String htmlContent = templateEngine.process("emails/reservation-link-guest", context);
+        String plainText = String.format(java.util.Locale.ROOT, """
+            ¡Hola %s!
+            Se ha creado una reserva para ti en %s.
+            Código: %s | Check-in: %s | Check-out: %s
+            Importe inicial: %s %s
+            Para completar tu reserva, ingresa aquí: %s
+            Este enlace vence en %d horas.
+            """, guestName, accommodationName, confirmationCode,
+                checkIn.format(DATE_FORMATTER), checkOut.format(DATE_FORMATTER),
+                formatAmount(totalAmount), accommodation.getBaseCurrency() != null
+                        ? accommodation.getBaseCurrency().name() : Currency.ARS.name(),
+                confirmationUrl, expirationHours);
+
+        // Estricto: creación y renovación no deben confirmar éxito si el correo no salió.
+        sendHybridEmail(toEmail, "🏡 " + accommodationName + " - Completa tu reserva " + confirmationCode,
+                htmlContent, plainText, true);
     }
 
     public void sendReservationConfirmedGuestEmail(Reservation reservation, Accommodation accommodation,
@@ -257,24 +414,15 @@ public class EmailService {
         context.setVariable("guestName", guestName);
         context.setVariable("watermark", "Plataforma de Reservas HostFlow");
         context.setVariable("reservationUrl", reservationUrl);
-
-        boolean argentinaOnly = isArgentinaOnly(accommodation);
-        context.setVariable("isArgentinaOnly", argentinaOnly);
-
-        String originalCurrency = accommodation.getBaseCurrency() != null ?
-                accommodation.getBaseCurrency().toString().toUpperCase() : "ARS";
-        BigDecimal total = reservation.getTotalAmount() != null ? reservation.getTotalAmount() : BigDecimal.ZERO;
-
-        context.setVariable("totalArs", convertCurrency(total, originalCurrency, "ARS"));
-        context.setVariable("totalUsd", convertCurrency(total, originalCurrency, "USD"));
-        context.setVariable("totalEur", convertCurrency(total, originalCurrency, "EUR"));
-        context.setVariable("originalCurrency", originalCurrency);
+        context.setVariable("paymentConfirmed", true);
+        addAdditionalServicesVariables(context, reservation);
+        addReservationCurrencyVariables(context, reservation, accommodation);
 
         String htmlContent = templateEngine.process("emails/reservation-confirmation-guest", context);
 
         sendHybridEmail(
                 reservation.getGuest().getEmail(),
-                "✅ " + appName + " - ¡Reserva confirmada! " + reservation.getConfirmationCode(),
+                "✅ " + appName + " - Pago recibido y reserva confirmada " + reservation.getConfirmationCode(),
                 htmlContent,
                 null
         );
@@ -293,35 +441,72 @@ public class EmailService {
         context.setVariable("ownerName", ownerName);
         context.setVariable("watermark", "Panel de Administración HostFlow");
         context.setVariable("reservationUrl", reservationUrl);
-
-        boolean argentinaOnly = isArgentinaOnly(accommodation);
-        context.setVariable("isArgentinaOnly", argentinaOnly);
-
-        String originalCurrency = accommodation.getBaseCurrency() != null ?
-                accommodation.getBaseCurrency().toString().toUpperCase() : "ARS";
-        BigDecimal total = reservation.getTotalAmount() != null ? reservation.getTotalAmount() : BigDecimal.ZERO;
-
-        context.setVariable("totalArs", convertCurrency(total, originalCurrency, "ARS"));
-        context.setVariable("totalUsd", convertCurrency(total, originalCurrency, "USD"));
-        context.setVariable("totalEur", convertCurrency(total, originalCurrency, "EUR"));
-        context.setVariable("originalCurrency", originalCurrency);
+        context.setVariable("paymentConfirmed", true);
+        addAdditionalServicesVariables(context, reservation);
+        addReservationCurrencyVariables(context, reservation, accommodation);
 
         String htmlContent = templateEngine.process("emails/reservation-notification-owner", context);
 
         sendHybridEmail(
                 accommodation.getOwner().getEmail(),
-                "🔔 " + appName + " - ¡Nueva reserva confirmada! " + reservation.getConfirmationCode(),
+                "💰 " + appName + " - Pago recibido para la reserva " + reservation.getConfirmationCode(),
                 htmlContent,
                 null
         );
     }
 
+    /**
+     * Aviso de seguridad enviado al correo anterior cuando cambia el contacto principal del huésped.
+     * Es tolerante: un fallo de correo nunca revierte el onboarding ni la reserva.
+     */
+    public void sendGuestEmailChangedNotification(String previousEmail, String guestName, String maskedNewEmail) {
+        if (previousEmail == null || previousEmail.isBlank()) {
+            log.warn("No se envió aviso de cambio de correo: el huésped no tenía correo anterior registrado.");
+            return;
+        }
+        String displayName = guestName == null || guestName.isBlank() ? "Huésped" : guestName.trim();
+        String displayEmail = maskedNewEmail == null || maskedNewEmail.isBlank()
+                ? "No disponible" : maskedNewEmail.trim();
+        String plainText = "Hola " + displayName + ",\n\n"
+                + "El correo electrónico asociado a tu perfil de huésped en HostFlow fue actualizado.\n\n"
+                + "Nuevo correo registrado: " + displayEmail + "\n\n"
+                + "Si realizaste este cambio, no necesitas hacer nada. Si no reconoces esta modificación, "
+                + "comunícate con el propietario del alojamiento o con el equipo de soporte de HostFlow.\n\n"
+                + "Por seguridad, no compartas contraseñas ni códigos de verificación.\n\n"
+                + "Este es un aviso automático de seguridad de " + appName + ".";
+
+        Context context = new Context();
+        context.setVariable("guestName", displayName);
+        context.setVariable("maskedNewEmail", displayEmail);
+        context.setVariable("appName", appName);
+        String htmlContent = templateEngine.process("emails/guest-email-changed", context);
+        sendHybridEmail(previousEmail, "Aviso de seguridad: tu correo de HostFlow fue actualizado",
+                htmlContent, plainText);
+    }
+
     public void sendReservationCancelledEmail(String toEmail, String guestName, String confirmationCode,
                                               String accommodationName, String reason) {
-        String plainText = String.format("¡Hola %s!\n\nTu reserva %s en %s ha sido cancelada.\nMotivo: %s",
-                guestName, confirmationCode, accommodationName, reason != null ? reason : "No especificado");
+        String displayName = guestName == null || guestName.isBlank() ? "Huésped" : guestName.trim();
+        String displayCode = confirmationCode == null || confirmationCode.isBlank()
+                ? "No disponible" : confirmationCode.trim();
+        String displayAccommodation = accommodationName == null || accommodationName.isBlank()
+                ? "el alojamiento" : accommodationName.trim();
+        String displayReason = reason == null || reason.isBlank() ? "No especificado" : reason.trim();
+        String plainText = "Hola " + displayName + ",\n\n"
+                + "Te informamos que tu reserva " + displayCode + " en " + displayAccommodation
+                + " ha sido cancelada.\n\nMotivo: " + displayReason + "\n\n"
+                + "Si necesitas aclarar alguna duda, comunícate directamente con el alojamiento.\n\n"
+                + "Este mensaje es una notificación automática de " + appName + ".";
 
-        sendHybridEmail(toEmail, "❌ " + appName + " - Reserva cancelada " + confirmationCode, null, plainText);
+        Context context = new Context();
+        context.setVariable("guestName", displayName);
+        context.setVariable("confirmationCode", displayCode);
+        context.setVariable("accommodationName", displayAccommodation);
+        context.setVariable("reason", displayReason);
+        context.setVariable("appName", appName);
+        String htmlContent = templateEngine.process("emails/reservation-cancelled", context);
+        sendHybridEmail(toEmail, "Reserva cancelada " + displayCode + " - " + displayAccommodation,
+                htmlContent, plainText);
     }
 
     // =========================================================================

@@ -16,27 +16,25 @@ import java.util.List;
  * <p><strong>Características clave:</strong></p>
  * <ul>
  *   <li>Un huésped puede tener múltiples reservas en diferentes alojamientos.</li>
- *   <li>Se identifica de forma única por su correo electrónico.</li>
+ *   <li>El correo es un dato de contacto y puede repetirse entre huéspedes.</li>
  *   <li>Almacena información de contacto, documento de identidad, preferencias y alergias.</li>
- *   <li>Mantiene un historial completo de reservas y métodos de pago asociados.</li>
+ *   <li>Mantiene un historial de reservas asociadas.</li>
  * </ul>
  *
  * <p><strong>Restricciones de negocio:</strong></p>
  * <ul>
- *   <li>El correo electrónico debe ser único en todo el sistema.</li>
+ *   <li>El correo electrónico no es único; puede compartirse entre reservas.</li>
  *   <li>El documento de identidad (DNI/CC) debe ser único si se proporciona.</li>
  *   <li>Nombre, apellido y nombre completo son obligatorios.</li>
  * </ul>
  *
  * @author HostFlow Team
- * @version 3.1.0
+ * @version 3.2.0 (Sin métodos de pago del huésped — fuera de alcance)
  * @see Reservation
- * @see GuestPaymentMethod
  */
 @Entity
 @Table(name = "guests",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_guests_email", columnNames = "email"),
                 @UniqueConstraint(name = "uk_guests_document", columnNames = "document_number")
         },
         indexes = {
@@ -99,7 +97,7 @@ public class Guest {
      * Correo electrónico del huésped.
      * Se utiliza como identificador principal para notificaciones y recuperación.
      */
-    @Column(name = "email", nullable = false, unique = true, length = 150)
+    @Column(name = "email", nullable = false, length = 150)
     private String email;
 
     /**
@@ -112,7 +110,7 @@ public class Guest {
      * Número de documento de identidad del huésped (DNI, CC, Pasaporte).
      * Se almacena como String para soportar diferentes formatos internacionales.
      */
-    @Column(name = "document_number", length = 20, unique = true)
+    @Column(name = "document_number", length = 40, unique = true)
     private String documentNumber;
 
     /**
@@ -153,17 +151,9 @@ public class Guest {
      * Lista de reservas realizadas por este huésped.
      * Relación bidireccional con {@link Reservation}.
      */
-    @OneToMany(mappedBy = "guest", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "guest", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Reservation> reservations = new ArrayList<>();
-
-    /**
-     * Lista de métodos de pago registrados por este huésped.
-     * Relación bidireccional con {@link GuestPaymentMethod}.
-     */
-    @OneToMany(mappedBy = "guest", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<GuestPaymentMethod> paymentMethods = new ArrayList<>();
 
     // =========================================================================
     // METADATOS DE AUDITORÍA

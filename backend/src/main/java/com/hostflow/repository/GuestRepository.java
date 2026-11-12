@@ -3,6 +3,10 @@ package com.hostflow.repository;
 import com.hostflow.model.Guest;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
@@ -29,24 +33,18 @@ import java.util.Optional;
 public interface GuestRepository extends JpaRepository<Guest, Long> {
 
     /**
-     * Busca un huésped por su correo electrónico.
-     *
-     * <p>Se utiliza principalmente para verificar si un huésped ya está
-     * registrado en el sistema antes de intentar crear uno nuevo, o para
-     * recuperar sus datos al momento de generar una reserva.</p>
+     * Busca el registro de huésped más reciente asociado a un correo.
+     * El correo puede repetirse entre diferentes reservas, por lo que esta
+     * consulta no debe utilizarse para identificar de forma única a una persona.
      *
      * @param email el correo electrónico del huésped (normalizado a minúsculas)
      * @return un {@link Optional} con el huésped encontrado, o vacío si no existe
      */
-    Optional<Guest> findByEmail(String email);
+    Optional<Guest> findFirstByEmailOrderByIdDesc(String email);
 
     /**
-     * Verifica si ya existe un huésped registrado con el correo especificado.
-     *
-     * <p>Este método es más eficiente que {@link #findByEmail} cuando solo
-     * se necesita saber si el registro existe (ej. para validaciones de
-     * unicidad), ya que ejecuta una consulta {@code EXISTS} o {@code COUNT}
-     * en la base de datos en lugar de traer toda la entidad a la memoria.</p>
+     * Verifica si existe al menos un registro asociado al correo.
+     * No debe utilizarse como validación de unicidad.
      *
      * @param email el correo electrónico a verificar
      * @return {@code true} si ya existe un huésped con ese correo, {@code false} en caso contrario
@@ -64,6 +62,11 @@ public interface GuestRepository extends JpaRepository<Guest, Long> {
      * @return un {@link Optional} con el huésped encontrado, o vacío si no existe
      */
     Optional<Guest> findByDocumentNumber(String documentNumber);
+
+    /** Bloquea el perfil durante una actualización para evitar escrituras concurrentes perdidas. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select g from Guest g where g.documentNumber = :documentNumber")
+    Optional<Guest> findByDocumentNumberForUpdate(@Param("documentNumber") String documentNumber);
 
     /**
      * 🆕 Verifica si ya existe un huésped registrado con el número de documento especificado.

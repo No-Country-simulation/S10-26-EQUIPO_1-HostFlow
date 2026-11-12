@@ -17,7 +17,7 @@ import java.util.List; // 🆕 Import necesario para la lista de alergias
  * <p><strong>Validaciones:</strong></p>
  * <ul>
  *   <li>Nombre y apellido son obligatorios (2-100 caracteres).</li>
- *   <li>El correo electrónico debe ser válido y único.</li>
+ *   <li>El correo electrónico debe tener un formato válido; puede repetirse entre huéspedes.</li>
  *   <li>El teléfono es opcional (máximo 40 caracteres).</li>
  *   <li>El documento de identidad es opcional (solo números, 5-12 dígitos).</li>
  *   <li>Las preferencias y alergias son opcionales.</li>
@@ -60,8 +60,8 @@ public record CreateGuestRequest(
         /**
          * Correo electrónico del huésped.
          *
-         * <p>Debe ser único en el sistema y se utiliza como identificador principal
-         * para la comunicación y verificación de la cuenta.</p>
+         * <p>Se utiliza como dato de contacto para las comunicaciones y puede
+         * repetirse en distintas reservas. No identifica de forma única al huésped.</p>
          *
          * <p><strong>Validaciones:</strong></p>
          * <ul>

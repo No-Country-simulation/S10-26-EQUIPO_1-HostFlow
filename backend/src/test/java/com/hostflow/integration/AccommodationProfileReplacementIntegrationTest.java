@@ -2,6 +2,7 @@ package com.hostflow.integration;
 
 import com.hostflow.dto.response.AccommodationProfileResponse;
 import com.hostflow.dto.response.CloudinaryUploadResult;
+import com.hostflow.dto.response.AccommodationProfileResponse;
 import com.hostflow.model.Accommodation;
 import com.hostflow.model.Owner;
 import com.hostflow.repository.AccommodationRepository;
@@ -115,12 +116,11 @@ class AccommodationProfileReplacementIntegrationTest {
             return null;
         }).when(cloudinaryImageService).deleteImage(OLD_PUBLIC_ID);
 
-        // ✅ El servicio ahora retorna un DTO
         AccommodationProfileResponse result = accommodationProfileService.uploadLogo(ownerId, file);
 
-        // ✅ Uso de accessors de Record para las aserciones
         assertThat(result.logoUrl()).isEqualTo(NEW_LOGO_URL);
-        assertThat(result.logoPublicId()).isEqualTo(NEW_PUBLIC_ID);
+        // El DTO público no expone logoPublicId; se valida en la entidad persistida.
+
 
         Accommodation persisted = accommodationRepository.findById(accommodationId).orElseThrow();
         assertThat(persisted.getLogoUrl()).isEqualTo(NEW_LOGO_URL);
