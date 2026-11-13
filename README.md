@@ -52,6 +52,8 @@ pnpm dev                              # <http://localhost:5173>
 | Datos | En memoria, sin red | Llamadas HTTP al backend |
 | Login | `anfitrion@hostflow.app` / `demo1234` · `admin@hostflow.app` / `admin1234` | Usuarios creados por registro |
 
+dato
+
 Si `VITE_API_URL` apunta al backend pero este no está levantado, el **login
 falla a propósito** (no hay fallback); el resto de las pantallas siguen
 operando con el store local cuando un endpoint aún no existe en el backend.
