@@ -13,7 +13,7 @@ import {
 import { Alert, Badge, Card } from "@components/ui";
 import { BookingDetailModal } from "../components/BookingDetailModal";
 import { useBlockedDays, useBookings, useBrand } from "@lib/api/hooks";
-import { useSession } from "@features/auth/context/SessionContext";
+import { useSession } from "@features/auth";
 import { useTheme } from "@lib/theme/ThemeContext";
 import { DEMO_MODE } from "@lib/config/env";
 import { colorDistance, hexToRgb, mixHex, normalizeHex, readableOn, visibleOn } from "@utils/color";
@@ -283,7 +283,7 @@ export default function AvailabilityPage() {
                 highlighted && "ring-2 ring-ink ring-offset-2 ring-offset-paper scale-[1.06] z-10",
               );
 
-              // Hoy: tarjeta lima destacada
+              // Hoy: tarjeta gris destacada — se distingue del resto
               if (isToday) {
                 return (
                   <button
@@ -293,11 +293,14 @@ export default function AvailabilityPage() {
                     title={titleText}
                     className={cn(
                       cellClass,
-                      "bg-lime font-extrabold text-lime-ink hover:bg-lime-strong",
+                      "bg-[#6b7280] font-black text-white hover:bg-[#4b5563]",
+                      "ring-[3px] ring-[#374151] ring-offset-2 ring-offset-paper",
+                      "shadow-[0_8px_24px_-6px_rgba(107,114,128,0.6)]",
+                      "scale-[1.08] z-10",
                     )}
                   >
-                    {Number(iso.slice(-2))}
-                    <span className="absolute bottom-1.5 size-1.5 rounded-full bg-lime-ink/60" />
+                    <span className="text-lg leading-none">{Number(iso.slice(-2))}</span>
+                    <span className="absolute bottom-1.5 size-2 rounded-full bg-white/70" />
                   </button>
                 );
               }
@@ -375,7 +378,7 @@ export default function AvailabilityPage() {
               <span>Bloqueado</span>
             </span>
             <span className="flex items-center gap-2">
-              <span className="size-3.5 rounded-md bg-lime shrink-0" />
+              <span className="size-3.5 rounded-md bg-[#6b7280] ring-[2px] ring-[#374151] shrink-0" />
               <span>Hoy</span>
             </span>
             <span className="flex items-center gap-2">

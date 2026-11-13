@@ -122,12 +122,17 @@ backend, o publicar la API detrás del mismo origen mediante un rewrite/proxy.
 `/lodgings/**`, `/bookings/**`, `/onboarding/**`, `/admin/stats` están
 **declarados como contrato reservado** en `endpoints.js`. Comportamiento:
 
-1. `httpApi.js` detecta `404 / 405 / 501 / status 0` ("este endpoint todavía
-   no existe") → `withLocalFallback` opera sobre el **store local**.
+1. El `op()` de `src/lib/api/index.js` detecta `404 / 405 / 501 / status 0`
+   ("este endpoint todavía no existe") y resuelve la operación sobre el
+   **store local** (`src/lib/api/storeOps.js`).
 2. Los errores reales (`400`, `401`, `500`…) **se propagan** y la pantalla los
    muestra: no se enmascaran.
 3. Si la operación no está declarada en absoluto (`ApiNotConfiguredError`), el
-   `op()` de `src/lib/api/index.js` cae al store sin romper la app.
+   mismo `op()` cae al store sin romper la app.
+
+El adaptador `httpApi.js` (y sus módulos en `http/`) solo ejecuta HTTP: no
+importa ni escribe el store. Esa frontera es la que permite cambiar el origen
+de datos sin tocar las pantallas.
 
 Esto permite usar reservas, calendario, servicios, pagos y admin con el
 backend parcialmente implementado, sin pantallas rotas.

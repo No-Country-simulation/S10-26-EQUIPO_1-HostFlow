@@ -8,7 +8,7 @@ import { BookingRequirementsAlert } from "../components/BookingRequirementsAlert
 import { getBookingRequirements } from "../lib/bookingRequirements";
 import { guardAction } from "../lib/guardAction";
 import { useBookings, useLodging, usePayments } from "@lib/api/hooks";
-import { useSession } from "@features/auth/context/SessionContext";
+import { useSession } from "@features/auth";
 import { DEMO_MODE } from "@lib/config/env";
 import { cn, toISODate } from "@utils/format";
 

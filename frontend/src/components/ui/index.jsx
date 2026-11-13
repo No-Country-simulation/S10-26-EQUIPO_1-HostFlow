@@ -7,6 +7,11 @@ import { cn, initials } from "@utils/format";
 
 export { cn };
 
+// Diálogo reutilizable (portal + foco): vive en su propio archivo y se
+// re-exporta desde el barrel para que la API de `@components/ui` sea única
+// (nadie importa la ruta directa `@components/ui/Modal`).
+export { default as Modal } from "./Modal";
+
 // ── Botones ─────────────────────────────────────────────────────────────────
 
 const BUTTON =

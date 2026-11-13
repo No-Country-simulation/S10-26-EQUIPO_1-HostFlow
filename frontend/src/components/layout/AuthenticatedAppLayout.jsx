@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { Avatar, Brand, ThemeToggle } from "@components/ui";
-import { useSession } from "@features/auth/context/SessionContext";
+import { useSession } from "@features/auth";
 import { useLodging } from "@lib/api/hooks";
 import { LodgingTheme } from "@lib/theme/LodgingTheme";
 import { cn } from "@utils/format";

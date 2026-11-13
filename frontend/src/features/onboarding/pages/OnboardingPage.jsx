@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router";
 import { ArrowLeft, ArrowRight, Check, ClipboardList } from "lucide-react";
 import { Button, EmptyState, WhatsAppIcon } from "@components/ui";
 import { useBooking, useLodging, usePayments, useServices } from "@lib/api/hooks";
-import { useSession } from "@features/auth/context/SessionContext";
+import { useSession } from "@features/auth";
 import { isOnboardingLinkExpired } from "@lib/domain/onboarding";
 import { DEMO_MODE } from "@lib/config/env";
 import { bookingGrandTotal, copyText, daysBetween, formatMoney, serviceLineTotal } from "@utils/format";

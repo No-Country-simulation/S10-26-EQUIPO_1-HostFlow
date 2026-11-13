@@ -12,8 +12,9 @@
 // Estado de implementación en el backend:
 //   · Auth y Owners  → IMPLEMENTADOS (AuthController / OwnerController).
 //   · El resto       → CONTRATO RESERVADO. Mientras el backend no los exponga,
-//                      httpApi.js detecta el 404/405/501 y cae al store local
-//                      para que la pantalla siga siendo usable sin romperse.
+//                      la fachada (src/lib/api/index.js) detecta el 404/405/501
+//                      y cae al store local para que la pantalla siga siendo
+//                      usable sin romperse.
 export const ENDPOINTS = {
   // ── Auth (públicos) ───────────────────────────────────────────────────
   login: { method: "POST", path: "/auth/login" },

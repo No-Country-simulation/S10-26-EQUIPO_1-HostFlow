@@ -14,7 +14,7 @@ pnpm build          # genera dist/
 ```
 
 Sin `VITE_API_URL` (ver `.env.example`) la app corre en **modo demo**: los datos viven en
-memoria + `sessionStorage`, no se valida nada contra un servidor y se muestra un aviso visible.
+memoria + `localStorage`, no se valida nada contra un servidor y se muestra un aviso visible.
 
 ### Credenciales de demostración
 
@@ -57,11 +57,14 @@ después de cambiar una clave).
 - Contrato de API: **[docs/swagger-api.md](docs/swagger-api.md)** (rutas, cuerpos, respuestas y errores).
 - `src/lib/api/endpoints.js` mapea cada operación a su ruta (contrato real del backend, ver
   `backend/src/main/java/com/hostflow/controller/`).
-- `src/lib/api/httpApi.js` implementa las llamadas reales; `src/lib/api/demoApi.js` implementa el
-  **mismo contrato** con datos en memoria.
+- `src/lib/api/httpApi.js` es el adaptador real: agrupa los módulos HTTP de
+  `src/lib/api/http/` (auth · owners · lodging · availability · bookings · onboarding ·
+  services · payments · admin) y **solo ejecuta llamadas, nunca toca el store**.
+  `src/lib/api/demoApi.js` implementa el **mismo contrato** con datos en memoria.
 - `src/lib/api/index.js` elige el adaptador según `VITE_API_URL`. Las pantallas nunca llaman a `fetch`.
-- El backend hoy solo expone **auth y dueños**. Para el resto de los módulos, `httpApi` detecta que
-  el endpoint aún no responde (404 / 405 / 501 o sin conexión) y opera sobre el store local: así
+- El backend hoy solo expone **auth y dueños**. Para el resto de los módulos, la fachada
+  (`src/lib/api/index.js`) es quien detecta que el endpoint aún no responde (404 / 405 / 501 o
+  sin conexión) y resuelve la operación sobre el store local (`src/lib/api/storeOps/`): así
   ninguna pantalla se rompe y, cuando el backend los publique, pasan a usarse sin tocar la UI.
 - El backend expone el context-path `/api/v1`, así que `VITE_API_URL` debe incluirlo:
   `VITE_API_URL=http://localhost:8080/api/v1`.
@@ -71,23 +74,36 @@ después de cambiar una clave).
 
 ```
 src/
-  features/home/pages/          HomePage (presentación)
-  features/dashboard/
-    pages/      OwnerDashboardPage · BookingsPage · LodgingPage · AvailabilityPage · PaymentMethodsPage · ServicesPage · LodgingProfilePage
-    components/ BookingSummaryCard · BookingDetailModal · BookingFormModal
-  features/onboarding/
-    pages/        OnboardingPage (ficha de llegada del huésped, B2C)
-    components/   OnboardingShell (identidad del alojamiento) · BoatQuoteStep
-  features/admin/pages/         AdminOverviewPage (control interno)
-  features/auth/
-    pages/        LoginPage · CreateAccountPage · PasswordRecoveryPage (OTP)
-    context/      SessionContext (sesión y acciones)
+  features/                cada feature expone su API pública en index.js (`@features/<nombre>`):
+                           páginas para el router y, en auth, el contexto de sesión.
+    home/
+      pages/               HomePage (presentación)
+      components/          Header · Hero · Gallery · Features · HowItWorks · Pricing · FAQ · Footer …
+      lib/                 datos de la landing (features · steps · faqs · plans)
+    dashboard/
+      pages/       OwnerDashboardPage · BookingsPage · LodgingPage · AvailabilityPage · PaymentMethodsPage · ServicesPage · LodgingProfilePage
+      components/  BookingSummaryCard · BookingDetailModal · BookingFormModal · PaymentMethodsCard · BrandSettingsCard …
+      lib/         bookingRequirements · guardAction · brandEditor · presetProviders
+    onboarding/
+      pages/        OnboardingPage (ficha de llegada del huésped, B2C)
+      components/   OnboardingShell (identidad del alojamiento) · BoatQuoteStep
+      lib/          steps · onboardingForm
+    admin/
+      pages/        AdminOverviewPage (control interno)
+      components/   AdminOverviewHeader · AdminStatsSection · LodgingsPanel · LodgingRow …
+      lib/          adminStats · filterLodgings
+    auth/
+      pages/        LoginPage · CreateAccountPage · PasswordRecoveryPage (OTP)
+      context/      SessionContext (sesión y acciones)
   routes/         index.jsx (rutas) · guards/ProtectedRoute.jsx
   components/
-    ui/index.jsx  sistema visual compartido · Modal.jsx (diálogo reutilizable)
+    ui/index.jsx  sistema visual compartido · Modal.jsx (diálogo reutilizable, re-exportado por el barrel)
     layout/       AuthenticatedAppLayout · AuthLayout · ScrollToTop
   lib/
-    api/          index (fachada) · httpApi · demoApi · endpoints · httpClient · tokenStorage · errors
+    api/          index (fachada: único punto que resuelve el fallback)
+                  httpApi + http/    adaptador HTTP puro, sin store
+                  storeOps/          proyección de respuestas y operación local
+                  demoApi · endpoints · httpClient · tokenStorage · errors · transforms · hooks
     state/        store.js (estado demo) · useStore.js (hook reactivo)
     config/env.js VITE_API_URL → DEMO_MODE
     theme/        ThemeContext (claro/oscuro) · LodgingTheme (colores del alojamiento, scoped)
@@ -105,5 +121,5 @@ prefieren imports relativos para módulos propios de la feature.
 - La sección **Mockups** se eliminó: no forms parte de la presentación final.
 - Las animaciones (`rise`, `fade`, `pop`, `float`, `marquee`) están en `src/styles/globals.css` y respetan
   `prefers-reduced-motion`.
-- El estado de la demo se persiste en `sessionStorage` (`hostflow.app.v1`), por lo que recargar la
+- El estado de la demo se persiste en `localStorage` (`hostflow.app.v1`), por lo que recargar la
   página no pierde los cambios (incluida una clave nueva definida por OTP).

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { ConciergeBell, Pencil, Plus, Trash2 } from "lucide-react";
-import { Alert, Badge, Button, Card, EmptyState, Field, Switch } from "@components/ui";
-import Modal from "@components/ui/Modal";
+import { Alert, Badge, Button, Card, EmptyState, Field, Modal, Switch } from "@components/ui";
 import { useLodging, useServices } from "@lib/api/hooks";
-import { useSession } from "@features/auth/context/SessionContext";
+import { useSession } from "@features/auth";
 import { DEMO_MODE } from "@lib/config/env";
 import { cn, formatMoney } from "@utils/format";
 

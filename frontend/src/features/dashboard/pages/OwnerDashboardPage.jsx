@@ -15,7 +15,7 @@ import { BookingSummaryCard } from "../components/BookingSummaryCard";
 import { BookingDetailModal } from "../components/BookingDetailModal";
 import { guardAction } from "../lib/guardAction";
 import { useBlockedDays, useBookings, useLodging } from "@lib/api/hooks";
-import { useSession } from "@features/auth/context/SessionContext";
+import { useSession } from "@features/auth";
 import { DEMO_MODE } from "@lib/config/env";
 import { addDays, bookingGrandTotal, formatMoney, toISODate } from "@utils/format";
 

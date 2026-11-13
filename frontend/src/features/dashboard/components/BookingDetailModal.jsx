@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { ArrowRight, Check, Copy, HeartPulse, Landmark, Ship, Users } from "lucide-react";
-import { Alert, Badge, Button, Switch } from "@components/ui";
-import Modal from "@components/ui/Modal";
+import { Alert, Badge, Button, Modal, Switch } from "@components/ui";
 import { PaymentStatusBadge, StatusBadge } from "./BookingSummaryCard";
 import { useBankDetails, useLodging } from "@lib/api/hooks";
-import { useSession } from "@features/auth/context/SessionContext";
+import { useSession } from "@features/auth";
 import { ONBOARDING_LINK_TTL_MS, isOnboardingLinkExpired } from "@lib/domain/onboarding";
 import { guardAction } from "../lib/guardAction";
 import { DEMO_MODE } from "@lib/config/env";

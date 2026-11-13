@@ -1,10 +1,9 @@
 import { useMemo, useRef, useState } from "react";
-import { Alert, Button, Field } from "@components/ui";
-import Modal from "@components/ui/Modal";
+import { Alert, Button, Field, Modal } from "@components/ui";
 import { BookingRequirementsAlert } from "./BookingRequirementsAlert";
 import { getBookingRequirements } from "../lib/bookingRequirements";
 import { useBlockedDays, useBookings, useLodging, usePayments } from "@lib/api/hooks";
-import { useSession } from "@features/auth/context/SessionContext";
+import { useSession } from "@features/auth";
 import { daysBetween, formatMoney, isEmail, plural, toISODate } from "@utils/format";
 
 // Teléfono del huésped: obligatorio, igual que en el onboarding, porque es el

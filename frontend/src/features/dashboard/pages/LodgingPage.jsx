@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BedDouble, ImagePlus, MapPin, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Alert, Badge, Button, Card, Field, StickyFormTitle } from "@components/ui";
 import { useLodging } from "@lib/api/hooks";
-import { useSession } from "@features/auth/context/SessionContext";
+import { useSession } from "@features/auth";
 import { MAX_IMAGES } from "@lib/domain/lodging";
 import { DEMO_MODE } from "@lib/config/env";
 import { readableOn } from "@utils/color";
