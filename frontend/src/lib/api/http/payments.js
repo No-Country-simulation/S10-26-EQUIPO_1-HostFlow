@@ -100,6 +100,7 @@ export const paymentsApi = {
     }
     const body = {
       displayName: data.label || data.displayName || "Método de pago",
+      providerName: data.providerName || data.label || data.displayName || "Método de pago",
       paymentType: typeMap[data.type] || "DIGITAL_WALLET",
       isActive: data.enabled !== false,
       bankName: data.bankName || data.bank || data.keys?.bank,
@@ -125,6 +126,7 @@ export const paymentsApi = {
     }
     const body = {
       ...(patch.displayName || patch.label ? { displayName: patch.displayName || patch.label } : {}),
+      ...(patch.providerName || patch.displayName || patch.label ? { providerName: patch.providerName || patch.displayName || patch.label } : {}),
       ...(patch.type ? { paymentType: typeMap[patch.type] || patch.type } : {}),
       ...(patch.enabled !== undefined ? { isActive: patch.enabled } : {}),
       ...((patch.bankName ?? patch.bank ?? patch.keys?.bank) !== undefined ? { bankName: patch.bankName ?? patch.bank ?? patch.keys?.bank } : {}),

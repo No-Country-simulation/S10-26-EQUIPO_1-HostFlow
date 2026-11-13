@@ -20,6 +20,7 @@ export function mergeLodging(dto) {
     capacity: Number(dto.guestCapacity ?? dto.capacity ?? current.capacity),
     pricePerNight: Number(dto.basePrice ?? dto.pricePerNight ?? current.pricePerNight),
     currency: dto.currency || current.currency,
+    email: dto.email ?? current.email ?? "",
     images: Array.isArray(dto.images)
       ? dto.images.map((img) => (typeof img === "string" ? img : img.url ?? img.imageUrl)).slice(0, MAX_IMAGES)
       : current.images,

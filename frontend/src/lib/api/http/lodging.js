@@ -16,6 +16,7 @@ export const lodgingApi = {
     if (patch.bathrooms !== undefined) body.bathroomCount = Number(patch.bathrooms)
     if (patch.capacity !== undefined) body.guestCapacity = Number(patch.capacity)
     if (patch.pricePerNight !== undefined) body.basePrice = Number(patch.pricePerNight)
+    if (patch.email !== undefined) body.email = patch.email
     if (patch.location !== undefined) body.address = patch.location
     if (patch.phone !== undefined) body.phone = patch.phone
     if (patch.tagline !== undefined) body.welcomeMessage = patch.tagline
@@ -37,6 +38,7 @@ export const lodgingApi = {
             bathroomCount: Number(patch.bathrooms ?? 1),
             guestCapacity: Number(patch.capacity ?? (patch.rooms ? patch.rooms * 2 : 2)),
             basePrice: Number(patch.pricePerNight ?? 85000),
+            email: patch.email || "",
             primaryColor: patch.brand?.primary || "#0fa3a3",
             accentColor: patch.brand?.accent || "#d4f53c",
             backgroundPattern: patch.brand?.pattern || "none",

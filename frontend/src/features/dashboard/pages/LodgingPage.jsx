@@ -45,16 +45,18 @@ export default function LodgingPage() {
     const capacity = Number(form.get("capacity"));
     const pricePerNight = Number(form.get("pricePerNight"));
     const currency = String(form.get("currency") || "ARS");
+    const email = String(form.get("email") || "").trim();
 
     if (!name) return setError("Ingresá el nombre del alojamiento.");
     if (!rooms || rooms < 1) return setError("El número de habitaciones debe ser al menos 1.");
     if (bathrooms < 0) return setError("Ingresá una cantidad de baños válida.");
     if (!capacity || capacity < 1) return setError("Ingresá la capacidad en huéspedes (al menos 1).");
     if (!pricePerNight || pricePerNight <= 0) return setError("Ingresá un precio por noche válido.");
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError("Ingresá un correo de contacto válido.");
 
     setError("");
     try {
-      await actions.updateLodging({ name, rooms, bathrooms, capacity, pricePerNight, currency });
+      await actions.updateLodging({ name, rooms, bathrooms, capacity, pricePerNight, currency, email });
       setSaved(true);
       setTimeout(() => setSaved(false), 2600);
     } catch (err) {
@@ -132,13 +134,21 @@ export default function LodgingPage() {
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         {/* Formulario */}
         <Card className="p-6">
-          <form onSubmit={submit} className="grid gap-4" noValidate>
+          <form key={lodging.id} onSubmit={submit} className="grid gap-4" noValidate>
             <StickyFormTitle
               title="Datos del alojamiento"
               hint="Estos datos se muestran en el enlace del huésped."
               className="-mt-6"
             />
             <Field label="Nombre del alojamiento" name="name" defaultValue={lodging.name} placeholder="Ej. Cabañas del Arroyo" />
+            <Field
+              label="Correo de contacto del alojamiento"
+              name="email"
+              type="email"
+              defaultValue={lodging.email || ""}
+              placeholder="reservas@mi-alojamiento.com"
+              hint="Debe ser válido para habilitar la creación de reservas."
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Número de habitaciones" name="rooms" type="number" min="1" defaultValue={lodging.rooms} />
               <Field label="Número de baños" name="bathrooms" type="number" min="0" defaultValue={lodging.bathrooms} />
