@@ -25,6 +25,7 @@ export default function OwnerDashboardPage() {
   const lodging = useLodging();
   const blockedDays = useBlockedDays();
   const [detailId, setDetailId] = useState(null);
+  const [ownerMetrics, setOwnerMetrics] = useState(null);
 
   // Métricas y próximas reservas: se cargan desde el backend. En modo demo el
   // store local ya es la fuente de verdad.
@@ -32,12 +33,14 @@ export default function OwnerDashboardPage() {
     if (DEMO_MODE) return;
     let alive = true;
     Promise.allSettled([
+      actions.getOwnerMetrics?.(),
       actions.getBookings?.(),
       actions.getBlockedDays?.(),
       actions.getPayments?.(),
       actions.getServices?.(),
     ]).then((results) => {
       if (!alive) return;
+      if (results[0]?.status === "fulfilled") setOwnerMetrics(results[0].value);
       results
         .filter((r) => r.status === "rejected")
         .forEach((r) => console.warn("Panel:", r.reason));
@@ -114,7 +117,7 @@ export default function OwnerDashboardPage() {
           </div>
           <BookingSummaryCard
             booking={next}
-            onConfirm={(id) => actions.setBookingStatus(id, "CONFIRMED")}
+            onConfirm={DEMO_MODE ? (id) => actions.setBookingStatus(id, "CONFIRMED") : undefined}
             onCancel={(id) => actions.setBookingStatus(id, "CANCELLED")}
             onView={(id) => setDetailId(id)}
           />
@@ -123,15 +126,18 @@ export default function OwnerDashboardPage() {
 
       {/* Métricas */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Próximas reservas" value={upcoming.length} hint={pendingCount ? `${pendingCount} pendiente${pendingCount === 1 ? "" : "s"}` : "Todo al día"} tone="lime" icon={CalendarDays} />
+        <Stat label="Reservas activas" value={ownerMetrics?.activeReservations ?? upcoming.length} hint={pendingCount ? `${pendingCount} pendiente${pendingCount === 1 ? "" : "s"}` : "Incluye reservas confirmadas"} tone="lime" icon={CalendarDays} />
         <Stat
           label="Ingresos próximos 30 días"
           value={formatMoney(revenue, lodging.currency)}
-          hint={
+          hint={[
             foreignBookings.length
               ? `+ ${foreignBookings.length} reserva${foreignBookings.length === 1 ? "" : "s"} en otra moneda`
-              : undefined
-          }
+              : null,
+            ownerMetrics
+              ? `Acumulado: ${formatMoney(Number(ownerMetrics.accumulatedIncome || 0), lodging.currency)} · Este mes: ${formatMoney(Number(ownerMetrics.incomeLastMonth || 0), lodging.currency)}`
+              : null,
+          ].filter(Boolean).join(" · ") || undefined}
           tone="teal"
           icon={Wallet}
         />
@@ -155,7 +161,7 @@ export default function OwnerDashboardPage() {
               <BookingSummaryCard
                 key={booking.id}
                 booking={booking}
-                onConfirm={(id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CONFIRMED"))}
+                onConfirm={DEMO_MODE ? (id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CONFIRMED")) : undefined}
                 onCancel={(id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CANCELLED"))}
                 onView={(id) => setDetailId(id)}
               />

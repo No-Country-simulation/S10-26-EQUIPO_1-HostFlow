@@ -8,8 +8,7 @@
 // solo ejecuta HTTP y nunca toca el store. Cuando el endpoint todavía no
 // existe (404 / 405 / 501, o falta de conexión) la operación se resuelve
 // contra el store local (storeOps.js) y, en último recurso, contra las
-// acciones demo. Así ninguna pantalla se rompe mientras el backend publica los
-// módulos pendientes.
+// acciones demo. Las acciones sin ruta remota mantienen su comportamiento local.
 import { DEMO_MODE } from "../config/env"
 import { actions, store } from "../state/store"
 import { buildAdminStats } from "./adminStats"
@@ -68,7 +67,8 @@ const op =
           throw error
         }
         if (!(error instanceof ApiNotConfiguredError)) throw error
-        console.warn(`Operación "${name}":`, error)
+        const local = storeOps[name]?.local
+        if (typeof local === "function") return local(...args)
       }
     }
 
@@ -99,6 +99,8 @@ export const api = {
   // La interfaz usa `password`; el backend espera `newPassword`: se envían ambos.
   resetPassword: ({ email, code, password }) =>
     impl.resetPassword({ email, code, password, newPassword: password }),
+  verifyEmail: op("verifyEmail"),
+  resendVerification: op("resendVerification"),
   logout: () => {
     // Siempre hay que limpiar el store: con backend real no hay endpoint de logout,
     // pero el usuario en memoria mantiene abierta la sesión de la interfaz.
@@ -113,6 +115,14 @@ export const api = {
   addImage: op("addImage"),
   removeImage: op("removeImage"),
   updateBrand: op("updateBrand"),
+  getGallery: op("getGallery"),
+  getOwnerByEmail: op("getOwnerByEmail"),
+  getOwnerById: op("getOwnerById"),
+  getAllOwners: op("getAllOwners"),
+  toggleOwnerStatus: op("toggleOwnerStatus"),
+  getOwnerMetrics: op("getOwnerMetrics"),
+  getAccommodationStatus: op("getAccommodationStatus"),
+  checkAvailability: op("checkAvailability"),
 
   // ── Disponibilidad ──────────────────────────────────────────────────────
   getBlockedDays: op("getBlockedDays"),
@@ -121,16 +131,18 @@ export const api = {
 
   // ── Reservas ────────────────────────────────────────────────────────────
   getBookings: op("getBookings"),
+  getBookingById: op("getBookingById"),
   createBooking: op("createBooking"),
   updateBooking: op("updateBooking"),
   setBookingStatus: op("setBookingStatus"),
-  // Estado del pago de una reserva (Pendiente / Pagado).
+  // Registra el pago recibido; volver a pendiente solo es local/demo.
   setPaymentStatus: op("setPaymentStatus"),
+  checkReservationAvailability: op("checkReservationAvailability"),
   // Renueva el enlace de llegada del huésped: nueva vigencia de 24 h.
   regenerateOnboardingLink: op("regenerateOnboardingLink"),
 
   // ── Onboarding del huésped (B2C) ────────────────────────────────────────
-  // Lectura pública del enlace de llegada (sin token).
+  // Lectura pública del enlace de llegada mediante el token del huésped.
   getOnboarding: op("getOnboarding"),
   submitOnboarding: op("submitOnboarding"),
   // Solicitud de cotización de lancha: genera el JSON; NO lo envía a otra API.
@@ -143,9 +155,14 @@ export const api = {
   updateService: op("updateService"),
   removeService: op("removeService"),
   toggleService: op("toggleService"),
+  getServiceImages: op("getServiceImages"),
+  addServiceImage: op("addServiceImage"),
+  removeServiceImage: op("removeServiceImage"),
 
   // ── Pagos ───────────────────────────────────────────────────────────────
   getPayments: op("getPayments"),
+  getCurrencies: op("getCurrencies"),
+  upsertCurrency: op("upsertCurrency"),
   setPrimaryCurrency: op("setPrimaryCurrency"),
   toggleWallet: op("toggleWallet"),
   togglePaymentMethod: op("togglePaymentMethod"),
@@ -159,6 +176,12 @@ export const api = {
   getAdminLodgings: op("getAdminLodgings"),
   getAdminStats: op("getAdminStats"),
   setAdminLodgingStatus: op("setAdminLodgingStatus"),
+
+  // Rutas públicas de huéspedes y precios.
+  createOrGetGuest: op("createOrGetGuest"),
+  getGuestByEmail: op("getGuestByEmail"),
+  getPublicBasePrice: op("getPublicBasePrice"),
+  getPublicServices: op("getPublicServices"),
 
   // En demo siempre hay acceso si existe un usuario en el store.
   isAuthenticated: () => (DEMO_MODE ? Boolean(store.get().user) : Boolean(tokenStorage.get())),

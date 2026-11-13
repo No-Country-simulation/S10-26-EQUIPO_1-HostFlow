@@ -350,7 +350,7 @@ Las propiedades `cloud-name`, `api-key`, `api-secret` y `folder` son **obligator
 | Recurso | Carpeta en Cloudinary | Tamaño | Otras reglas |
 |---------|-----------------------|--------|--------------|
 | Logotipo y galería del alojamiento | `cloudinary.folder` (por defecto `hostflow`) | Máx. **5 MB** | `Content-Type` debe iniciar con `image/`. |
-| Imágenes de servicios adicionales | `hostflow/additional-services/{serviceId}` | **500 KB – 2 MB** | `image/*`; **máx. 3 imágenes por servicio**. |
+| Imágenes de servicios adicionales | `hostflow/additional-services/{serviceId}` | **Máx. 2 MB** | `image/*`; **máx. 3 imágenes por servicio**. |
 
 Todas las subidas usan `overwrite=false` y conexión HTTPS.
 
@@ -817,7 +817,7 @@ Servicios extra del alojamiento (desayuno, traslado, limpieza, etc.). Requiere J
 | `priceType` | `PER_DAY` (por día) o `TOTAL` (por defecto). |
 | `active` | Si está activo, aparece en la consulta pública. |
 
-**Imágenes del servicio:** solo por subida de archivo, `image/*`, entre **500 KB y 2 MB**, **máximo 3 por servicio**.
+**Imágenes del servicio:** solo por subida de archivo, `image/*`, hasta **2 MB**, **máximo 3 por servicio**.
 
 ```http
 POST /api/v1/owners/accommodation/additional-services

@@ -205,7 +205,7 @@ public class AdditionalServiceController {
     @PostMapping(value = "/{serviceId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
             summary = "Subir una imagen a un servicio adicional",
-            description = "Sube una imagen a Cloudinary. Restricciones: Máx 3 imágenes, 500 KB - 2 MB, tipo image/*."
+            description = "Sube una imagen a Cloudinary. Restricciones: Máx 3 imágenes, hasta 2 MB, tipo image/*."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Imagen subida exitosamente",
@@ -218,7 +218,7 @@ public class AdditionalServiceController {
     })
     public ResponseEntity<AdditionalServiceImageResponse> uploadImage(
             @PathVariable Long serviceId,
-            @Parameter(description = "Archivo de imagen (entre 500 KB y 2 MB)", required = true)
+            @Parameter(description = "Archivo de imagen (hasta 2 MB)", required = true)
             @RequestParam("file") MultipartFile file,
             Authentication auth) {
 

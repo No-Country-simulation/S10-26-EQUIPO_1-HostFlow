@@ -37,8 +37,14 @@ export function BookingDetailModal({ booking, open, onClose }) {
         .filter(Boolean);
   const preferences = booking.onboarding?.preferences;
 
-  // Enlace de llegada del huésped (onboarding B2C): identifica alojamiento + reserva.
-  const onboardingUrl = `${window.location.origin}${lodging.onboardingPath || "/llegada"}/${lodging.id}/${booking.id}`;
+  // El backend emite un enlace de un solo uso con token. En modo demo se
+  // conserva la ruta local que identifica alojamiento + reserva.
+  const token = booking.confirmationLink?.token;
+  const onboardingUrl = token
+    ? `${window.location.origin}/reservations/confirm?token=${encodeURIComponent(token)}`
+    : DEMO_MODE
+      ? `${window.location.origin}${lodging.onboardingPath || "/llegada"}/${lodging.id}/${booking.id}`
+      : "";
 
   // Vigencia del enlace: dura 24 h desde su emisión.
   const issuedAt = booking.onboardingLinkIssuedAt ? Date.parse(booking.onboardingLinkIssuedAt) : NaN;
@@ -48,6 +54,7 @@ export function BookingDetailModal({ booking, open, onClose }) {
     : Math.max(0, Math.ceil((issuedAt + ONBOARDING_LINK_TTL_MS - Date.now()) / 3_600_000));
 
   const copyLink = async () => {
+    if (!onboardingUrl) return;
     try {
       await navigator.clipboard.writeText(onboardingUrl);
       setCopied(true);
@@ -116,11 +123,12 @@ export function BookingDetailModal({ booking, open, onClose }) {
           <div className="flex flex-wrap items-start justify-between gap-3 sm:flex-nowrap">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-ink">Estado del pago</p>
-              <p className="text-xs text-muted">Marcá la reserva como pagada cuando recibas la transferencia.</p>
+              <p className="text-xs text-muted">Marcá la reserva como pagada cuando recibas la transferencia. El backend no permite revertir ese registro.</p>
             </div>
             <Switch
               checked={booking.paymentStatus === "PAID"}
               onChange={(next) => guardAction("setPaymentStatus", actions.setPaymentStatus(booking.id, next ? "PAID" : "PENDING"))}
+              disabled={!DEMO_MODE && booking.paymentStatus === "PAID"}
               label={booking.paymentStatus === "PAID" ? "Pagado" : "Pendiente"}
             />
           </div>
@@ -246,16 +254,16 @@ export function BookingDetailModal({ booking, open, onClose }) {
           )}
         </div>
 
-        {!DEMO_MODE && (
+        {!DEMO_MODE && booking.status === "PENDING" && (
           <Alert tone="info">
-            El backend aún no expone el módulo de reservas: los cambios de esta pantalla se guardan localmente en
-            este navegador.
+            El huésped confirma esta reserva al completar el onboarding. Desde el panel podés cancelarla y registrar
+            el pago recibido.
           </Alert>
         )}
 
         {/* Acciones de la reserva */}
         <div className="flex flex-wrap gap-2">
-          {booking.status === "PENDING" && (
+          {DEMO_MODE && booking.status === "PENDING" && (
             <Button
               type="button"
               icon={Check}

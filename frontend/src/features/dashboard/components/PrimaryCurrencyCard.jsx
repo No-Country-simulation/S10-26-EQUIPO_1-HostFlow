@@ -2,7 +2,7 @@ import { Coins } from "lucide-react";
 import { Card } from "@components/ui";
 import { CURRENCIES, cn, formatMoney } from "@utils/format";
 
-export function PrimaryCurrencyCard({ payments, setPrimary, lodging }) {
+export function PrimaryCurrencyCard({ payments, setPrimary, lodging, editable = true }) {
   return (
     <Card className="p-6">
       <div className="mb-4 flex items-center gap-2">
@@ -15,6 +15,12 @@ export function PrimaryCurrencyCard({ payments, setPrimary, lodging }) {
         </div>
       </div>
 
+      {!editable && (
+        <p className="mb-3 rounded-xl bg-cloud px-3 py-2 text-xs text-muted">
+          En la conexión con el backend, la moneda base es ARS. Podés habilitar USD y EUR como monedas secundarias.
+        </p>
+      )}
+
       <div className="grid gap-2">
         {Object.values(CURRENCIES).map((currency) => {
           const active = payments.primary === currency.code;
@@ -22,9 +28,11 @@ export function PrimaryCurrencyCard({ payments, setPrimary, lodging }) {
             <button
               key={currency.code}
               type="button"
-              onClick={() => setPrimary(currency.code)}
+              disabled={!editable}
+              onClick={() => editable && setPrimary(currency.code)}
               className={cn(
                 "flex items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-all",
+                !editable && "cursor-not-allowed opacity-70",
                 active
                   ? "border-lime bg-lime-soft dark:bg-lime/12"
                   : "border-line bg-paper hover:border-line-strong",

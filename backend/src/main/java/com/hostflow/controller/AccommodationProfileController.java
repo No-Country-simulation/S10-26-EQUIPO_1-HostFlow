@@ -207,14 +207,14 @@ public class AccommodationProfileController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Imagen subida y registrada correctamente"),
-            @ApiResponse(responseCode = "400", description = "Archivo ausente, vacío, inválido o fuera del rango de 500 KB a 2 MB, o galería completa"),
+            @ApiResponse(responseCode = "400", description = "Archivo ausente, vacío, mayor a 2 MB o inválido, o galería completa"),
             @ApiResponse(responseCode = "401", description = "Token ausente o inválido"),
             @ApiResponse(responseCode = "403", description = "El usuario no tiene el rol OWNER"),
             @ApiResponse(responseCode = "404", description = "No existe un perfil para el propietario autenticado"),
             @ApiResponse(responseCode = "502", description = "No fue posible subir la imagen a Cloudinary")
     })
     public ResponseEntity<AccommodationImageResponse> uploadGalleryImage(
-            @Parameter(description = "Archivo de imagen (entre 500 KB y 2 MB).", required = true)
+            @Parameter(description = "Archivo de imagen (hasta 2 MB).", required = true)
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
 
@@ -236,14 +236,14 @@ public class AccommodationProfileController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Logotipo actualizado correctamente"),
-            @ApiResponse(responseCode = "400", description = "Archivo ausente, vacío, inválido o fuera del rango de 500 KB a 2 MB"),
+            @ApiResponse(responseCode = "400", description = "Archivo ausente, vacío, mayor a 2 MB o inválido"),
             @ApiResponse(responseCode = "401", description = "Token ausente o inválido"),
             @ApiResponse(responseCode = "403", description = "El usuario no tiene el rol OWNER"),
             @ApiResponse(responseCode = "404", description = "No existe un perfil para el propietario autenticado"),
             @ApiResponse(responseCode = "502", description = "No fue posible subir el logotipo a Cloudinary")
     })
     public ResponseEntity<AccommodationProfileResponse> uploadLogo(
-            @Parameter(description = "Archivo del logotipo (entre 500 KB y 2 MB).", required = true)
+            @Parameter(description = "Archivo del logotipo (hasta 2 MB).", required = true)
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
 

@@ -21,10 +21,17 @@ export function BankDetailsCard({ savedBank, bankDetails, saveBankDetails }) {
 
       <form onSubmit={saveBankDetails} className="grid gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Titular de la cuenta" name="holder" defaultValue={bankDetails.holder} placeholder="Ej. Cabañas del Arroyo" />
-          <Field label="Alias" name="alias" defaultValue={bankDetails.alias} placeholder="Ej. cabañas.arroyo" />
+          <Field label="Titular de la cuenta" name="holder" defaultValue={bankDetails.holder} placeholder="Ej. Cabañas del Arroyo" required />
+          <Field label="Alias" name="alias" defaultValue={bankDetails.alias} placeholder="Ej. cabañas.arroyo" required />
         </div>
-        <Field label="CBU / CVU" name="cbu" defaultValue={bankDetails.cbu} placeholder="0000000000000000000000" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Banco o entidad" name="bank" defaultValue={bankDetails.bank} placeholder="Ej. Banco Nación" required />
+          <Field label="Tipo de cuenta" name="accountType" defaultValue={bankDetails.accountType} placeholder="Ej. Caja de ahorro" required />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Número de cuenta" name="accountNumber" defaultValue={bankDetails.accountNumber} placeholder="Número de cuenta" required />
+          <Field label="CBU / CVU" name="cbu" defaultValue={bankDetails.cbu} placeholder="0000000000000000000000" required />
+        </div>
         <Field
           as="textarea"
           label="Indicaciones para el huésped (opcional)"

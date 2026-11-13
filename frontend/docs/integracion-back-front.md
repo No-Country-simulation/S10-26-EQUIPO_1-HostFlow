@@ -70,8 +70,8 @@ pnpm dev                         # http://localhost:3000 (fijado en vite.config.
 
 ## 2. Contrato verificado contra el backend
 
-Fuente de verdad: `backend/src/main/java/com/hostflow/controller/`
-(`AuthController`, `OwnerController`) y `.../dto/`.
+Fuente de verdad: `backend/src/main/java/com/hostflow/controller/` y
+`backend/src/main/java/com/hostflow/dto/`.
 
 ### 2.1 Auth — `AuthController` ✅ coincide con `endpoints.js`
 
@@ -81,6 +81,8 @@ Fuente de verdad: `backend/src/main/java/com/hostflow/controller/`
 | `POST /auth/register` | `@PostMapping("/auth/register")` → `AuthResponse` | ✅ |
 | `POST /auth/forgot-password` | `@PostMapping("/auth/forgot-password")` | ✅ |
 | `POST /auth/reset-password` | `@PostMapping("/auth/reset-password")` | ✅ |
+| `GET /auth/verify-email?token=` | `@GetMapping("/verify-email")` | ✅ |
+| `POST /auth/resend-verification?email=` | `@PostMapping("/resend-verification")` | ✅ |
 
 - **`LoginRequest`**: `{ email, password }` → lo que envía `httpApi.js`. ✅
 - **`AuthResponse`**: `{ token, tokenType, userId, email, fullName, roles }` →
@@ -117,10 +119,34 @@ agregar ese origen en el backend: Vite en 5173 no pasa el preflight.
 **En producción** el dominio de Vercel también tiene que estar permitido en el
 backend, o publicar la API detrás del mismo origen mediante un rewrite/proxy.
 
-### 2.4 Módulos aún no implementados en el backend
+### 2.4 Alojamiento, reservas y demás módulos
 
-`/lodgings/**`, `/bookings/**`, `/onboarding/**`, `/admin/stats` están
-**declarados como contrato reservado** en `endpoints.js`. Comportamiento:
+Los siguientes módulos ya están conectados a sus controladores Spring Boot:
+
+- **Perfil y galería:** `/owners/accommodation/profile`, `/gallery`, `/gallery/upload`,
+  `/profile/logo`.
+- **Disponibilidad del alojamiento:** `/owners/accommodation/status`, `/history`,
+  `/disable`, `/enable` y `/availability`.
+- **Reservas:** `/owners/reservations`, detalle, creación, cancelación, pago recibido,
+  finalización, disponibilidad y reactivación del enlace.
+- **Onboarding público:** `/public/reservations/confirm?token=...`; el formulario
+  envía el DTO de huésped, alergias, servicios seleccionados y solicitud de traslado.
+- **Servicios adicionales e imágenes:** `/owners/accommodation/additional-services/**`.
+- **Pagos y monedas:** `/owners/accommodation/payment-methods/**` y
+  `/owners/accommodation/currencies`.
+- **Métricas:** `/owners/dashboard/metrics` y `/admin/dashboard/metrics`.
+- **Huéspedes y precios públicos:** `/public/guests/**` y
+  `/public/accommodations/{id}/base-price` o `/additional-services`.
+
+Hay acciones de la interfaz para las que el backend aún no define una ruta
+equivalente: modificar libremente una reserva, cambiar su estado manualmente a
+`CONFIRMED` o `PENDING`, volver un pago a pendiente, mantener varios rangos
+independientes de días bloqueados y enviar una cotización detallada de lancha.
+Esas acciones conservan su comportamiento local. El backend confirma una
+reserva al completarse el onboarding del huésped y registra pagos mediante
+`POST /owners/reservations/{id}/mark-paid`.
+
+Para endpoints ausentes, la fachada maneja el fallback así:
 
 1. El `op()` de `src/lib/api/index.js` detecta `404 / 405 / 501 / status 0`
    ("este endpoint todavía no existe") y resuelve la operación sobre el
@@ -134,8 +160,8 @@ El adaptador `httpApi.js` (y sus módulos en `http/`) solo ejecuta HTTP: no
 importa ni escribe el store. Esa frontera es la que permite cambiar el origen
 de datos sin tocar las pantallas.
 
-Esto permite usar reservas, calendario, servicios, pagos y admin con el
-backend parcialmente implementado, sin pantallas rotas.
+Los errores de validación y autorización (`400`, `401`, `403`, `409`, `500`…)
+se muestran y no se convierten en cambios locales.
 
 ---
 

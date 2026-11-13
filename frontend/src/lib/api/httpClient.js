@@ -8,7 +8,7 @@ export const AUTH_EXPIRED_EVENT = "hostflow:auth-expired"
 // Cliente fetch estándar.
 // Soporta JSON y FormData (para subida de archivos multipart como fotos o logos).
 // `auth: true` agrega `Authorization: Bearer <token>`.
-export async function request(endpoint, { name = "endpoint", body, auth = true } = {}) {
+export async function request(endpoint, { name = "endpoint", body, auth = true, query } = {}) {
   if (!API_URL || !endpoint?.path) throw new ApiNotConfiguredError(name)
 
   const headers = { Accept: "application/json" }
@@ -26,7 +26,11 @@ export async function request(endpoint, { name = "endpoint", body, auth = true }
 
   let response
   try {
-    response = await fetch(API_URL + endpoint.path, {
+    const url = new URL(API_URL + endpoint.path)
+    Object.entries(query || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value))
+    })
+    response = await fetch(url.toString(), {
       method: endpoint.method,
       headers,
       body: isFormData ? body : (body ? JSON.stringify(body) : undefined),

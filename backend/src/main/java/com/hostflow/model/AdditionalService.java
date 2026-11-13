@@ -98,7 +98,7 @@ public class AdditionalService {
      * <p><strong>Restricciones:</strong></p>
      * <ul>
      *   <li>Máximo 3 imágenes por servicio (validado en el servicio).</li>
-     *   <li>Tamaño: entre 500 KB y 2 MB por imagen.</li>
+     *   <li>Tamaño: máximo 2 MB por imagen; no se admite archivo vacío.</li>
      *   <li>Se eliminan en cascada si se elimina el servicio.</li>
      * </ul>
      *

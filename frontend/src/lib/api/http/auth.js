@@ -44,4 +44,10 @@ export const authApi = {
       body: { email, code, newPassword },
       auth: false,
     }),
+
+  verifyEmail: (token) =>
+    request(E.verifyEmail, { name: "verifyEmail", auth: false, query: { token } }),
+
+  resendVerification: (email) =>
+    request(E.resendVerification, { name: "resendVerification", auth: false, query: { email } }),
 }

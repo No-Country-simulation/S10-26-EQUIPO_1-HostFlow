@@ -15,15 +15,9 @@
 // La conversión al formato interno de la interfaz (`{ token, user }`) se hace
 // AQUÍ, nunca en las pantallas.
 //
-// ── Módulos todavía no implementados en el backend ─────────────────────────
-// Auth y Owners existen; el resto (alojamiento, disponibilidad, reservas,
-// servicios, pagos y estadísticas de administración) está RESERVADO en el
-// contrato. Quién detecta que el endpoint aún no responde (404 / 405 / 501, o
-// falta de conexión), cómo se cae al store local y cómo se proyecta cada
-// respuesta exitosa en el store vive en src/lib/api/index.js (la fachada, único
-// punto que resuelve el fallback) junto con src/lib/api/storeOps.js. De ese
-// modo NINGUNA pantalla se rompe y, cuando el backend publique los endpoints,
-// la app pasa a usarlos sin tocar las pantallas.
+// La mayoría de los módulos apunta a endpoints ya implementados. Las acciones
+// sin ruta de backend siguen usando el store local mediante la fachada
+// src/lib/api/index.js y sus proyecciones en src/lib/api/storeOps/.
 import { adminApi } from "./http/admin"
 import { availabilityApi } from "./http/availability"
 import { authApi } from "./http/auth"
@@ -32,6 +26,7 @@ import { lodgingApi } from "./http/lodging"
 import { onboardingApi } from "./http/onboarding"
 import { ownersApi } from "./http/owners"
 import { paymentsApi } from "./http/payments"
+import { publicApi } from "./http/public"
 import { servicesApi } from "./http/services"
 
 export const httpApi = {
@@ -44,4 +39,5 @@ export const httpApi = {
   ...servicesApi,
   ...paymentsApi,
   ...adminApi,
+  ...publicApi,
 }

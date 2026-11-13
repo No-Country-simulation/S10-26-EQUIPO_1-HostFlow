@@ -172,7 +172,7 @@ export default function AvailabilityPage() {
 
   const move = (delta) => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
 
-  const handleDayClick = (iso) => {
+  const handleDayClick = async (iso) => {
     if (iso < today) return;
     // Día ocupado por reserva → detalle completo de la reserva.
     if (bookedDaysMap.has(iso)) {
@@ -180,7 +180,12 @@ export default function AvailabilityPage() {
       return;
     }
     // Día libre o bloqueado a mano → alternar bloqueo.
-    actions.toggleBlockedDay(iso);
+    setSyncError("")
+    try {
+      await actions.toggleBlockedDay(iso)
+    } catch (error) {
+      setSyncError(error?.message || "No se pudo actualizar el bloqueo en el backend.")
+    }
   };
 
   // Detalle vivo: si la reserva cambia (estado, pago) el modal abierto la ve.
@@ -496,7 +501,7 @@ export default function AvailabilityPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => actions.toggleBlockedDay(date)}
+                      onClick={() => handleDayClick(date)}
                       title="Desbloquear fecha"
                       className="cursor-pointer rounded-lg p-1 text-muted transition hover:bg-danger-soft hover:text-danger"
                     >

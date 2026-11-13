@@ -35,3 +35,25 @@ export const toAdminLodging = (owner) => ({
   createdAt: owner.createdAt,
   roles: owner.roles || [],
 })
+
+// Convierte un dataUrl base64 o Blob/File a File real para subidas multipart a Spring Boot
+export function toFile(fileOrDataUrl, defaultFilename = "upload.jpg") {
+  if (!fileOrDataUrl) return null
+  if (typeof File !== "undefined" && fileOrDataUrl instanceof File) return fileOrDataUrl
+  if (typeof Blob !== "undefined" && fileOrDataUrl instanceof Blob) {
+    return new File([fileOrDataUrl], defaultFilename, { type: fileOrDataUrl.type || "image/jpeg" })
+  }
+  if (typeof fileOrDataUrl === "string" && fileOrDataUrl.startsWith("data:")) {
+    const parts = fileOrDataUrl.split(",")
+    const mimeMatch = parts[0].match(/:(.*?);/)
+    const mime = mimeMatch ? mimeMatch[1] : "image/jpeg"
+    const bstr = atob(parts[1])
+    let n = bstr.length
+    const u8arr = new Uint8Array(n)
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n)
+    }
+    return new File([u8arr], defaultFilename, { type: mime })
+  }
+  return null
+}
