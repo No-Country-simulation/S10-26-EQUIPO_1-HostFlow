@@ -123,12 +123,16 @@ export function BookingDetailModal({ booking, open, onClose }) {
           <div className="flex flex-wrap items-start justify-between gap-3 sm:flex-nowrap">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-ink">Estado del pago</p>
-              <p className="text-xs text-muted">Marcá la reserva como pagada cuando recibas la transferencia. El backend no permite revertir ese registro.</p>
+              <p className="text-xs text-muted">
+                {booking.status === "CONFIRMED"
+                  ? "Marcá la reserva como pagada cuando recibas la transferencia. El backend no permite revertir ese registro."
+                  : "El huésped debe completar su enlace de llegada antes de registrar el pago."}
+              </p>
             </div>
             <Switch
               checked={booking.paymentStatus === "PAID"}
               onChange={(next) => guardAction("setPaymentStatus", actions.setPaymentStatus(booking.id, next ? "PAID" : "PENDING"))}
-              disabled={!DEMO_MODE && booking.paymentStatus === "PAID"}
+              disabled={!DEMO_MODE && (booking.paymentStatus === "PAID" || booking.status !== "CONFIRMED")}
               label={booking.paymentStatus === "PAID" ? "Pagado" : "Pendiente"}
             />
           </div>

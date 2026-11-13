@@ -51,6 +51,9 @@ export const bookingsApi = {
   // el propietario recibió el pago. No existe una transición remota a PENDING.
   setPaymentStatus: (id, paymentStatus) => {
     if (paymentStatus !== "PAID") throw new ApiNotConfiguredError("setPaymentStatus")
+    if (!/^\d+$/.test(String(id))) {
+      throw new Error("Esta reserva no tiene un ID del backend. Recargá las reservas antes de registrar el pago.")
+    }
     return request(pathFor(E.markBookingPaid, { id }), { name: "markBookingPaid" })
   },
 
