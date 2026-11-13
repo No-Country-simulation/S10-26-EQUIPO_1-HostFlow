@@ -1,12 +1,5 @@
-node_modules/
-dist/
-build/
-.cache/
-.env*
-!.env.example
-.vite/
+# Las reglas generales (node_modules, dist, build, .cache, .vite, .env*, logs,
+# *.log, *.tsbuildinfo, Usuarios.lnk…) viven en el .gitignore de la RAÍZ del
+# repositorio y aplican también a esta carpeta: aquí solo se añade lo específico
+# de este paquete.
 vite.config.*.timestamp-*
-*.tsbuildinfo
-*-debug.log*
-logs/
-*.log

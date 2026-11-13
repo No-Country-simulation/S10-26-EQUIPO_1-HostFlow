@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   Building2,
   CalendarDays,
   CalendarX,
+  ConciergeBell,
   CreditCard,
   LayoutDashboard,
   LogOut,
@@ -13,7 +14,9 @@ import {
   X,
 } from "lucide-react";
 import { Avatar, Brand, ThemeToggle } from "@components/ui";
-import { useSession } from "@features/auth/context/SessionContext";
+import { useSession } from "@features/auth";
+import { useLodging } from "@lib/api/hooks";
+import { LodgingTheme } from "@lib/theme/LodgingTheme";
 import { cn } from "@utils/format";
 
 const hostNav = [
@@ -22,6 +25,7 @@ const hostNav = [
   { to: "/panel/alojamiento", label: "Alojamiento", icon: Building2 },
   { to: "/panel/disponibilidad", label: "Disponibilidad", icon: CalendarX },
   { to: "/panel/pagos", label: "Pagos", icon: CreditCard },
+  { to: "/panel/servicios", label: "Servicios", icon: ConciergeBell },
   { to: "/panel/perfil", label: "Perfil", icon: UserRound },
 ];
 
@@ -77,9 +81,26 @@ function UserCard({ user, isAdmin, onLogout }) {
 
 export default function AuthenticatedAppLayout() {
   const { user, logout, isAdmin } = useSession();
+  const lodging = useLodging();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Drawer móvil: al abrir bloquea el scroll del fondo (el panel tiene el suyo)
+  // y Escape lo cierra (consistente con el patrón del Modal).
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
 
   const nav = isAdmin ? adminNav : hostNav;
 
@@ -89,7 +110,8 @@ export default function AuthenticatedAppLayout() {
   };
 
   return (
-    <div className="min-h-dvh bg-cloud text-ink">
+    <LodgingTheme brand={isAdmin ? null : lodging?.brand} className="min-h-dvh text-ink">
+      <div className="hf-surface min-h-dvh">
       {/* Sidebar escritorio */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] flex-col gap-6 border-r border-line bg-paper p-5 lg:flex">
         <Brand />
@@ -123,7 +145,7 @@ export default function AuthenticatedAppLayout() {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade" onClick={() => setMobileOpen(false)} />
-          <div className="absolute inset-y-0 left-0 flex w-[280px] flex-col gap-6 bg-paper p-5 animate-rise">
+          <div className="absolute inset-y-0 left-0 flex w-[280px] max-w-[85vw] flex-col gap-6 overflow-y-auto overscroll-contain bg-paper p-5 animate-rise">
             <div className="flex items-center justify-between">
               <Brand />
               <button
@@ -140,11 +162,12 @@ export default function AuthenticatedAppLayout() {
         </div>
       )}
 
-      <main className="px-4 py-6 pb-16 sm:px-6 lg:pl-[288px] lg:pr-8 lg:py-8">
+      <main className="min-w-0 px-4 py-6 pb-16 sm:px-6 lg:pl-[288px] lg:pr-8 lg:py-8">
         <div className="mx-auto max-w-6xl animate-rise" key={location.pathname}>
           <Outlet />
         </div>
       </main>
-    </div>
+      </div>
+    </LodgingTheme>
   );
 }

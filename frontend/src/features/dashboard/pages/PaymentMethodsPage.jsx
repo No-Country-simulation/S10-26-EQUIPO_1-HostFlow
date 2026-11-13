@@ -1,183 +1,253 @@
-import { useState } from "react";
-import { Coins, CreditCard, Plus, Wallet } from "lucide-react";
-import { Alert, Badge, Button, Card, Switch } from "@components/ui";
-import { useStore } from "@lib/state/useStore";
-import { useSession } from "@features/auth/context/SessionContext";
-import { CURRENCIES, WALLETS, cn, formatMoney } from "@utils/format";
+import { useEffect, useState } from "react";
+import { Alert, Badge } from "@components/ui";
+import { PaymentMethodsCard } from "../components/PaymentMethodsCard";
+import { PrimaryCurrencyCard } from "../components/PrimaryCurrencyCard";
+import { SecondaryCurrenciesCard } from "../components/SecondaryCurrenciesCard";
+import { BankDetailsCard } from "../components/BankDetailsCard";
+import { PaymentMethodModal } from "../components/PaymentMethodModal";
+import { useLodging, usePayments } from "@lib/api/hooks";
+import { useSession } from "@features/auth";
+import { MAX_PAYMENT_METHODS } from "@lib/domain/payments";
+import { DEMO_MODE } from "@lib/config/env";
+import { copyText } from "@utils/format";
 
 export default function PaymentMethodsPage() {
   const { actions } = useSession();
-  const payments = useStore((s) => s.payments);
-  const lodging = useStore((s) => s.lodging);
-  const [newWallet, setNewWallet] = useState("");
+  const payments = usePayments();
+  const lodging = useLodging();
+  const bankDetails = payments.bankDetails || {};
+  const methods = Array.isArray(payments.methods) ? payments.methods : [];
+
   const [saved, setSaved] = useState(false);
+  const [savedBank, setSavedBank] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
+  const [editingMethod, setEditingMethod] = useState(null);
+  const [isNewMethod, setIsNewMethod] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+  const [modalError, setModalError] = useState("");
+  const [actionError, setActionError] = useState("");
+
+  // Sincroniza los métodos de pago con el backend al abrir la pantalla. En
+  // modo demo el store local ya es la fuente de verdad.
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let alive = true;
+    Promise.resolve()
+      .then(() => actions.getPayments?.())
+      .catch((err) => {
+        if (alive) setActionError(err?.message || "No se pudieron cargar los métodos de pago desde el backend.");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [actions]);
+
+  // Ejecuta una acción de pago y, si el backend responde un error real, lo
+  // muestra en pantalla en lugar de dejar una promesa sin manejar.
+  // Devuelve true si la operación terminó bien.
+  const runAction = async (action) => {
+    setActionError("");
+    try {
+      await action();
+      flashSaved();
+      return true;
+    } catch (err) {
+      setActionError(err?.message || "No se pudo guardar la configuración de pagos.");
+      return false;
+    }
+  };
 
   const flashSaved = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2200);
   };
 
-  const setPrimary = (code) => {
-    actions.setPrimaryCurrency(code);
-    flashSaved();
-  };
+  const setPrimary = (code) => runAction(() => actions.setPrimaryCurrency(code));
 
-  const toggleWallet = (code) => {
-    actions.toggleWallet(code);
-    flashSaved();
-  };
+  const toggleWallet = (code) => runAction(() => actions.toggleWallet(code));
 
-  const addWallet = (event) => {
+  const toggleMethod = (id) => runAction(() => actions.togglePaymentMethod(id));
+
+  const saveBankDetails = async (event) => {
     event.preventDefault();
-    const label = newWallet.trim();
-    if (!label) return;
-    actions.addPaymentMethod(label, "WALLET");
-    setNewWallet("");
+    const form = new FormData(event.currentTarget);
+    const ok = await runAction(() =>
+      actions.updateBankDetails({
+        holder: String(form.get("holder") || "").trim(),
+        alias: String(form.get("alias") || "").trim(),
+        cbu: String(form.get("cbu") || "").trim(),
+        notes: String(form.get("notes") || "").trim(),
+      }),
+    );
+    // Solo se confirma si la operación terminó bien.
+    if (!ok) return;
+    setSavedBank(true);
+    setTimeout(() => setSavedBank(false), 2200);
+  };
+
+  const copyCredentials = async (method) => {
+    const keys = method.keys || {};
+    const lines = [`Método: ${method.label}`];
+    if (keys.holder) lines.push(`Titular: ${keys.holder}`);
+    if (keys.alias) lines.push(`Alias: ${keys.alias}`);
+    if (keys.cbu) lines.push(`CBU: ${keys.cbu}`);
+    if (keys.cvu) lines.push(`CVU: ${keys.cvu}`);
+    if (keys.bank) lines.push(`Banco: ${keys.bank}`);
+    if (keys.email) lines.push(`Correo: ${keys.email}`);
+    if (keys.paypalMe) lines.push(`PayPal.Me: ${keys.paypalMe}`);
+    if (keys.publicKey) lines.push(`Llave pública / Client ID: ${keys.publicKey}`);
+    if (method.notes) lines.push(`Indicaciones: ${method.notes}`);
+
+    // Si el navegador bloquea el portapapeles no se marca como copiado.
+    if (!(await copyText(lines.join("\n")))) return;
+    setCopiedId(method.id);
+    setTimeout(() => setCopiedId(null), 2500);
+  };
+
+  const openAddModal = (preset = null) => {
+    if (methods.length >= MAX_PAYMENT_METHODS) return;
+    setIsNewMethod(true);
+    setShowSecret(false);
+    setModalError("");
+    if (preset) {
+      setEditingMethod({
+        id: "",
+        label: preset.label,
+        type: preset.type,
+        enabled: true,
+        keys: { ...preset.defaultKeys },
+        notes: preset.notes,
+      });
+    } else {
+      setEditingMethod({
+        id: "",
+        label: "Nuevo método de pago",
+        type: "WALLET",
+        enabled: true,
+        keys: { alias: "", cvu: "", publicKey: "", accessToken: "" },
+        notes: "",
+      });
+    }
+  };
+
+  const openEditModal = (method) => {
+    setIsNewMethod(false);
+    setShowSecret(false);
+    setModalError("");
+    setEditingMethod({
+      ...method,
+      keys: { ...(method.keys || {}) },
+      notes: method.notes || "",
+    });
+  };
+
+  const saveMethodModal = async (event) => {
+    event.preventDefault();
+    if (!editingMethod) return;
+
+    const form = new FormData(event.currentTarget);
+    const label = String(form.get("label") || "").trim() || editingMethod.label;
+    const type = String(form.get("type") || editingMethod.type);
+    const notes = String(form.get("notes") || "").trim();
+
+    const keys = {
+      holder: String(form.get("holder") || "").trim(),
+      alias: String(form.get("alias") || "").trim(),
+      cbu: String(form.get("cbu") || "").trim(),
+      cvu: String(form.get("cvu") || "").trim(),
+      bank: String(form.get("bank") || "").trim(),
+      email: String(form.get("email") || "").trim(),
+      paypalMe: String(form.get("paypalMe") || "").trim(),
+      publicKey: String(form.get("publicKey") || "").trim(),
+      accessToken: String(form.get("accessToken") || "").trim(),
+    };
+
+    // Quitar claves vacías
+    Object.keys(keys).forEach((k) => {
+      if (!keys[k]) delete keys[k];
+    });
+
+    // Límite estricto: se vuelve a chequear acá porque el modal pudo quedar
+    // abierto mientras otro usuario agregaba un método.
+    if (isNewMethod && methods.length >= MAX_PAYMENT_METHODS) {
+      setModalError(`Ya tenés los ${MAX_PAYMENT_METHODS} métodos permitidos. Eliminá uno para agregar otro.`);
+      return;
+    }
+
+    try {
+      if (isNewMethod) {
+        await actions.addPaymentMethod({ label, type, keys, notes });
+      } else {
+        await actions.updatePaymentMethod(editingMethod.id, { label, type, keys, notes });
+      }
+    } catch (err) {
+      setModalError(err?.message || "No se pudo guardar el método de pago. Intentá nuevamente.");
+      return;
+    }
+
+    setModalError("");
+    setEditingMethod(null);
     flashSaved();
   };
+
+  const removeMethod = (id) => runAction(() => actions.removePaymentMethod(id));
+
+  const canAdd = methods.length < MAX_PAYMENT_METHODS;
 
   return (
     <div className="grid gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[clamp(24px,4vw,32px)] font-extrabold">Métodos de pago</h1>
-          <p className="mt-1 text-sm text-muted">Definí la moneda principal y las billeteras digitales que aceptás.</p>
+          <p className="mt-1 text-sm text-muted">
+            Configurá hasta {MAX_PAYMENT_METHODS} métodos con sus llaves y credenciales para cobrar a tus huéspedes.
+          </p>
         </div>
-        {saved && <Alert tone="success">Configuración guardada.</Alert>}
+        <div className="flex items-center gap-2">
+          {saved && <Alert tone="success">Configuración guardada.</Alert>}
+          <Badge tone={canAdd ? "lime" : "neutral"}>
+            {methods.length} / {MAX_PAYMENT_METHODS} métodos configurados
+          </Badge>
+        </div>
       </header>
 
+      {actionError && <Alert tone="danger">{actionError}</Alert>}
+
+      {/* Listado de Métodos de Pago y Configuración de Llaves */}
+      <PaymentMethodsCard
+        methods={methods}
+        canAdd={canAdd}
+        openAddModal={openAddModal}
+        copiedId={copiedId}
+        toggleMethod={toggleMethod}
+        openEditModal={openEditModal}
+        copyCredentials={copyCredentials}
+        removeMethod={removeMethod}
+      />
+
+      {/* Moneda principal y secundarias */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Moneda principal */}
-        <Card className="p-6">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="grid size-10 place-items-center rounded-xl bg-lime-soft text-lime-ink">
-              <Coins size={20} />
-            </span>
-            <div>
-              <h2 className="font-bold text-ink">Moneda principal</h2>
-              <p className="text-xs text-muted">Es la que usan tus huéspedes por defecto.</p>
-            </div>
-          </div>
-
-          <div className="grid gap-2">
-            {Object.values(CURRENCIES).map((currency) => {
-              const active = payments.primary === currency.code;
-              return (
-                <button
-                  key={currency.code}
-                  type="button"
-                  onClick={() => setPrimary(currency.code)}
-                  className={cn(
-                    "flex items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-all",
-                    active
-                      ? "border-lime bg-lime-soft"
-                      : "border-line bg-paper hover:border-line-strong",
-                  )}
-                >
-                  <span className="flex items-center gap-3">
-                    <span className={cn("grid size-9 place-items-center rounded-lg text-sm font-extrabold", active ? "bg-lime text-lime-ink" : "bg-cloud text-muted")}>
-                      {currency.symbol}
-                    </span>
-                    <span>
-                      <span className="block text-sm font-bold text-ink">{currency.label}</span>
-                      <span className="block text-xs text-muted">{currency.code}</span>
-                    </span>
-                  </span>
-                  <span className={cn("grid size-5 place-items-center rounded-full border-2", active ? "border-lime-ink bg-lime-ink text-lime" : "border-line-strong text-transparent")}>
-                    ✓
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <p className="mt-4 text-xs text-muted">
-            Precio actual: <span className="font-bold text-ink">{formatMoney(lodging.pricePerNight, payments.primary)}</span> por noche.
-          </p>
-        </Card>
+        <PrimaryCurrencyCard payments={payments} setPrimary={setPrimary} lodging={lodging} />
 
         {/* Monedas secundarias */}
-        <Card className="p-6">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="grid size-10 place-items-center rounded-xl bg-teal-soft text-teal-strong">
-              <Wallet size={20} />
-            </span>
-            <div>
-              <h2 className="font-bold text-ink">Monedas secundarias</h2>
-              <p className="text-xs text-muted">Ofrecé alternativas a tus huéspedes.</p>
-            </div>
-          </div>
-
-          <div className="grid gap-3">
-            {["USD", "EUR"].map((code) => {
-              const currency = CURRENCIES[code];
-              const active = payments.wallets.includes(code);
-              return (
-                <div key={code} className="flex items-center justify-between rounded-xl border border-line px-4 py-3.5">
-                  <span className="flex items-center gap-3">
-                    <span className="grid size-9 place-items-center rounded-lg bg-cloud text-sm font-extrabold text-muted">{currency.symbol}</span>
-                    <span>
-                      <span className="block text-sm font-bold text-ink">{currency.label}</span>
-                      <span className="block text-xs text-muted">{currency.code}</span>
-                    </span>
-                  </span>
-                  <Switch checked={active} onChange={() => toggleWallet(code)} label={active ? "Activa" : "Inactiva"} />
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+        <SecondaryCurrenciesCard payments={payments} toggleWallet={toggleWallet} />
       </div>
 
-      {/* Billeteras digitales */}
-      <Card className="p-6">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="grid size-10 place-items-center rounded-xl bg-pink-soft text-pink-strong">
-              <CreditCard size={20} />
-            </span>
-            <div>
-              <h2 className="font-bold text-ink">Billeteras digitales</h2>
-              <p className="text-xs text-muted">Habilitá las plataformas que aceptás para cobrar.</p>
-            </div>
-          </div>
-          <Badge tone="teal">{payments.methods.filter((m) => m.enabled).length} habilitadas</Badge>
-        </div>
+      {/* Datos para transferencia estándar */}
+      <BankDetailsCard savedBank={savedBank} bankDetails={bankDetails} saveBankDetails={saveBankDetails} />
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {payments.methods.map((method) => (
-            <div
-              key={method.id}
-              className={cn(
-                "flex items-center justify-between rounded-xl border px-4 py-3.5 transition-all",
-                method.enabled ? "border-lime/70 bg-lime-soft/40" : "border-line bg-paper",
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <span className={cn("grid size-9 place-items-center rounded-lg", method.enabled ? "bg-lime text-lime-ink" : "bg-cloud text-muted")}>
-                  <CreditCard size={17} />
-                </span>
-                <span className="text-sm font-bold text-ink">{method.label}</span>
-              </div>
-              <Switch checked={method.enabled} onChange={() => { actions.togglePaymentMethod(method.id); flashSaved(); }} label={method.enabled ? "On" : "Off"} />
-            </div>
-          ))}
-        </div>
-
-        <form onSubmit={addWallet} className="mt-5 flex flex-col gap-2 sm:flex-row">
-          <input
-            value={newWallet}
-            onChange={(e) => setNewWallet(e.target.value)}
-            placeholder="Agregar otra billetera (ej. Binance Pay)"
-            className="min-h-[46px] flex-1 appearance-none rounded-xl border border-line-strong bg-paper px-4 text-sm font-medium text-ink outline-none transition placeholder:text-muted focus:border-teal focus:shadow-[0_0_0_4px_var(--color-teal-soft)]"
-          />
-          <Button type="submit" variant="secondary" icon={Plus} className="shrink-0">
-            Agregar
-          </Button>
-        </form>
-
-        <p className="mt-4 text-xs text-muted">Sugeridas: {WALLETS.join(" · ")}</p>
-      </Card>
+      {/* Modal de Configuración de Llaves y Credenciales */}
+      {editingMethod && (
+        <PaymentMethodModal
+          editingMethod={editingMethod}
+          isNewMethod={isNewMethod}
+          showSecret={showSecret}
+          setShowSecret={setShowSecret}
+          saveMethodModal={saveMethodModal}
+          setEditingMethod={setEditingMethod}
+          modalError={modalError}
+        />
+      )}
     </div>
   );
 }
