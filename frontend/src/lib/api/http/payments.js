@@ -14,7 +14,7 @@ export const paymentsApi = {
   getPayments: async () => {
     const [methodsResult, currenciesResult] = await Promise.all([
       request(E.getPayments, { name: "getPaymentMethods" }),
-      request(E.getCurrencies, { name: "getCurrencies" }),
+      request(E.getCurrencies, { name: "getCurrencies" }).catch(() => []),
     ])
 
     const currencies = Array.isArray(currenciesResult) ? currenciesResult : []

@@ -30,7 +30,7 @@ export function mergeLodging(dto) {
       ...(dto.primaryColor ? { primary: dto.primaryColor } : {}),
       ...(dto.accentColor ? { accent: dto.accentColor } : {}),
       ...(dto.tertiaryColor ? { tertiary: dto.tertiaryColor } : {}),
-      ...(dto.backgroundPattern ? { radius: dto.backgroundPattern } : {}),
+      ...(dto.backgroundPattern ? { pattern: dto.backgroundPattern } : {}),
       ...(dto.brand || {}),
     },
     brandPalette: Array.isArray(dto.brandPalette) ? dto.brandPalette : current.brandPalette,

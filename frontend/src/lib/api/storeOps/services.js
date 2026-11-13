@@ -23,7 +23,11 @@ export const servicesOps = {
       }
       return store.get().services
     },
-    local: () => store.get().services || [],
+    // Un 404 en modo real no debe llenar el panel con servicios de demostración.
+    local: () => {
+      actions.setServices([])
+      return []
+    },
   },
 
   addService: {

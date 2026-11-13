@@ -37,7 +37,12 @@ export const paymentsOps = {
       }
       return store.get().payments
     },
-    local: () => store.get().payments || {},
+    // Si el endpoint no está desplegado, no mostrar IDs de demo (pm_1, etc.)
+    // que luego se enviarían al backend como si fueran métodos persistidos.
+    local: () => {
+      actions.setPayments({ methods: [], wallets: [] })
+      return store.get().payments || {}
+    },
   },
 
   setPrimaryCurrency: {
