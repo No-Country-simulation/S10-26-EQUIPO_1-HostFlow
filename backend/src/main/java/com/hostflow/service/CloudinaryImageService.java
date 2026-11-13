@@ -24,7 +24,7 @@ import java.util.Map;
  *
  * <p><strong>Características principales:</strong></p>
  * <ul>
- *   <li>Validación estricta de archivos (tamaño entre 500 KB y 2 MB, tipo MIME de imagen).</li>
+ *   <li>Validación estricta de archivos (no vacíos, hasta 2 MB, tipo MIME de imagen).</li>
  *   <li>Soporte para subida a carpetas predeterminadas o personalizadas.</li>
  *   <li>Eliminación segura de recursos con manejo idempotente de errores.</li>
  *   <li>Manejo robusto de excepciones específicas de Cloudinary.</li>
@@ -51,9 +51,6 @@ public class CloudinaryImageService {
      */
     private final String defaultFolder;
 
-    /** Tamaño mínimo permitido (bytes). Config: app.images.min-size-bytes */
-    private final long minImageSizeBytes;
-
     /** Tamaño máximo permitido (bytes). Config: app.images.max-size-bytes */
     private final long maxImageSizeBytes;
 
@@ -66,18 +63,15 @@ public class CloudinaryImageService {
     public CloudinaryImageService(
             Cloudinary cloudinary,
             CloudinaryProperties properties,
-            @Value("${app.images.min-size-bytes:512000}") long minImageSizeBytes,
             @Value("${app.images.max-size-bytes:2097152}") long maxImageSizeBytes) {
         this.cloudinary = cloudinary;
         this.defaultFolder = properties.getFolder();
-        this.minImageSizeBytes = minImageSizeBytes;
         this.maxImageSizeBytes = maxImageSizeBytes;
-        if (minImageSizeBytes <= 0 || maxImageSizeBytes <= minImageSizeBytes) {
-            throw new IllegalStateException(
-                    "Config inválida: app.images.min-size-bytes debe ser > 0 y max-size-bytes > min-size-bytes");
+        if (maxImageSizeBytes <= 0) {
+            throw new IllegalStateException("Config inválida: app.images.max-size-bytes debe ser > 0");
         }
-        log.info("✅ CloudinaryImageService inicializado. Carpeta: {}, límites: {} – {}",
-                defaultFolder, formatSize(minImageSizeBytes), formatSize(maxImageSizeBytes));
+        log.info("✅ CloudinaryImageService inicializado. Carpeta: {}, tamaño máximo: {}",
+                defaultFolder, formatSize(maxImageSizeBytes));
     }
 
     /**
@@ -259,7 +253,7 @@ public class CloudinaryImageService {
      * <p>Validaciones realizadas:</p>
      * <ol>
      *   <li>El archivo no debe ser nulo ni estar vacío.</li>
-     *   <li>El tamaño debe estar entre 500 KB y 2 MB.</li>
+     *   <li>El archivo no debe superar 2 MB.</li>
      *   <li>El tipo MIME debe comenzar con "image/" (ej: image/jpeg, image/png).</li>
      * </ol>
      *
@@ -275,18 +269,7 @@ public class CloudinaryImageService {
             );
         }
 
-        // 2. Validar tamaño mínimo
-        if (file.getSize() < minImageSizeBytes) {
-            log.warn("⚠️ Imagen demasiado pequeña: {} bytes (mínimo: {} bytes)",
-                    file.getSize(), minImageSizeBytes);
-            throw new InvalidImageException(
-                    String.format(
-                            "La imagen es demasiado pequeña (%s). El tamaño mínimo permitido es %s.",
-                            formatSize(file.getSize()), formatSize(minImageSizeBytes))
-            );
-        }
-
-        // 3. Validar tamaño máximo
+        // 2. Validar tamaño máximo
         if (file.getSize() > maxImageSizeBytes) {
             log.warn("⚠️ Imagen demasiado grande: {} bytes (máximo: {} bytes)",
                     file.getSize(), maxImageSizeBytes);
@@ -297,7 +280,7 @@ public class CloudinaryImageService {
             );
         }
 
-        // 4. Validar tipo de contenido (MIME type)
+        // 3. Validar tipo de contenido (MIME type)
         String contentType = file.getContentType();
         if (contentType == null || !contentType.toLowerCase().startsWith("image/")) {
             log.warn("⚠️ Tipo de archivo inválido: {}", contentType);

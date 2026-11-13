@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
  * <p><strong>Restricciones de negocio:</strong></p>
  * <ul>
  *   <li>Máximo 3 imágenes por servicio (validado en el servicio).</li>
- *   <li>Tamaño mínimo: 500 KB (evita imágenes de baja calidad).</li>
+ *   <li>Tamaño máximo: 2 MB; no se aceptan archivos vacíos.</li>
  *   <li>Tamaño máximo: 2 MB (optimiza tiempos de carga).</li>
  *   <li>Solo se aceptan archivos de tipo imagen (image/*).</li>
  * </ul>
@@ -92,7 +92,7 @@ public class AdditionalServiceImage {
      * Tamaño del archivo en bytes.
      *
      * <p>Se utiliza para validar las restricciones de tamaño
-     * (500 KB ≤ size ≤ 2 MB) antes de subir a Cloudinary.</p>
+     * (0 &lt; size ≤ 2 MB) antes de subir a Cloudinary.</p>
      */
     @Column(name = "file_size_bytes", nullable = false)
     private Long fileSizeBytes;

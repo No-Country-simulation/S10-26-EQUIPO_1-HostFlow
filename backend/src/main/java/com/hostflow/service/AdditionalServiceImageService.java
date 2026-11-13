@@ -38,8 +38,8 @@ import java.util.List;
  *
  * <p><strong>Restricciones de imágenes:</strong></p>
  * <ul>
- *   <li>Tamaño mínimo/máximo: configurables en app.images.min-size-bytes / max-size-bytes.</li>
- *   <li>Por defecto: 500 KB – 2 MB.</li>
+ *   <li>Tamaño máximo configurable en app.images.max-size-bytes (2 MB por defecto).</li>
+ *   <li>Se rechazan archivos vacíos.</li>
  *   <li>Tipo: solo archivos de imagen (image/*).</li>
  *   <li>Cantidad máxima: 3 imágenes por servicio.</li>
  * </ul>

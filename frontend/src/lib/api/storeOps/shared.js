@@ -21,7 +21,7 @@ export function mergeLodging(dto) {
     pricePerNight: Number(dto.basePrice ?? dto.pricePerNight ?? current.pricePerNight),
     currency: dto.currency || current.currency,
     images: Array.isArray(dto.images)
-      ? dto.images.map((img) => (typeof img === "string" ? img : img.imageUrl)).slice(0, MAX_IMAGES)
+      ? dto.images.map((img) => (typeof img === "string" ? img : img.url ?? img.imageUrl)).slice(0, MAX_IMAGES)
       : current.images,
     galleryImages: Array.isArray(dto.images) && typeof dto.images[0] === "object" ? dto.images : current.galleryImages || [],
     logo: dto.logoUrl ?? dto.logo ?? current.logo,

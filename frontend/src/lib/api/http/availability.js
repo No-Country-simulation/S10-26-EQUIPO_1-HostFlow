@@ -32,6 +32,10 @@ export const availabilityApi = {
   // Alterna un día suelto.
   toggleBlockedDay: async (date, blocked) => {
     if (blocked) {
+      const activeDays = await readBlockedDays()
+      if (activeDays.length > 0) {
+        throw new Error("El backend solo permite un período de bloqueo activo. Reactivá el período actual antes de bloquear otra fecha.")
+      }
       await request(E.disableAccommodation, {
         name: "disableAccommodation",
         body: {

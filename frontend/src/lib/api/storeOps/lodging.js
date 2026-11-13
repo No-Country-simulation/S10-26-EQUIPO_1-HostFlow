@@ -11,7 +11,7 @@ export const lodgingOps = {
       const images = Array.isArray(gallery) ? gallery.slice(0, MAX_IMAGES) : []
       actions.updateLodging({
         galleryImages: images,
-        images: images.map((image) => image.imageUrl || image),
+        images: images.map((image) => image.url ?? image.imageUrl ?? image),
       })
       return images
     },
@@ -84,9 +84,10 @@ export const lodgingOps = {
   addImage: {
     // Fotos del alojamiento: máximo MAX_IMAGES; la primera es la portada.
     project: (res, dataUrl) => {
-      const url = res?.imageUrl || (typeof res === "string" ? res : dataUrl)
+      const imageUrl = res?.url ?? res?.imageUrl
+      const url = imageUrl || (typeof res === "string" ? res : dataUrl)
       const current = store.get().lodging
-      const galleryImages = [...(current.galleryImages || []), ...(res?.imageUrl ? [res] : [])].slice(0, MAX_IMAGES)
+      const galleryImages = [...(current.galleryImages || []), ...(imageUrl ? [res] : [])].slice(0, MAX_IMAGES)
       actions.updateLodging({
         images: [...(current.images || []), url].filter(Boolean).slice(0, MAX_IMAGES),
         galleryImages,
