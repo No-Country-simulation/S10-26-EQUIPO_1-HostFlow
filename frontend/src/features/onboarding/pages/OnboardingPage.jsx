@@ -284,7 +284,7 @@ export default function OnboardingPage() {
 
   // Confirmación final: genera la solicitud de lancha (si la hubo) y guarda el
   // onboarding. Protegido contra dobles envíos (submitting / done).
-  const confirm = () => {
+  const confirm = async () => {
     if (submitting || completed) return;
 
     // Última barrera: si el huésped volvió atrás y dejó algo mal, no se envía.
