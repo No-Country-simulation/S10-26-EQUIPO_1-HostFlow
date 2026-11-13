@@ -2,6 +2,10 @@
 import { actions, store } from "../../state/store"
 import { toBooking } from "./shared"
 
+const backendUnavailable = (operation) => {
+  throw new Error(`No se pudo ${operation} en el backend. La interfaz no guardó una reserva local de demostración.`)
+}
+
 export const bookingsOps = {
   getBookingById: {
     project: (response) => {
@@ -12,7 +16,7 @@ export const bookingsOps = {
         : [...store.get().bookings, booking])
       return booking
     },
-    local: (id) => store.get().bookings.find((item) => String(item.id) === String(id)) || null,
+    local: () => backendUnavailable("consultar la reserva"),
   },
 
   getBookings: {
@@ -20,7 +24,10 @@ export const bookingsOps = {
       if (Array.isArray(response)) actions.setBookings(response.map(toBooking))
       return store.get().bookings
     },
-    local: () => store.get().bookings || [],
+    local: () => {
+      actions.setBookings([])
+      return backendUnavailable("consultar las reservas")
+    },
   },
 
   createBooking: {
@@ -29,7 +36,7 @@ export const bookingsOps = {
       actions.setBookings([...store.get().bookings, booking])
       return booking
     },
-    local: (data) => actions.createBooking(data),
+    local: () => backendUnavailable("crear la reserva"),
   },
 
   updateBooking: {
@@ -37,10 +44,7 @@ export const bookingsOps = {
       actions.updateBooking(id, updated || patch)
       return store.get().bookings.find((b) => String(b.id) === String(id))
     },
-    local: (id, patch) => {
-      actions.updateBooking(id, patch)
-      return store.get().bookings.find((b) => String(b.id) === String(id))
-    },
+    local: () => backendUnavailable("actualizar la reserva"),
   },
 
   setBookingStatus: {
@@ -48,10 +52,7 @@ export const bookingsOps = {
       actions.setBookingStatus(id, status)
       return status
     },
-    local: (id, status) => {
-      actions.setBookingStatus(id, status)
-      return status
-    },
+    local: () => backendUnavailable("actualizar el estado de la reserva"),
   },
 
   setPaymentStatus: {
@@ -59,10 +60,7 @@ export const bookingsOps = {
       actions.setPaymentStatus(id, paymentStatus)
       return paymentStatus
     },
-    local: (id, paymentStatus) => {
-      actions.setPaymentStatus(id, paymentStatus)
-      return paymentStatus
-    },
+    local: () => backendUnavailable("registrar el pago de la reserva"),
   },
 
   regenerateOnboardingLink: {
@@ -72,6 +70,6 @@ export const bookingsOps = {
       actions.updateBooking(id, { onboardingLinkIssuedAt: issuedAt, confirmationLink: link })
       return link || issuedAt
     },
-    local: (id) => actions.regenerateOnboardingLink(id),
+    local: () => backendUnavailable("renovar el enlace de llegada"),
   },
 }
