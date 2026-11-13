@@ -2,134 +2,58 @@ package com.hostflow.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
-import java.time.LocalDateTime;
-import java.util.List; // 🆕 Import necesario para la lista de alergias
+import java.time.LocalDate;
 
 /**
  * DTO para solicitar la creación de una nueva reserva.
  *
- * <p>Contiene todos los datos necesarios para generar una reserva
- * y el enlace de confirmación que se enviará al huésped.</p>
- *
- * <p><strong>Validaciones:</strong></p>
- * <ul>
- *   <li>Nombre y apellido del huésped son obligatorios.</li>
- *   <li>Correo electrónico debe ser válido.</li>
- *   <li>Fechas de check-in y check-out deben ser futuras.</li>
- *   <li>Check-out debe ser posterior a check-in.</li>
- *   <li>Preferencias y alergias son opcionales, pero cruciales para la experiencia del huésped.</li>
- * </ul>
+ * <p>El propietario envía los datos preliminares de contacto y las fechas de estadía.
+ * Alergias, preferencias y servicios adicionales se capturan en el onboarding del huésped,
+ * no en este request. La vigencia del enlace de onboarding es fija: 24 horas.</p>
  *
  * @author HostFlow Team
- * @version 1.1.0 (Agregado soporte para preferencias y alergias del huésped)
+ * @version 2.0.0 (Contrato alineado al flujo de onboarding; sin alergias/preferencias ni expiración configurable)
  */
-@Schema(description = "Datos necesarios para crear una nueva reserva")
+@Schema(description = "Datos preliminares para que el propietario cree una reserva y genere el enlace de onboarding")
 public record CreateReservationRequest(
 
-        /**
-         * Nombre del huésped.
-         */
         @NotBlank(message = "El nombre del huésped es obligatorio")
         @Size(min = 2, max = 100, message = "El nombre debe tener entre 2 y 100 caracteres")
         @Schema(description = "Nombre del huésped", example = "Juan Carlos")
         String guestFirstName,
 
-        /**
-         * Apellido del huésped.
-         */
         @NotBlank(message = "El apellido del huésped es obligatorio")
         @Size(min = 2, max = 100, message = "El apellido debe tener entre 2 y 100 caracteres")
         @Schema(description = "Apellido del huésped", example = "Pérez")
         String guestLastName,
 
-        /**
-         * Correo electrónico del huésped.
-         * Debe ser válido y único en el sistema.
-         */
         @NotBlank(message = "El correo electrónico es obligatorio")
         @Email(message = "El formato del correo electrónico no es válido")
         @Schema(description = "Correo electrónico del huésped", example = "juan.perez@email.com")
         String guestEmail,
 
-        /**
-         * Teléfono del huésped (opcional).
-         */
         @Size(max = 40, message = "El teléfono no puede superar los 40 caracteres")
         @Schema(description = "Teléfono de contacto del huésped", example = "+54 11 5555 5555")
         String guestPhone,
 
-        /**
-         * Fecha y hora de check-in.
-         * Debe ser una fecha futura.
-         */
         @NotNull(message = "La fecha de check-in es obligatoria")
-        @Future(message = "La fecha de check-in debe ser futura")
-        @Schema(description = "Fecha y hora de ingreso al alojamiento", example = "2026-12-15T14:00:00")
-        LocalDateTime checkIn,
+        @Schema(description = "Fecha de ingreso al alojamiento (YYYY-MM-DD). Se permite el día actual.", example = "2026-12-15")
+        LocalDate checkIn,
 
-        /**
-         * Fecha y hora de check-out.
-         * Debe ser posterior al check-in.
-         */
         @NotNull(message = "La fecha de check-out es obligatoria")
-        @Future(message = "La fecha de check-out debe ser futura")
-        @Schema(description = "Fecha y hora de salida del alojamiento", example = "2026-12-18T11:00:00")
-        LocalDateTime checkOut,
+        @Schema(description = "Fecha de salida del alojamiento (YYYY-MM-DD). Debe ser posterior al check-in.", example = "2026-12-18")
+        LocalDate checkOut,
 
-        /**
-         * Número de huéspedes que se hospedarán.
-         */
         @Min(value = 1, message = "Debe haber al menos 1 huésped")
         @Max(value = 50, message = "No se permiten más de 50 huéspedes")
         @Schema(description = "Número de huéspedes", example = "2")
         Integer guestCount,
 
-        /**
-         * Comentarios o solicitudes especiales (opcional).
-         */
         @Size(max = 1000, message = "Los comentarios no pueden superar los 1000 caracteres")
-        @Schema(description = "Solicitudes especiales o comentarios", example = "Necesito cuna para bebé")
-        String specialRequests,
-
-        /**
-         * Horas de validez del enlace de confirmación.
-         * Por defecto: 24 horas.
-         */
-        @Min(value = 1, message = "La validez mínima es de 1 hora")
-        @Max(value = 168, message = "La validez máxima es de 168 horas (7 días)")
-        @Schema(description = "Horas de validez del enlace de confirmación (default: 24)",
-                example = "24")
-        Integer linkExpirationHours,
-
-        // =========================================================================
-        // 🆕 CAMPOS AGREGADOS: PREFERENCIAS Y ALERGIAS
-        // =========================================================================
-
-        /**
-         * Preferencias o solicitudes especiales del huésped (texto libre).
-         * Se utiliza para mostrar información relevante al propietario y personalizar la estadía.
-         */
-        @Size(max = 1000, message = "Las preferencias no pueden superar los 1000 caracteres")
-        @Schema(description = "Preferencias del huésped",
-                example = "Prefiere habitación en piso bajo, lejos del elevador")
-        String guestPreferences,
-
-        /**
-         * Lista de alergias o restricciones alimentarias del huésped.
-         * Se envía como un array de strings desde el frontend (ej: ["Gluten", "Mariscos"]).
-         */
-        @Schema(description = "Lista de alergias o restricciones alimentarias",
-                example = "[\"Gluten\", \"Mariscos\", \"Látex\"]")
-        List<String> guestAllergies
+        @Schema(description = "Solicitudes especiales o comentarios del propietario", example = "Necesito cuna para bebé")
+        String specialRequests
 
 ) {
-    /**
-     * Obtiene las horas de validez del enlace, con valor por defecto de 24.
-     */
-    public int getLinkExpirationHoursOrDefault() {
-        return linkExpirationHours != null ? linkExpirationHours : 24;
-    }
-
     /**
      * Obtiene el número de huéspedes, con valor por defecto de 1.
      */

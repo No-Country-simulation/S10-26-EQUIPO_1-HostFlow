@@ -3,9 +3,33 @@
 // contra un servidor, no envía nada a la red y no emite tokens reales.
 // Las operaciones mutan el store reactivo de src/lib/state/store.js.
 import { actions, store } from "../state/store"
+import { buildAdminStats } from "./adminStats"
 
 export const demoApi = {
   ...actions,
+  // Lecturas (getters) en memoria para el modo demostración
+  getLodging: async () => store.get().lodging,
+  updateLodging: async (patch) => {
+    actions.updateLodging(patch)
+    return store.get().lodging
+  },
+  getBlockedDays: async () => store.get().blockedDays || [],
+  getBookings: async () => store.get().bookings || [],
+  getPayments: async () => store.get().payments || {},
+  getServices: async () => store.get().services || [],
+  getAdminLodgings: async () => store.get().admin?.lodgings || [],
+  // En demo todo ya vive en el store del navegador: no hay nada que traer.
+  getOnboarding: async () => null,
+  // Métricas agregadas del panel de administración.
+  getAdminStats: async () =>
+    buildAdminStats({
+      lodgings: store.get().admin?.lodgings || [],
+      bookings: store.get().bookings,
+    }),
+  setAdminLodgingStatus: async (id, status) => {
+    actions.setAdminLodgingStatus(id, status)
+    return { id, status }
+  },
   logout: actions.logout,
   isAuthenticated: () => Boolean(store.get().user),
 }

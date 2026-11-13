@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Reserva cancelada - HostFlow</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f3f5f7;font-family:Arial,Helvetica,sans-serif;color:#263238;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f5f7;padding:32px 12px;">
+    <tr><td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #e6ebef;border-radius:12px;">
+            <tr><td style="padding:28px 32px;background:#263b53;border-radius:12px 12px 0 0;">
+                <p style="margin:0;color:#d5dee8;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;">Notificación de reserva</p>
+                <h1 style="margin:10px 0 0;color:#ffffff;font-size:26px;line-height:1.3;">Tu reserva fue cancelada</h1>
+            </td></tr>
+            <tr><td style="padding:30px 32px 18px;">
+                <p style="margin:0 0 12px;color:#263238;font-size:16px;line-height:1.6;">Hola <strong th:text="${guestName}">Huésped</strong>,</p>
+                <p style="margin:0;color:#52616b;font-size:15px;line-height:1.7;">Te confirmamos que la reserva realizada en <strong th:text="${accommodationName}">el alojamiento</strong> ha sido cancelada.</p>
+            </td></tr>
+            <tr><td style="padding:8px 32px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f7f9fb;border:1px solid #e5eaf0;border-radius:9px;">
+                    <tr><td style="padding:20px;">
+                        <p style="margin:0 0 14px;color:#718096;font-size:11px;letter-spacing:1px;text-transform:uppercase;">Resumen de cancelación</p>
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr><td style="padding:7px 0;color:#718096;font-size:14px;">Alojamiento</td><td th:text="${accommodationName}" style="padding:7px 0;text-align:right;color:#263238;font-size:14px;font-weight:bold;">Casa</td></tr>
+                            <tr><td style="padding:7px 0;color:#718096;font-size:14px;">Código de reserva</td><td th:text="${confirmationCode}" style="padding:7px 0;text-align:right;color:#263238;font-size:14px;font-weight:bold;">HF-0000</td></tr>
+                        </table>
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;border-top:1px solid #e5eaf0;">
+                            <tr><td style="padding:14px 0 0;color:#718096;font-size:13px;">Motivo indicado</td></tr>
+                            <tr><td th:text="${reason}" style="padding:5px 0 0;color:#263238;font-size:14px;line-height:1.6;">No especificado</td></tr>
+                        </table>
+                    </td></tr>
+                </table>
+            </td></tr>
+            <tr><td style="padding:0 32px 28px;">
+                <p style="margin:0;color:#52616b;font-size:14px;line-height:1.7;">Si tienes preguntas sobre esta cancelación o necesitas más información, comunícate directamente con el alojamiento.</p>
+                <p style="margin:16px 0 0;color:#718096;font-size:12px;line-height:1.6;">Este mensaje es una notificación automática de <strong th:text="${appName}">HostFlow</strong>. No es necesario responder a este correo.</p>
+            </td></tr>
+            <tr><td style="padding:18px 32px;background:#f7f9fb;border-radius:0 0 12px 12px;text-align:center;">
+                <p style="margin:0;color:#718096;font-size:12px;">© <span th:text="${appName}">HostFlow</span> · Gestión de reservas</p>
+            </td></tr>
+        </table>
+    </td></tr>
+</table>
+</body>
+</html>

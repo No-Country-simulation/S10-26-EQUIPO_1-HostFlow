@@ -30,7 +30,7 @@ import java.util.List;
  *
  * <p>Responsabilidades:</p>
  * <ul>
- *   <li>Subir imágenes a Cloudinary con validación de tamaño (500 KB - 2 MB).</li>
+ *   <li>Subir imágenes a Cloudinary (límites de tamaño en app.images.* vía CloudinaryImageService).</li>
  *   <li>Limitar a máximo 3 imágenes por servicio.</li>
  *   <li>Eliminar imágenes de Cloudinary y de la base de datos.</li>
  *   <li>Reemplazar imágenes existentes.</li>
@@ -38,8 +38,8 @@ import java.util.List;
  *
  * <p><strong>Restricciones de imágenes:</strong></p>
  * <ul>
- *   <li>Tamaño mínimo: 500 KB (evita imágenes de baja calidad).</li>
- *   <li>Tamaño máximo: 2 MB (optimiza tiempos de carga).</li>
+ *   <li>Tamaño mínimo/máximo: configurables en app.images.min-size-bytes / max-size-bytes.</li>
+ *   <li>Por defecto: 500 KB – 2 MB.</li>
  *   <li>Tipo: solo archivos de imagen (image/*).</li>
  *   <li>Cantidad máxima: 3 imágenes por servicio.</li>
  * </ul>
@@ -52,11 +52,7 @@ import java.util.List;
 @Slf4j
 public class AdditionalServiceImageService {
 
-    /** Tamaño mínimo permitido: 500 KB en bytes. */
-    private static final long MIN_IMAGE_SIZE_BYTES = 500L * 1024;
 
-    /** Tamaño máximo permitido: 2 MB en bytes. */
-    private static final long MAX_IMAGE_SIZE_BYTES = 2L * 1024 * 1024;
 
     /** Cantidad máxima de imágenes por servicio. */
     private static final int MAX_IMAGES_PER_SERVICE = 3;
@@ -314,18 +310,6 @@ public class AdditionalServiceImageService {
             throw new BusinessException("El archivo debe ser una imagen (JPEG, PNG, WEBP, etc.).");
         }
 
-        // Validar tamaño mínimo (500 KB)
-        if (file.getSize() < MIN_IMAGE_SIZE_BYTES) {
-            throw new BusinessException(
-                    String.format("La imagen es demasiado pequeña (%.1f KB). El tamaño mínimo es 500 KB.",
-                            file.getSize() / 1024.0));
-        }
-
-        // Validar tamaño máximo (2 MB)
-        if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
-            throw new BusinessException(
-                    String.format("La imagen supera el tamaño máximo permitido (%.1f MB). El tamaño máximo es 2 MB.",
-                            file.getSize() / (1024.0 * 1024.0)));
-        }
+        // El tamaño (min/max) lo valida CloudinaryImageService con app.images.*-size-bytes
     }
 }

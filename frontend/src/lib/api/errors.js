@@ -18,6 +18,14 @@ export class ApiError extends Error {
   }
 }
 
+// Un 404 / 405 / 501 (o sin conexión) significa "este endpoint todavía no
+// existe en el backend": se cae al store local. El resto de los errores (400,
+// 403, 409, 500…) son reales y se propagan a la pantalla.
+export const isEndpointUnavailable = (error) => {
+  const status = error?.status
+  return status === 0 || status === 404 || status === 405 || status === 501
+}
+
 // Texto amigable para mostrar al usuario a partir de cualquier error de servicio.
 export function describeError(error, fallback = "No pudimos completar la operación. Intentá nuevamente.") {
   if (error instanceof ApiNotConfiguredError)

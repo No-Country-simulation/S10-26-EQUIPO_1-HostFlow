@@ -1,0 +1,22 @@
+# Dependencias y artefactos de build
+node_modules/
+dist/
+build/
+.cache/
+.vite/
+target/
+*.tsbuildinfo
+
+# Entornos (nunca subir secretos)
+.env*
+!.env.example
+
+# Logs
+logs/
+*.log
+*-debug.log*
+
+# Sistema
+Usuarios.lnk
+Thumbs.db
+.DS_Store

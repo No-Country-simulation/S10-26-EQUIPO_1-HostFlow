@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Completa tu reserva - HostFlow</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f3f5f7;font-family:Arial,Helvetica,sans-serif;color:#263238;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f5f7;padding:28px 12px;">
+    <tr>
+        <td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"
+                   style="width:100%;max-width:600px;background:#ffffff;border-radius:14px;overflow:hidden;">
+                <tr>
+                    <td align="center"
+                        th:style="'background-color:' + (${accommodation.primaryColor} ?: '#1E293B') + ';padding:34px 24px 30px;'">
+                        <img th:if="${accommodation.logoUrl != null and !#strings.isEmpty(accommodation.logoUrl)}"
+                             th:src="${accommodation.logoUrl}" th:alt="${accommodationName}"
+                             style="display:block;max-width:150px;max-height:90px;width:auto;height:auto;object-fit:contain;background:#ffffff;border-radius:9px;padding:9px;margin:0 auto 18px;">
+                        <p style="margin:0 0 8px;color:#ffffff;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;">Tu próxima estadía</p>
+                        <h1 th:text="${accommodationName}" style="margin:0;color:#ffffff;font-size:27px;line-height:1.25;">Nombre del alojamiento</h1>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:34px 32px 12px;">
+                        <h2 th:style="'margin:0 0 12px;color:' + (${accommodation.primaryColor} ?: '#1E293B') + ';font-size:23px;line-height:1.3;'">
+                            ¡Hola <span th:text="${guestName} ?: 'Huésped'">Huésped</span>!
+                        </h2>
+                        <p style="margin:0;color:#52616b;font-size:15px;line-height:1.7;">
+                            <strong th:text="${accommodationName}">El alojamiento</strong> ha registrado una reserva a tu nombre.
+                            Para completar tus datos y revisar los detalles de tu estadía, continúa desde el siguiente enlace.
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:18px 32px 8px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                               style="background:#f7f9fb;border:1px solid #e8edf1;border-radius:10px;">
+                            <tr>
+                                <td style="padding:20px 22px;">
+                                    <p style="margin:0 0 14px;color:#52616b;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Resumen de tu reserva</p>
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td style="padding:6px 0;color:#687780;font-size:14px;">Código</td>
+                                            <td th:text="${confirmationCode}" style="padding:6px 0;text-align:right;color:#263238;font-size:14px;font-weight:bold;">HF-0000</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:6px 0;color:#687780;font-size:14px;">Check-in</td>
+                                            <td th:text="${#temporals.format(checkIn, 'dd/MM/yyyy')}" style="padding:6px 0;text-align:right;color:#263238;font-size:14px;font-weight:bold;">01/01/2026</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:6px 0;color:#687780;font-size:14px;">Check-out</td>
+                                            <td th:text="${#temporals.format(checkOut, 'dd/MM/yyyy')}" style="padding:6px 0;text-align:right;color:#263238;font-size:14px;font-weight:bold;">05/01/2026</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:12px 0 4px;border-top:1px solid #e1e7eb;color:#263238;font-size:14px;font-weight:bold;">Importe inicial</td>
+                                            <td style="padding:12px 0 4px;border-top:1px solid #e1e7eb;text-align:right;color:#263238;font-size:17px;font-weight:bold;">
+                                                <span th:text="${#numbers.formatDecimal(originalTotal, 1, 2)}">0.00</span>
+                                                <span th:text="${originalCurrency}">ARS</span>
+                                            </td>
+                                        </tr>
+                                        <tr th:if="${showCurrencyEquivalents and totalUsd != null}">
+                                            <td style="padding:5px 0;color:#687780;font-size:13px;">Equivalente en USD</td>
+                                            <td style="padding:5px 0;text-align:right;color:#263238;font-size:13px;font-weight:bold;">$<span th:text="${#numbers.formatDecimal(totalUsd, 1, 2)}">0.00</span> USD</td>
+                                        </tr>
+                                        <tr th:if="${showCurrencyEquivalents and totalEur != null}">
+                                            <td style="padding:5px 0;color:#687780;font-size:13px;">Equivalente en EUR</td>
+                                            <td style="padding:5px 0;text-align:right;color:#263238;font-size:13px;font-weight:bold;">€<span th:text="${#numbers.formatDecimal(totalEur, 1, 2)}">0.00</span> EUR</td>
+                                        </tr>
+                                    </table>
+                                    <p th:if="${showCurrencyEquivalents}" style="margin:12px 0 0;color:#7b8790;font-size:11px;line-height:1.5;">
+                                        Las equivalencias en USD/EUR son orientativas. El pago se coordina directamente con el alojamiento.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="center" style="padding:26px 32px 12px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td align="center" th:style="'background-color:' + (${accommodation.primaryColor} ?: '#1E293B') + ';border-radius:8px;'">
+                                    <a th:href="${confirmationUrl}" href="#"
+                                       style="display:inline-block;padding:15px 30px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;">
+                                        Completar mi reserva
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                        <p style="margin:16px 0 0;color:#b45309;font-size:13px;font-weight:bold;">
+                            Este enlace vence en <span th:text="${expirationHours}">24</span> horas.
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:16px 32px 30px;">
+                        <p style="margin:0;color:#7b8790;font-size:12px;line-height:1.6;text-align:center;">
+                            Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
+                            <a th:href="${confirmationUrl}" th:text="${confirmationUrl}"
+                               style="color:#477b91;word-break:break-all;">Enlace de reserva</a>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="center" style="padding:17px 20px;background:#f7f9fb;border-top:1px solid #edf0f2;">
+                        <p style="margin:0;color:#7b8790;font-size:11px;line-height:1.5;">
+                            Este correo fue enviado para que puedas completar tu reserva.<br>
+                            <span th:text="${watermark}">Powered by HostFlow</span>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

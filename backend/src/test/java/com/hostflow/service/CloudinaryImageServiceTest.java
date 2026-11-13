@@ -15,6 +15,11 @@ import static org.mockito.Mockito.verify;
 
 class CloudinaryImageServiceTest {
 
+    /** 500 KB exactos (500 * 1024). */
+    private static final long MIN_BYTES = 512_000L;
+    /** 2 MB exactos (2 * 1024 * 1024). */
+    private static final long MAX_BYTES = 2_097_152L;
+
     private Cloudinary cloudinary;
     private CloudinaryImageService service;
 
@@ -23,40 +28,40 @@ class CloudinaryImageServiceTest {
         cloudinary = mock(Cloudinary.class);
         CloudinaryProperties properties = mock(CloudinaryProperties.class);
         org.mockito.Mockito.when(properties.getFolder()).thenReturn("hostflow");
-        service = new CloudinaryImageService(cloudinary, properties);
+        service = new CloudinaryImageService(cloudinary, properties, MIN_BYTES, MAX_BYTES);
     }
 
     @Test
-    void rechazaImagenInferiorA500KB() {
+    void rechazaImagenInferiorAlMinimo() {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "pequena.jpg", "image/jpeg", new byte[499_999]);
+                "file", "pequena.jpg", "image/jpeg", new byte[(int) MIN_BYTES - 1]);
 
         assertThrows(InvalidImageException.class, () -> service.uploadImage(file));
         verify(cloudinary, never()).uploader();
     }
 
     @Test
-    void rechazaImagenSuperiorA2MB() {
+    void rechazaImagenSuperiorAlMaximo() {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "grande.jpg", "image/jpeg", new byte[2_000_001]);
+                "file", "grande.jpg", "image/jpeg", new byte[(int) MAX_BYTES + 1]);
 
         assertThrows(InvalidImageException.class, () -> service.uploadImage(file));
         verify(cloudinary, never()).uploader();
     }
 
     @Test
-    void aceptaElLimiteMinimoDe500KBParaLaValidacionDeTamano() {
+    void aceptaElLimiteMinimoParaLaValidacionDeTamano() {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "minima.jpg", "image/jpeg", new byte[500_000]);
+                "file", "minima.jpg", "image/jpeg", new byte[(int) MIN_BYTES]);
 
         // El mock no realiza una carga real: el error esperado ocurre después de validar el tamaño.
         assertThrows(CloudinaryUploadException.class, () -> service.uploadImage(file));
     }
 
     @Test
-    void aceptaElLimiteMaximoDe2MBParaLaValidacionDeTamano() {
+    void aceptaElLimiteMaximoParaLaValidacionDeTamano() {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "maxima.jpg", "image/jpeg", new byte[2_000_000]);
+                "file", "maxima.jpg", "image/jpeg", new byte[(int) MAX_BYTES]);
 
         // El mock no realiza una carga real: el error esperado ocurre después de validar el tamaño.
         assertThrows(CloudinaryUploadException.class, () -> service.uploadImage(file));
