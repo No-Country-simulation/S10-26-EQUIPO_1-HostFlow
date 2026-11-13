@@ -310,6 +310,6 @@ public class AdditionalServiceImageService {
             throw new BusinessException("El archivo debe ser una imagen (JPEG, PNG, WEBP, etc.).");
         }
 
-        // El tamaño (min/max) lo valida CloudinaryImageService con app.images.*-size-bytes
+        // El tamaño máximo lo valida CloudinaryImageService con app.images.max-size-bytes.
     }
 }
