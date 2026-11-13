@@ -1,9 +1,15 @@
-import { useMemo, useState } from "react";
-import { CalendarDays, Search } from "lucide-react";
-import { Badge, EmptyState } from "@components/ui";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, Plus, Search } from "lucide-react";
+import { Alert, Badge, Button, EmptyState } from "@components/ui";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
-import { useStore } from "@lib/state/useStore";
-import { useSession } from "@features/auth/context/SessionContext";
+import { BookingDetailModal } from "../components/BookingDetailModal";
+import { BookingFormModal } from "../components/BookingFormModal";
+import { BookingRequirementsAlert } from "../components/BookingRequirementsAlert";
+import { getBookingRequirements } from "../lib/bookingRequirements";
+import { guardAction } from "../lib/guardAction";
+import { useBookings, useLodging, usePayments } from "@lib/api/hooks";
+import { useSession } from "@features/auth";
+import { DEMO_MODE } from "@lib/config/env";
 import { cn, toISODate } from "@utils/format";
 
 const FILTERS = [
@@ -15,11 +21,39 @@ const FILTERS = [
 
 export default function BookingsPage() {
   const { actions } = useSession();
-  const bookings = useStore((s) => s.bookings);
+  const bookings = useBookings();
+  const lodging = useLodging();
+  const payments = usePayments();
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [detailId, setDetailId] = useState(null);
+  const [syncError, setSyncError] = useState("");
 
   const today = toISODate();
+
+  // Sincroniza el listado con el backend. En modo demo el store local ya es la
+  // fuente de verdad, así que no hace falta pedir nada.
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let alive = true;
+    Promise.resolve()
+      .then(() => actions.getBookings?.())
+      .catch((err) => {
+        if (alive) setSyncError(err?.message || "No se pudieron cargar las reservas desde el backend.");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [actions]);
+
+  // Aviso previo: si al alojamiento le falta configuración, no se puede crear
+  // una reserva. La alerta lleva a cada pantalla para completarla.
+  const requirements = useMemo(() => getBookingRequirements(lodging, payments), [lodging, payments]);
+
+  // El detalle vive en un estado derivado: si la reserva cambia (estado, pago,
+  // onboarding), el modal abierto refleja el nuevo valor sin recargar.
+  const detail = useMemo(() => bookings.find((b) => b.id === detailId) || null, [bookings, detailId]);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -41,8 +75,20 @@ export default function BookingsPage() {
           <h1 className="text-[clamp(24px,4vw,32px)] font-extrabold">Reservas</h1>
           <p className="mt-1 text-sm text-muted">Gestioná las llegadas y el estado de cada reserva.</p>
         </div>
-        <Badge tone="teal">{list.length} resultado{list.length === 1 ? "" : "s"}</Badge>
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge tone="teal">{list.length} resultado{list.length === 1 ? "" : "s"}</Badge>
+          <Button type="button" icon={Plus} onClick={() => setCreating(true)}>
+            Nueva reserva
+          </Button>
+        </div>
       </header>
+
+      {syncError && <Alert tone="danger">{syncError}</Alert>}
+
+      <BookingRequirementsAlert
+        requirements={requirements}
+        intro="Sin estos datos no se pueden crear reservas: el huésped los ve en su enlace de llegada y los necesita para pagar. Entrá a cada pantalla y completalos."
+      />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
@@ -84,12 +130,16 @@ export default function BookingsPage() {
             <BookingSummaryCard
               key={booking.id}
               booking={booking}
-              onConfirm={(id) => actions.setBookingStatus(id, "CONFIRMED")}
-              onCancel={(id) => actions.setBookingStatus(id, "CANCELLED")}
+              onConfirm={(id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CONFIRMED"))}
+              onCancel={(id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CANCELLED"))}
+              onView={(id) => setDetailId(id)}
             />
           ))}
         </div>
       )}
+
+      <BookingDetailModal booking={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />
+      <BookingFormModal open={creating} onClose={() => setCreating(false)} />
     </div>
   );
 }

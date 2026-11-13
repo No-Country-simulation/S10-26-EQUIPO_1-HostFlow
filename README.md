@@ -48,6 +48,43 @@ La validación de la aplicación contempla pruebas de los servicios del backend 
 * **Swagger UI:** Consulta y exploración de la documentación de la API.
 * **Cypress:** Automatización de pruebas end-to-end para verificar los flujos principales de la aplicación.
 
+## Cómo correr el stack completo (back + front)
+
+### 1. Backend (Spring Boot + PostgreSQL)
+
+```powershell
+createdb hostflow_dev                 # base de datos (una sola vez)
+cd backend
+copy .env.example .env                # completar DB_PASSWORD, JWT_SECRET, ADMIN_PASSWORD
+.\mvnw.cmd spring-boot:run            # requiere JDK 17
+```
+
+- API: <http://localhost:8080/api/v1>
+- Swagger UI: <http://localhost:8080/api/v1/swagger-ui.html>
+
+### 2. Frontend (React + Vite)
+
+```powershell
+cd frontend
+pnpm install
+copy .env.example .env                # VITE_API_URL=http://localhost:8080/api/v1
+pnpm dev                              # <http://localhost:5173>
+```
+
+### Modos de uso
+
+| | **Modo demo** (sin `.env` o `VITE_API_URL` vacía) | **Modo real** (`VITE_API_URL=http://localhost:8080/api/v1`) |
+|---|---|---|
+| Datos | En memoria, sin red | Llamadas HTTP al backend |
+| Login | `anfitrion@hostflow.app` / `demo1234` · `admin@hostflow.app` / `admin1234` | Usuarios creados por registro |
+
+Si `VITE_API_URL` apunta al backend pero este no está levantado, el **login
+falla a propósito** (no hay fallback); el resto de las pantallas siguen
+operando con el store local cuando un endpoint aún no existe en el backend.
+
+> Detalle completo de la integración, contrato verificado y checklist de
+> pruebas: [`frontend/docs/integracion-back-front.md`](frontend/docs/integracion-back-front.md).
+
 ## Alcance del MVP
 
 El producto contempla las siguientes consideraciones:
@@ -63,7 +100,6 @@ El producto contempla las siguientes consideraciones:
 Este proyecto se ha llevado a cabo mediante trabajo colaborativo implementando la metodología ágil Scrum en el entorno de No Country (S10-26-Equipo-1). Los integrantes son:
 * Mary Sofía Pérez Gómez, QA Engineer & Project Manager
 * Pedro L. Acosta Pérez, QA Tester
-* Daniel Mosquera, QA Tester
 * Carlos Fernando Palacios Gracia, Backend Developer
 * Ana Roxana Marca Guzman, Backend Developer
 * Diego Armando Maza Churio, Frontend Developer

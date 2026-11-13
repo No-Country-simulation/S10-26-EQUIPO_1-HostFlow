@@ -8,7 +8,8 @@ archivos, imports y nombres internos; no incluye rediseño de interfaces ni camb
 negocio.
 
 Cada fase debe compilar y ser revisable de forma independiente. Deben conservarse el modo
-demo, el uso de `sessionStorage`, el manejo del token, los adaptadores HTTP/demo, los
+demo, el uso de `localStorage` (estado de la demo), el manejo del token, los adaptadores
+HTTP/demo, los
 contratos de `SessionContext` y las URLs públicas existentes.
 
 ## Estado actual observado

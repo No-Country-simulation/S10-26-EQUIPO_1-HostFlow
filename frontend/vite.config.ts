@@ -9,6 +9,17 @@ const srcPath = path.resolve(fileURLToPath(new URL('.', import.meta.url)), 'src'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // El backend solo permite CORS desde http://localhost:3000 (además de 4200 y
+  // 8080). Fijamos el puerto para que el navegador no bloquee las llamadas al
+  // backend cuando Vite elegiría 5173 por defecto.
+  server: {
+    port: 3000,
+    strictPort: true,
+  },
+  preview: {
+    port: 3000,
+    strictPort: true,
+  },
   resolve: {
     alias: {
       '@': srcPath,

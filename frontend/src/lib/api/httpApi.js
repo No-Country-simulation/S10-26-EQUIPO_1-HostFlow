@@ -1,7 +1,11 @@
 // Adaptador REAL hacia el backend Java Spring Boot (se usa cuando VITE_API_URL está definida).
 //
-// Cada función corresponde a una entrada de endpoints.js. Los cuerpos y las
-// respuestas están alineados con los DTOs del backend:
+// ── Capa PURA de HTTP ──────────────────────────────────────────────────────
+// Cada función corresponde a una entrada de endpoints.js y vive en su módulo
+// de dominio (http/auth.js, http/lodging.js, http/bookings.js, …). Solo
+// ejecuta el request y devuelve la respuesta ya traducida al formato interno
+// de la interfaz: ESTE ARCHIVO NO IMPORTA NI ESCRIBE EL STORE.
+//
 //   · LoginRequest          { email, password }
 //   · OwnerRegisterRequest  { fullName, accommodationName, email, password, termsAccepted }
 //   · ForgotPasswordRequest { email }
@@ -10,77 +14,34 @@
 //
 // La conversión al formato interno de la interfaz (`{ token, user }`) se hace
 // AQUÍ, nunca en las pantallas.
-import { ENDPOINTS as E } from "./endpoints"
-import { request } from "./httpClient"
-
-const withId = (endpoint, id) => ({
-  ...endpoint,
-  path: endpoint.path.replace("{id}", encodeURIComponent(id)),
-})
-
-// AuthResponse → usuario interno de la app.
-const toUser = (response) => {
-  const roles = response?.roles || []
-  return {
-    id: response?.userId ?? null,
-    name: response?.fullName ?? "",
-    email: response?.email ?? "",
-    roles,
-    role: roles.some((role) => /ADMIN/i.test(role)) ? "ADMIN" : "HOST",
-  }
-}
-
-const toAuth = (response) => ({
-  token: response?.token ?? null,
-  tokenType: response?.tokenType ?? "Bearer",
-  user: toUser(response),
-})
+//
+// ── Módulos todavía no implementados en el backend ─────────────────────────
+// Auth y Owners existen; el resto (alojamiento, disponibilidad, reservas,
+// servicios, pagos y estadísticas de administración) está RESERVADO en el
+// contrato. Quién detecta que el endpoint aún no responde (404 / 405 / 501, o
+// falta de conexión), cómo se cae al store local y cómo se proyecta cada
+// respuesta exitosa en el store vive en src/lib/api/index.js (la fachada, único
+// punto que resuelve el fallback) junto con src/lib/api/storeOps.js. De ese
+// modo NINGUNA pantalla se rompe y, cuando el backend publique los endpoints,
+// la app pasa a usarlos sin tocar las pantallas.
+import { adminApi } from "./http/admin"
+import { availabilityApi } from "./http/availability"
+import { authApi } from "./http/auth"
+import { bookingsApi } from "./http/bookings"
+import { lodgingApi } from "./http/lodging"
+import { onboardingApi } from "./http/onboarding"
+import { ownersApi } from "./http/owners"
+import { paymentsApi } from "./http/payments"
+import { servicesApi } from "./http/services"
 
 export const httpApi = {
-  // ── Auth ────────────────────────────────────────────────────────────────
-  login: async (credentials) =>
-    toAuth(await request(E.login, { name: "login", body: credentials, auth: false })),
-
-  register: async (data) =>
-    toAuth(
-      await request(E.register, {
-        name: "register",
-        body: {
-          fullName: data.fullName,
-          accommodationName: data.accommodationName ?? data.lodgingName,
-          email: data.email,
-          password: data.password,
-          termsAccepted: data.termsAccepted ?? true,
-        },
-        auth: false,
-      }),
-    ),
-
-  // Devuelve { message, email, expirationMinutes }.
-  forgotPassword: (email) =>
-    request(E.forgotPassword, { name: "forgotPassword", body: { email }, auth: false }),
-
-  // El backend espera `code` (6 dígitos) y `newPassword`.
-  resetPassword: ({ email, code, newPassword }) =>
-    request(E.resetPassword, {
-      name: "resetPassword",
-      body: { email, code, newPassword },
-      auth: false,
-    }),
-
-  // ── Dueños de alojamiento (JWT) ─────────────────────────────────────────
-  getOwnerByEmail: (email) =>
-    request({ ...E.getOwnerByEmail, path: E.getOwnerByEmail.path.replace("{email}", encodeURIComponent(email)) }, {
-      name: "getOwnerByEmail",
-    }),
-
-  getOwnerById: (id) => request(withId(E.getOwnerById, id), { name: "getOwnerById" }),
-
-  getAllOwners: () => request(E.getAllOwners, { name: "getAllOwners" }),
-
-  toggleOwnerStatus: (id, enabled) =>
-    request(
-      { ...withId(E.toggleOwnerStatus, id), path: `${withId(E.toggleOwnerStatus, id).path}?enabled=${enabled}` },
-      { name: "toggleOwnerStatus" },
-    ),
+  ...authApi,
+  ...ownersApi,
+  ...lodgingApi,
+  ...availabilityApi,
+  ...bookingsApi,
+  ...onboardingApi,
+  ...servicesApi,
+  ...paymentsApi,
+  ...adminApi,
 }

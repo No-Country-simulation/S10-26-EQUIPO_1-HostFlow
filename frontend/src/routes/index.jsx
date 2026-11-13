@@ -1,19 +1,21 @@
 import { Navigate } from "react-router"
 import ProtectedRoute from "./guards/ProtectedRoute"
 import AuthenticatedAppLayout from "@components/layout/AuthenticatedAppLayout"
-import AuthLayout from "@/components/layout/AuthLayout"
-import { useSession } from "@features/auth/context/SessionContext"
-import LoginPage from "@features/auth/pages/LoginPage"
-import CreateAccountPage from "@features/auth/pages/CreateAccountPage"
-import PasswordRecoveryPage from "@features/auth/pages/PasswordRecoveryPage"
-import HomePage from "@features/home/pages/HomePage"
-import OwnerDashboardPage from "@features/dashboard/pages/OwnerDashboardPage"
-import BookingsPage from "@features/dashboard/pages/BookingsPage"
-import LodgingPage from "@features/dashboard/pages/LodgingPage"
-import AvailabilityPage from "@features/dashboard/pages/AvailabilityPage"
-import PaymentMethodsPage from "@features/dashboard/pages/PaymentMethodsPage"
-import LodgingProfilePage from "@features/dashboard/pages/LodgingProfilePage"
-import AdminOverviewPage from "@features/admin/pages/AdminOverviewPage"
+import AuthLayout from "@components/layout/AuthLayout"
+// Cada feature se consume por su barrel: una única puerta de entrada por feature.
+import { useSession, LoginPage, CreateAccountPage, PasswordRecoveryPage } from "@features/auth"
+import { HomePage } from "@features/home"
+import {
+  OwnerDashboardPage,
+  BookingsPage,
+  LodgingPage,
+  AvailabilityPage,
+  PaymentMethodsPage,
+  LodgingProfilePage,
+  ServicesPage,
+} from "@features/dashboard"
+import { AdminOverviewPage } from "@features/admin"
+import { OnboardingPage } from "@features/onboarding"
 
 // El panel de anfitrión no aplica a un administrador: se lo manda a su dashboard.
 function PanelIndex() {
@@ -32,6 +34,9 @@ export const routes = [
       { path: "recuperar", Component: PasswordRecoveryPage },
     ],
   },
+  // Onboarding del huésped (B2C): enlace único por alojamiento y reserva,
+  // sin cuenta ni sesión. La identidad visual es la del alojamiento.
+  { path: "/llegada/:lodgingId/:bookingId", Component: OnboardingPage },
   {
     path: "/panel",
     Component: ProtectedRoute,
@@ -45,6 +50,7 @@ export const routes = [
           { path: "alojamiento", Component: LodgingPage },
           { path: "disponibilidad", Component: AvailabilityPage },
           { path: "pagos", Component: PaymentMethodsPage },
+          { path: "servicios", Component: ServicesPage },
           { path: "perfil", Component: LodgingProfilePage },
         ],
       },
