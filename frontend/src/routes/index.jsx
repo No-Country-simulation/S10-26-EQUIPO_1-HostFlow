@@ -37,6 +37,7 @@ export const routes = [
   // Onboarding del huésped (B2C): enlace único por alojamiento y reserva,
   // sin cuenta ni sesión. La identidad visual es la del alojamiento.
   { path: "/llegada/:lodgingId/:bookingId", Component: OnboardingPage },
+  { path: "/reservations/confirm", Component: OnboardingPage },
   {
     path: "/panel",
     Component: ProtectedRoute,

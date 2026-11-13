@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { ArrowLeft, ArrowRight, Check, ClipboardList } from "lucide-react";
 import { Button, EmptyState, WhatsAppIcon } from "@components/ui";
 import { useBooking, useLodging, usePayments, useServices } from "@lib/api/hooks";
@@ -34,9 +34,12 @@ import { STEPS } from "../lib/steps";
 // del alojamiento (OnboardingShell + LodgingTheme).
 export default function OnboardingPage() {
   const { lodgingId, bookingId } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
+  const effectiveBookingId = token || bookingId;
   const { actions } = useSession();
   const lodging = useLodging();
-  const booking = useBooking(bookingId);
+  const booking = useBooking(effectiveBookingId);
   const services = useServices();
   const payments = usePayments();
   const bankDetails = payments?.bankDetails || {};
@@ -45,6 +48,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [started, setStarted] = useState(false);
   const [error, setError] = useState("");
+  const [loadingLink, setLoadingLink] = useState(Boolean(token && !DEMO_MODE));
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -76,19 +80,23 @@ export default function OnboardingPage() {
   // la reserva, los servicios y las formas de pago con sus credenciales.
   // En modo demo todo ya vive en el store del navegador.
   useEffect(() => {
-    if (DEMO_MODE || !lodgingId || !bookingId) return;
+    if (DEMO_MODE || (!token && (!lodgingId || !bookingId))) return;
     let alive = true;
+    setLoadingLink(true);
     Promise.resolve()
-      .then(() => actions.getOnboarding?.(lodgingId, bookingId))
+      .then(() => token ? actions.getOnboarding?.(token) : actions.getOnboarding?.(lodgingId, bookingId))
       .catch((err) => {
-        if (alive) console.warn("Onboarding:", err);
+        if (alive) setError(err?.message || "No se pudo cargar el enlace de llegada.");
+      })
+      .finally(() => {
+        if (alive) setLoadingLink(false);
       });
     return () => {
       alive = false;
     };
-  }, [actions, lodgingId, bookingId]);
+  }, [actions, lodgingId, bookingId, token]);
 
-  const linkValid = lodgingId === lodging.id;
+  const linkValid = token ? true : lodgingId === lodging.id;
   const availableServices = useMemo(() => services.filter((sv) => sv.enabled), [services]);
   // Fotos del alojamiento (0 a 4): una por paso, en el mismo orden del panel.
   const stepPhotos = Array.isArray(lodging.images) ? lodging.images : [];
@@ -292,7 +300,7 @@ export default function OnboardingPage() {
     try {
       const data = cleanGuest(guest);
       if (quote.wanted) {
-        actions.createBoatQuoteRequest(booking.id, {
+        await actions.createBoatQuoteRequest(booking.id, {
           guestName: data.guestName,
           guestEmail: data.guestEmail,
           guestPhone: data.guestPhone,
@@ -305,9 +313,9 @@ export default function OnboardingPage() {
           notes: quote.notes,
         });
       } else if (quote.decided) {
-        actions.declineBoatQuote(booking.id);
+        await actions.declineBoatQuote(booking.id);
       }
-      actions.submitOnboarding(booking.id, {
+      await actions.submitOnboarding(booking.id, {
         ...data,
         ...health,
         allergies: allergyList,
@@ -357,8 +365,8 @@ export default function OnboardingPage() {
       <OnboardingShell lodging={lodging}>
         <EmptyState
           icon={ClipboardList}
-          title="No encontramos tu reserva"
-          text="Este enlace de llegada ya no está disponible. Consultá con tu anfitrión."
+          title={loadingLink ? "Cargando tu reserva…" : "No encontramos tu reserva"}
+          text={loadingLink ? "Estamos verificando tu enlace de llegada." : error || "Este enlace de llegada ya no está disponible. Consultá con tu anfitrión."}
           action={
             <Link to="/" className="mt-2 inline-flex text-sm font-semibold text-teal-strong hover:text-teal">
               Volver al inicio

@@ -70,10 +70,31 @@ export function PaymentMethodModal({
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Field
+              label="Tipo de cuenta"
+              name="accountType"
+              defaultValue={editingMethod.keys?.accountType || ""}
+              placeholder="Ej. Caja de ahorro"
+            />
+            <Field
+              label="Número de cuenta"
+              name="accountNumber"
+              defaultValue={editingMethod.keys?.accountNumber || ""}
+              placeholder="Número de cuenta"
+            />
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <Field
               label="Correo / Usuario asociado"
               name="email"
               defaultValue={editingMethod.keys?.email || ""}
               placeholder="Ej. pagos@mihotel.com"
+            />
+            <Field
+              label="Teléfono de billetera"
+              name="phone"
+              defaultValue={editingMethod.keys?.phone || ""}
+              placeholder="Ej. +54 9 11 1234 5678"
             />
             <Field
               label="Enlace de cobro / PayPal.Me"

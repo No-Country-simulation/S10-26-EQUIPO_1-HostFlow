@@ -3,6 +3,18 @@ import { actions, store } from "../../state/store"
 import { toBooking } from "./shared"
 
 export const bookingsOps = {
+  getBookingById: {
+    project: (response) => {
+      const booking = toBooking(response)
+      const exists = store.get().bookings.some((item) => String(item.id) === String(booking.id))
+      actions.setBookings(exists
+        ? store.get().bookings.map((item) => String(item.id) === String(booking.id) ? booking : item)
+        : [...store.get().bookings, booking])
+      return booking
+    },
+    local: (id) => store.get().bookings.find((item) => String(item.id) === String(id)) || null,
+  },
+
   getBookings: {
     project: (response) => {
       if (Array.isArray(response)) actions.setBookings(response.map(toBooking))
@@ -55,10 +67,10 @@ export const bookingsOps = {
 
   regenerateOnboardingLink: {
     project: (response, id) => {
-      const issuedAt =
-        response?.onboardingLinkIssuedAt || response?.issuedAt || new Date().toISOString()
-      actions.updateBooking(id, { onboardingLinkIssuedAt: issuedAt })
-      return issuedAt
+      const link = response?.confirmationUrl ? response : response?.confirmationLink
+      const issuedAt = link?.createdAt || response?.onboardingLinkIssuedAt || new Date().toISOString()
+      actions.updateBooking(id, { onboardingLinkIssuedAt: issuedAt, confirmationLink: link })
+      return link || issuedAt
     },
     local: (id) => actions.regenerateOnboardingLink(id),
   },

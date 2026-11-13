@@ -1,6 +1,4 @@
-// Dueños de alojamiento (JWT). Auth y Owners son los únicos módulos ya
-// implementados en el backend; el listado de dueños se usa además como
-// respaldo de lectura de otros módulos pendientes.
+// Rutas de propietarios (JWT), usadas por el panel y la administración.
 import { ENDPOINTS as E } from "../endpoints"
 import { request } from "../httpClient"
 import { pathFor } from "./pathFor"

@@ -76,6 +76,9 @@ export default function PaymentMethodsPage() {
         holder: String(form.get("holder") || "").trim(),
         alias: String(form.get("alias") || "").trim(),
         cbu: String(form.get("cbu") || "").trim(),
+        bank: String(form.get("bank") || "").trim(),
+        accountType: String(form.get("accountType") || "").trim(),
+        accountNumber: String(form.get("accountNumber") || "").trim(),
         notes: String(form.get("notes") || "").trim(),
       }),
     );
@@ -154,9 +157,11 @@ export default function PaymentMethodsPage() {
       holder: String(form.get("holder") || "").trim(),
       alias: String(form.get("alias") || "").trim(),
       cbu: String(form.get("cbu") || "").trim(),
-      cvu: String(form.get("cvu") || "").trim(),
+      accountNumber: String(form.get("accountNumber") || "").trim(),
+      accountType: String(form.get("accountType") || "").trim(),
       bank: String(form.get("bank") || "").trim(),
       email: String(form.get("email") || "").trim(),
+      phone: String(form.get("phone") || "").trim(),
       paypalMe: String(form.get("paypalMe") || "").trim(),
       publicKey: String(form.get("publicKey") || "").trim(),
       accessToken: String(form.get("accessToken") || "").trim(),
@@ -166,6 +171,17 @@ export default function PaymentMethodsPage() {
     Object.keys(keys).forEach((k) => {
       if (!keys[k]) delete keys[k];
     });
+
+    const missingBankFields = ["holder", "bank", "accountType", "accountNumber", "cbu", "alias"].filter((key) => !keys[key])
+    if ((type === "BANK" || type === "TRANSFER") && missingBankFields.length) {
+      setModalError("Para una transferencia completá titular, banco, tipo y número de cuenta, CBU/CVU y alias.")
+      return
+    }
+    const walletIdentifier = keys.userIdentifier || keys.email || keys.paypalMe || keys.publicKey
+    if (type === "WALLET" && (!walletIdentifier || !keys.phone)) {
+      setModalError("Para una billetera digital completá el identificador de usuario y el teléfono asociado.")
+      return
+    }
 
     // Límite estricto: se vuelve a chequear acá porque el modal pudo quedar
     // abierto mientras otro usuario agregaba un método.
@@ -227,7 +243,7 @@ export default function PaymentMethodsPage() {
 
       {/* Moneda principal y secundarias */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <PrimaryCurrencyCard payments={payments} setPrimary={setPrimary} lodging={lodging} />
+        <PrimaryCurrencyCard payments={payments} setPrimary={setPrimary} lodging={lodging} editable={DEMO_MODE} />
 
         {/* Monedas secundarias */}
         <SecondaryCurrenciesCard payments={payments} toggleWallet={toggleWallet} />

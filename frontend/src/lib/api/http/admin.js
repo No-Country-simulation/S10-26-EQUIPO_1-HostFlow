@@ -5,15 +5,22 @@ import { toAdminLodging } from "../transforms"
 import { pathFor } from "./pathFor"
 
 export const adminApi = {
+  getOwnerMetrics: () => request(E.getOwnerMetrics, { name: "getOwnerMetrics" }),
+
   // Métricas agregadas del panel.
   getAdminStats: async () => {
-    const stats = await request(E.getAdminStats, { name: "getAdminStats" })
+    const [stats, owners] = await Promise.all([
+      request(E.getAdminStats, { name: "getAdminStats" }),
+      request(E.getAdminLodgings, { name: "getAllOwners" }),
+    ])
+    const total = Number(stats?.totalAccommodations ?? 0)
+    const inactive = Number(stats?.inactiveAccommodations ?? 0)
     return {
-      lodgings: Number(stats?.lodgings ?? 0),
-      active: Number(stats?.active ?? 0),
-      paused: Number(stats?.paused ?? 0),
-      hosts: Number(stats?.hosts ?? 0),
-      bookings: Number(stats?.bookings ?? 0),
+      lodgings: total,
+      active: Math.max(0, total - inactive),
+      paused: inactive,
+      hosts: Array.isArray(owners) ? new Set(owners.map((owner) => owner.email).filter(Boolean)).size : 0,
+      bookings: Number(stats?.totalCompletedReservations ?? 0),
     }
   },
 

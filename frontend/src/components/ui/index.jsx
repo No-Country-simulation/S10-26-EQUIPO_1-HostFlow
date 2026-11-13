@@ -407,17 +407,19 @@ export function Stat({ label, value, hint, tone = "lime", icon: Icon }) {
 
 // ── Switch ──────────────────────────────────────────────────────────────────
 
-export function Switch({ checked, onChange, label, description }) {
+export function Switch({ checked, onChange, label, description, disabled = false }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3">
+    <label className={cn("flex items-start gap-3", disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer")}>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         aria-label={label}
+        disabled={disabled}
         onClick={() => onChange?.(!checked)}
         className={cn(
           "relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors duration-200",
+          disabled && "cursor-not-allowed",
           checked ? "border-lime bg-lime" : "border-line-strong bg-overlay",
         )}
       >

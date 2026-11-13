@@ -1,33 +1,51 @@
 // Onboarding del huésped (B2C, enlace único).
 //
-// La lectura es PÚBLICA: el huésped no tiene token, así que getOnboarding va
-// sin Authorization. El resto de operaciones sí viajan con el JWT del panel.
+// Lectura y envío del onboarding son públicos: el token de enlace identifica
+// la reserva y no requiere una sesión de huésped.
 import { ENDPOINTS as E } from "../endpoints"
+import { ApiNotConfiguredError } from "../errors"
 import { request } from "../httpClient"
-import { pathFor } from "./pathFor"
 
 export const onboardingApi = {
-  getOnboarding: (lodgingId, bookingId) =>
-    request(pathFor(E.getOnboarding, { lodgingId, bookingId }), {
+  getOnboarding: (tokenOrLodgingId, bookingId) => {
+    if (bookingId !== undefined) throw new ApiNotConfiguredError("getOnboarding")
+    return request(E.getOnboarding, {
       name: "getOnboarding",
       auth: false,
-    }),
+      query: { token: tokenOrLodgingId },
+    })
+  },
 
-  // El enlace público trae lodgingId y bookingId; el panel llama solo con el
-  // bookingId, así que la fachada aporta el alojamiento (sale del store).
-  submitOnboarding: (lodgingId, bookingId, data) =>
-    request(pathFor(E.submitOnboarding, { lodgingId, bookingId }), {
+  // El token va como query parameter porque el backend usa un enlace público
+  // de un solo uso para leer y completar la ficha.
+  submitOnboarding: (token, data) =>
+    request(E.submitOnboarding, {
       name: "submitOnboarding",
-      body: data,
+      auth: false,
+      query: { token },
+      body: {
+        firstName: data.firstName || String(data.guestName || "").split(/\s+/)[0] || "",
+        lastName: data.lastName || String(data.guestName || "").split(/\s+/).slice(1).join(" "),
+        documentNumber: data.guestDocument || data.documentNumber,
+        email: data.guestEmail || data.email,
+        phone: data.guestPhone || data.phone,
+        allergies: Array.isArray(data.allergies) ? data.allergies : [],
+        preferences: data.preferences || "",
+        additionalServices: (data.selectedServices || []).map((service) => ({
+          serviceId: Number(service.serviceId ?? service.id),
+          quantity: Number(service.quantity || 1),
+        })),
+        boatTransferRequested: Boolean(data.boatTransferRequested ?? data.boatQuoteRequested),
+      },
     }),
 
-  // Solicitud de cotización de lancha: genera el JSON; NO lo envía a otra API.
-  createBoatQuoteRequest: (id, quote) =>
-    request(pathFor(E.createBoatQuoteRequest, { id }), {
-      name: "createBoatQuoteRequest",
-      body: quote,
-    }),
+  // El contrato del backend guarda solo el indicador boatTransferRequested;
+  // la cotización detallada del traslado queda en el estado de interfaz.
+  createBoatQuoteRequest: () => {
+    throw new ApiNotConfiguredError("createBoatQuoteRequest")
+  },
 
-  declineBoatQuote: (id) =>
-    request(pathFor(E.declineBoatQuote, { id }), { name: "declineBoatQuote" }),
+  declineBoatQuote: () => {
+    throw new ApiNotConfiguredError("declineBoatQuote")
+  },
 }

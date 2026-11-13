@@ -1,5 +1,5 @@
-// Rellena los placeholders de la ruta: pathFor(E.toggleBlockedDay, { date })
-//   → "/lodgings/mine/blocked-days/2026-10-30"
+// Rellena los placeholders de una ruta: pathFor(E.removeImage, { id })
+//   → "/owners/accommodation/gallery/12"
 export const pathFor = (endpoint, params = {}) => ({
   ...endpoint,
   path: Object.entries(params).reduce(

@@ -156,12 +156,6 @@ export default function ServicesPage() {
         <Badge tone="lime">{services.filter((s) => s.enabled).length} activo{services.filter((s) => s.enabled).length === 1 ? "" : "s"}</Badge>
       </header>
 
-      {!DEMO_MODE && (
-        <Alert tone="info">
-          El backend aún no expone el módulo de servicios: los cambios se guardan localmente en este navegador.
-        </Alert>
-      )}
-
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         {/* Listado */}
         <div className="grid content-start gap-4">

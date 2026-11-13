@@ -130,7 +130,7 @@ export default function BookingsPage() {
             <BookingSummaryCard
               key={booking.id}
               booking={booking}
-              onConfirm={(id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CONFIRMED"))}
+              onConfirm={DEMO_MODE ? (id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CONFIRMED")) : undefined}
               onCancel={(id) => guardAction("setBookingStatus", actions.setBookingStatus(id, "CANCELLED"))}
               onView={(id) => setDetailId(id)}
             />
