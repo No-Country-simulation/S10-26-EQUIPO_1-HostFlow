@@ -17,12 +17,6 @@ export function SessionProvider({ children }) {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (user) {
-      api.syncUserData().catch(() => null);
-    }
-  }, [user?.email, user?.role]);
-
   const value = useMemo(
     () => ({
       user,
