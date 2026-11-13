@@ -48,7 +48,6 @@ class CloudinaryImageServiceTest {
     }
 
     @Test
-    @Test
     void aceptaElLimiteMaximoParaLaValidacionDeTamano() {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "maxima.jpg", "image/jpeg", new byte[(int) MAX_BYTES]);
