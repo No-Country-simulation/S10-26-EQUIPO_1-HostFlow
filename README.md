@@ -60,7 +60,14 @@ El producto contempla las siguientes consideraciones:
 
 ## Equipo
 
-Este proyecto se ha llevado a cabo mediante trabajo colaborativo implementando la metodología ágil Scrum en el entorno de No Country (S10-26-Equipo-1).
+Este proyecto se ha llevado a cabo mediante trabajo colaborativo implementando la metodología ágil Scrum en el entorno de No Country (S10-26-Equipo-1). Los integrantes son:
+* Mary Sofía Pérez Gómez, QA Engineer & Project Manager
+* Pedro L. Acosta Pérez, QA Tester
+* Carlos Fernando Palacios Gracia, Backend Developer
+* Ana Roxana Marca Guzman, Backend Developer
+* Diego Armando Maza Churio, Frontend Developer
+* Jesús Hernández, Frontend Developer
+* Brayan Acosta, Frontend Developer
 
 ---
 
