@@ -74,6 +74,10 @@ export function getBookingRequirements(lodging, payments) {
     list.push({ key: "phone", label: "el WhatsApp del alojamiento", to: "/panel/perfil", page: "Perfil" });
   }
 
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(lodging?.email || "").trim())) {
+    list.push({ key: "email", label: "un correo de contacto válido para el alojamiento", to: "/panel/alojamiento", page: "Alojamiento" });
+  }
+
   const bank = payments?.bankDetails || {};
   const hasBankDetails = [bank.holder, bank.alias, bank.cbu].some((value) => String(value ?? "").trim() !== "");
   if (!hasEnabledMethod && !hasBankDetails) {

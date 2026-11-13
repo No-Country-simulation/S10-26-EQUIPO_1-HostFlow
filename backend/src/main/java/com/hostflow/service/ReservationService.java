@@ -193,7 +193,7 @@ public class ReservationService {
         return switch (m.getPaymentType()) {
             case BANK_TRANSFER -> notBlank(m.getBankName()) && notBlank(m.getAccountHolder()) &&
                     (notBlank(m.getCbuCvu()) || notBlank(m.getAccountNumber()) || notBlank(m.getAlias()));
-            case DIGITAL_WALLET -> notBlank(m.getProviderName()) &&
+            case DIGITAL_WALLET -> (notBlank(m.getProviderName()) || notBlank(m.getDisplayName())) &&
                     (notBlank(m.getUserIdentifier()) || notBlank(m.getWalletPhone()) || notBlank(m.getWalletEmail()) || notBlank(m.getAlias()));
             case CASH -> true;
             case CARD, OTHER -> notBlank(m.getInstructions()) || notBlank(m.getProviderName()) || notBlank(m.getAccountNumber());
