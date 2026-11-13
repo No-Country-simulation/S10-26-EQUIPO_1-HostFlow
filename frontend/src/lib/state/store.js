@@ -51,6 +51,7 @@ watchStorage((next) => {
 export const store = {
   get: () => state,
   subscribe,
+  setState,
 };
 
 // ── Acciones (demo) ─────────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ const delay = (ms = 320) => new Promise((resolve) => setTimeout(resolve, ms));
 const publicUser = ({ password, ...user }) => user;
 
 export const actions = {
+  setState,
   // Setea (o limpia) el usuario de la sesión.
   // Con el backend real es el login quien lo informa: el token viaja en los headers
   // pero el store necesita la identidad para proteger las rutas de la interfaz.
