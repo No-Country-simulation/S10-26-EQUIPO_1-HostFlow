@@ -26,8 +26,21 @@ const readForm = (form) => ({
   guests: Number(form.get("guests")),
 });
 
+const validateGuestName = (value) => {
+  if (!value) return "Ingresá el nombre y apellido del huésped.";
+  const [firstName, ...lastNameParts] = value.split(/\s+/);
+  const lastName = lastNameParts.join(" ");
+  if (firstName.length < 2 || firstName.length > 100) {
+    return "El nombre debe tener entre 2 y 100 caracteres.";
+  }
+  if (lastName.length < 2 || lastName.length > 100) {
+    return "Ingresá un apellido de entre 2 y 100 caracteres.";
+  }
+  return "";
+};
+
 const validateFields = (data) => ({
-  guestName: !data.guestName ? "Ingresá el nombre del huésped." : "",
+  guestName: validateGuestName(data.guestName),
   guestEmail: !data.guestEmail
     ? "Ingresá el correo del huésped."
     : !isEmail(data.guestEmail)
@@ -211,6 +224,7 @@ export function BookingFormModal({ open, onClose, onCreated }) {
           label="Nombre del huésped"
           name="guestName"
           placeholder="Ej. María González"
+          hint="Ingresá nombre y apellido para generar la reserva."
           autoFocus={requirements.length === 0}
           onChange={onFieldChange("guestName")}
           onBlur={onFieldBlur("guestName")}
