@@ -23,7 +23,7 @@ export const lodgingApi = {
     if (patch.brand?.primary) body.primaryColor = patch.brand.primary
     if (patch.brand?.accent) body.accentColor = patch.brand.accent
     if (patch.brand?.tertiary) body.tertiaryColor = patch.brand.tertiary
-    if (patch.brand?.radius) body.backgroundPattern = patch.brand.radius
+    if (patch.brand?.pattern) body.backgroundPattern = patch.brand.pattern
 
     try {
       return await request(E.updateLodging, { name: "updateLodging", body })
@@ -39,7 +39,7 @@ export const lodgingApi = {
             basePrice: Number(patch.pricePerNight ?? 85000),
             primaryColor: patch.brand?.primary || "#0fa3a3",
             accentColor: patch.brand?.accent || "#d4f53c",
-            backgroundPattern: patch.brand?.radius || "rounded",
+            backgroundPattern: patch.brand?.pattern || "none",
             welcomeMessage: patch.tagline || "",
             address: patch.location || "",
             phone: patch.phone || "",
@@ -56,7 +56,7 @@ export const lodgingApi = {
     if (patch.primary) body.primaryColor = patch.primary
     if (patch.accent) body.accentColor = patch.accent
     if (patch.tertiary) body.tertiaryColor = patch.tertiary
-    if (patch.radius) body.backgroundPattern = patch.radius
+    if (patch.pattern !== undefined) body.backgroundPattern = patch.pattern
     return request(E.updateBrand, { name: "updateBrand", body })
   },
 
