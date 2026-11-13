@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { BrandLogo, LogoMark, ThemeToggle, DemoBanner } from "@components/ui";
+import { BrandLogo, LogoMark, ThemeToggle } from "@components/ui";
 import { LodgingTheme } from "@lib/theme/LodgingTheme";
 
 // Shell de las páginas PÚBLICAS del huésped (onboarding B2C).
@@ -13,7 +13,6 @@ export default function OnboardingShell({ lodging, children, wide = false }) {
   return (
     <LodgingTheme brand={lodging?.brand} className="min-h-dvh text-ink">
       <div className="hf-surface flex min-h-dvh flex-col">
-        <DemoBanner />
 
         {/* Cabecera de marca: color plano del alojamiento (sin degradé) */}
         <header

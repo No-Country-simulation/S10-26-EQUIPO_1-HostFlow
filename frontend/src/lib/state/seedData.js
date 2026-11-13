@@ -9,7 +9,7 @@ import { onboardingLinkIssuedAt } from "@lib/domain/onboarding";
 
 const today = toISODate();
 
-const seedUsers = [
+export const seedUsers = [
   {
     id: "u_host",
     name: "Martina Silva",
@@ -25,6 +25,14 @@ const seedUsers = [
     password: "admin1234",
     role: "ADMIN",
     lodgingId: null,
+  },
+  {
+    id: "u_jesus",
+    name: "Jesús",
+    email: "jesus@hostflow.com",
+    password: "jesus1234",
+    role: "HOST",
+    lodgingId: "lod_1",
   },
 ];
 

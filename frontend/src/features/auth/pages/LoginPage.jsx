@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, LogIn, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowRight, LogIn } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import {
   Alert,
@@ -11,7 +11,6 @@ import {
 } from "@components/ui";
 import { isEmail } from "@utils/format";
 import { useSession } from "../context/SessionContext";
-import { DEMO_MODE } from "@lib/config/env";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -43,19 +42,6 @@ export default function LoginPage() {
       finish(user.role);
     } catch (err) {
       setError(err?.status === 401 ? "Correo o contraseña incorrectos." : err?.message || "No pudimos iniciar sesión.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const quickLogin = async (email) => {
-    setError("");
-    setLoading(true);
-    try {
-      const { user } = await actions.demoLogin(email);
-      finish(user.role);
-    } catch (err) {
-      setError(err?.message || "No pudimos iniciar sesión.");
     } finally {
       setLoading(false);
     }
@@ -103,25 +89,6 @@ export default function LoginPage() {
       <Link to="/auth/registro" className={buttonClass("secondary", "mt-4 w-full")}>
         Crear cuenta de alojamiento
       </Link>
-
-      {DEMO_MODE && (
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => quickLogin("anfitrion@hostflow.app")}
-            className="inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-cloud px-3 text-xs font-bold text-ink-soft transition-all hover:-translate-y-px hover:border-teal hover:text-teal-strong"
-          >
-            <UserRound size={15} /> Demo anfitrión
-          </button>
-          <button
-            type="button"
-            onClick={() => quickLogin("admin@hostflow.app")}
-            className="inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-cloud px-3 text-xs font-bold text-ink-soft transition-all hover:-translate-y-px hover:border-teal hover:text-teal-strong"
-          >
-            <ShieldCheck size={15} /> Demo admin
-          </button>
-        </div>
-      )}
 
       <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-muted">
         <LogIn size={13} /> Protegido con OTP y sesión segura

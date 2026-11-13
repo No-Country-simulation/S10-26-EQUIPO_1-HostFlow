@@ -1,11 +1,9 @@
 import { Outlet } from "react-router";
-import { Brand, DemoBanner, ThemeToggle } from "@components/ui";
+import { Brand, ThemeToggle } from "@components/ui";
 
 export default function AuthLayout() {
   return (
     <div className="flex min-h-dvh flex-col bg-paper text-ink">
-      <DemoBanner />
-
       <div className="relative grid flex-1 place-items-center overflow-hidden px-4 py-10">
         {/* Decoración */}
         <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">

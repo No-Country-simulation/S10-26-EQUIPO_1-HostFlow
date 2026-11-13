@@ -1,4 +1,3 @@
-import { DemoBanner } from "@components/ui";
 import { Header } from "../components/Header";
 import { Hero } from "../components/Hero";
 import { LogoMarquee } from "../components/LogoMarquee";
@@ -15,7 +14,6 @@ import { Footer } from "../components/Footer";
 export default function HomePage() {
   return (
     <div className="min-h-dvh bg-paper text-ink antialiased">
-      <DemoBanner />
       <Header />
       <Hero />
       <LogoMarquee />

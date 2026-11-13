@@ -6,12 +6,18 @@
 import { MAX_IMAGES, sanitizeBrand } from "@lib/domain/lodging";
 import { MAX_PAYMENT_METHODS } from "@lib/domain/payments";
 import { onboardingLinkIssuedAt } from "@lib/domain/onboarding";
-import { seedBookings, seedLodging, seedPayments, seedServices } from "./seedData";
+import { seedBookings, seedLodging, seedPayments, seedServices, seedUsers as defaultSeedUsers } from "./seedData";
 
 // Aplica migraciones/validaciones a un estado guardado por una versión previa
 // de la demo. Se usa al cargar y al recibir el estado de OTRA pestaña.
 export function normalizeStored(stored, fallback) {
   const merged = { ...fallback, ...stored };
+  // Asegurar que los usuarios del seed siempre existan (p.ej. al agregar un usuario nuevo al seed).
+  const storedUsers = Array.isArray(merged.users) ? merged.users : [];
+  const missingSeeds = defaultSeedUsers.filter(
+    (su) => !storedUsers.some((u) => u.id === su.id || u.email.toLowerCase() === su.email.toLowerCase()),
+  );
+  if (missingSeeds.length > 0) merged.users = [...storedUsers, ...missingSeeds];
   // Compatibilidad con estados guardados por versiones anteriores.
   merged.lodging = {
     ...seedLodging,
